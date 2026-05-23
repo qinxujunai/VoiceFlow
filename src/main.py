@@ -162,11 +162,16 @@ class VoiceInputSystem:
                         chunk = np.concatenate(buf, axis=0).flatten()
                         new_samples = len(chunk) - last_len
                         if new_samples > self.audio.sample_rate * 0.6 or last_len == 0:
+                            # Energy gate: skip transcription on silence
+                            new_audio = chunk[last_len:] if last_len > 0 else chunk
+                            window = min(len(new_audio), self.audio.sample_rate // 2)
+                            rms = float(np.sqrt(np.mean(new_audio[-window:].astype(np.float64)**2))) / 32768.0
+                            if rms < 0.008 and last_len > 0:
+                                continue
                             text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
                             last_len = len(chunk)
                             if text:
                                 self._latest_text = text
-                                # Use streaming-specific clean (no punctuation)
                                 clean = self.cleaner.clean_streaming(text)
                                 if clean:
                                     self.overlay.update_streaming(clean)
@@ -215,7 +220,8 @@ class VoiceInputSystem:
     # ---- 生命周期 ----
 
     def start(self):
-        ptt = self.config.get("hotkeys", {}).get("push_to_talk", "f2")
+        ptt_raw = self.config.get("hotkeys", {}).get("push_to_talk", "f2")
+        ptt = ptt_raw if isinstance(ptt_raw, str) else "+".join(ptt_raw)
         engine = self.config.get("engine", {}).get("active", "sensevoice")
         print(f"\n  VoiceFlow | {engine} | {ptt.upper()}=录音/停止  Esc=取消\n", flush=True)
 

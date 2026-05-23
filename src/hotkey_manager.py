@@ -7,6 +7,7 @@ import time
 import threading
 import keyboard
 import yaml
+from pynput import mouse
 
 
 class HotkeyManager:
@@ -32,9 +33,32 @@ class HotkeyManager:
         self._recording = False
         self._lock = threading.Lock()
         self._last_event_time = 0
+        self._mouse_listener = None
+        # Map pynput mouse buttons to config names
+        self._mouse_buttons = {
+            mouse.Button.x1: "xbutton1",
+            mouse.Button.x2: "xbutton2",
+        }
 
     def _on_ptt(self, event):
         if event.event_type != "down":
+            return
+        now = time.time()
+        with self._lock:
+            if now - self._last_event_time < 0.5:
+                return
+            self._last_event_time = now
+            self._recording = not self._recording
+            cb_name = "on_record_start" if self._recording else "on_record_stop"
+        cb = self.callbacks.get(cb_name)
+        if cb:
+            threading.Thread(target=cb, daemon=True).start()
+
+    def _on_mouse_click(self, x, y, button, pressed):
+        if not pressed:
+            return
+        btn_name = self._mouse_buttons.get(button)
+        if btn_name not in self.ptt_keys:
             return
         now = time.time()
         with self._lock:
@@ -56,15 +80,27 @@ class HotkeyManager:
             threading.Thread(target=cb, daemon=True).start()
 
     def start(self):
-        keyboard.on_press_key(self.ptt_key, self._on_f2, suppress=True)
+        mouse_keys = [k for k in self.ptt_keys if k in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
+        kb_keys = [k for k in self.ptt_keys if k not in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
+        for key in kb_keys:
+            keyboard.on_press_key(key, self._on_ptt, suppress=True)
+        if mouse_keys:
+            self._mouse_listener = mouse.Listener(on_click=self._on_mouse_click)
+            self._mouse_listener.start()
         keyboard.add_hotkey(self.cancel_key, self._on_cancel, suppress=False)
-        print(f"[热键] {self.ptt_key.upper()}=录音, {self.cancel_key}=取消", flush=True)
+        display_keys = "+".join(k.upper() for k in self.ptt_keys)
+        print(f"[热键] {display_keys}=录音, {self.cancel_key.upper()}=取消", flush=True)
 
     def stop(self):
         try:
             keyboard.unhook_all()
         except Exception:
             pass
+        if self._mouse_listener:
+            try:
+                self._mouse_listener.stop()
+            except Exception:
+                pass
 
     @property
     def is_recording(self):
