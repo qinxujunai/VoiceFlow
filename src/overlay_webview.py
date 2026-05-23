@@ -135,14 +135,11 @@ class OverlayWindow:
         if self._bridge:
             self._bridge.js_requested.emit(code)
 
-    def show_ready(self):
-        self._js("showReady()")
-
     def show_recording(self):
         self._js("showRecording()")
 
-    def show_transcribing(self):
-        self._js("showTranscribing()")
+    def show_processing(self):
+        self._js("showProcessing()")
 
     def show_result(self, text):
         self._js(f"showResult({json.dumps(text, ensure_ascii=False)})")
@@ -150,22 +147,14 @@ class OverlayWindow:
     def show_error(self, msg):
         self._js(f"showError({json.dumps(msg, ensure_ascii=False)})")
 
-    def show_cancelled(self):
-        self._js("showCancelled()")
-
-    def update_streaming(self, text):
-        self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)})")
-
-    def show_for_recording(self):
-        """线程安全：通过信号在主线程执行 window.show()"""
+    def show_window(self):
         if self._bridge:
             self._bridge.show_requested.emit()
 
-    def hide_after_result(self):
-        """线程安全：2秒后通过信号隐藏"""
+    def hide_after(self, ms=2000):
         if self._tray is None:
             return
-        QTimer.singleShot(2000, self._hide)
+        QTimer.singleShot(ms, self._hide)
 
 
 # ============================================================
