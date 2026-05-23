@@ -261,17 +261,43 @@ function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
 }
 
+function measureTextWidth(text) {
+    var w = 0;
+    for (var i = 0; i < text.length; i++) {
+        var c = text.charCodeAt(i);
+        // CJK + fullwidth: ~12px
+        if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
+            (c >= 0x3000 && c <= 0x303f) || (c >= 0xff00 && c <= 0xffef) ||
+            (c >= 0x2e80 && c <= 0x2eff) || (c >= 0x3300 && c <= 0x33bf) ||
+            (c >= 0xfe30 && c <= 0xfe4f) || (c >= 0xf900 && c <= 0xfaff)) {
+            w += 12;
+        } else if (c <= 0x7f) {
+            w += 6.8;  // ASCII
+        } else {
+            w += 8;    // other
+        }
+    }
+    return w;
+}
+
 function setWidthForText(text) {
     if (!text) {
         pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
         return;
     }
-    // Measure actual rendered width instead of guessing
-    // pill layout: mark(18px) + gap(8px) + pad-left(12px) + text + pad-right(12px) = 50px + text
-    txt.textContent = text;
-    var textWidth = txt.scrollWidth;
-    var width = clamp(50 + textWidth, MIN_WIDTH, MAX_WIDTH);
+    var est = measureTextWidth(text);
+    var width = clamp(50 + est, MIN_WIDTH, MAX_WIDTH);
     pill.style.setProperty('--target-width', width + 'px');
+    // Also measure actual after layout, refine next frame
+    requestAnimationFrame(function() {
+        if (txt.textContent === text) {
+            var real = txt.scrollWidth;
+            if (real > 0) {
+                var w2 = clamp(50 + real, MIN_WIDTH, MAX_WIDTH);
+                pill.style.setProperty('--target-width', w2 + 'px');
+            }
+        }
+    });
 }
 
 let _tickerTarget = 0;

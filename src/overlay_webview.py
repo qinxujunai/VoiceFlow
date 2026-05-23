@@ -97,11 +97,6 @@ class OverlayWindow:
         if self._on_ready:
             self._on_ready()
 
-        # Exit cleanly when terminal closes (Ctrl+C or window closed)
-        import signal
-        signal.signal(signal.SIGINT, lambda s, f: app.quit())
-        signal.signal(signal.SIGTERM, lambda s, f: app.quit())
-
         app.exec()
 
     # ============================================================

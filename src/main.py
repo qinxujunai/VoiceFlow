@@ -165,8 +165,14 @@ class VoiceInputSystem:
                             if text:
                                 self._latest_text = text
                                 clean = self.cleaner.clean(text)
+                                # Filter short English-only hallucinations
                                 if clean:
-                                    self.overlay.update_streaming(clean)
+                                    stripped = clean.strip()
+                                    ascii_chars = sum(1 for c in stripped if ord(c) < 128)
+                                    if ascii_chars == len(stripped) and len(stripped) <= 8:
+                                        pass  # skip short English-only (likely hallucination)
+                                    else:
+                                        self.overlay.update_streaming(clean)
                 except Exception:
                     pass
                 time.sleep(0.25)
