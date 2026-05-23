@@ -43,6 +43,12 @@ class HotkeyManager:
     def _on_ptt(self, event):
         if event.event_type != "down":
             return
+        self._trigger_ptt()
+
+    def _on_ptt_combo(self):
+        self._trigger_ptt()
+
+    def _trigger_ptt(self):
         now = time.time()
         with self._lock:
             if now - self._last_event_time < 0.5:
@@ -81,9 +87,12 @@ class HotkeyManager:
 
     def start(self):
         mouse_keys = [k for k in self.ptt_keys if k in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
-        kb_keys = [k for k in self.ptt_keys if k not in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
-        for key in kb_keys:
+        combo_keys = [k for k in self.ptt_keys if "+" in k]
+        single_keys = [k for k in self.ptt_keys if k not in mouse_keys and k not in combo_keys]
+        for key in single_keys:
             keyboard.on_press_key(key, self._on_ptt, suppress=True)
+        for combo in combo_keys:
+            keyboard.add_hotkey(combo, self._on_ptt_combo, suppress=True)
         if mouse_keys:
             self._mouse_listener = mouse.Listener(on_click=self._on_mouse_click)
             self._mouse_listener.start()
