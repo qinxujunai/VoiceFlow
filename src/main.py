@@ -136,7 +136,7 @@ class VoiceInputSystem:
                     buf = self.audio._audio_buffer
                     if buf:
                         chunk = np.concatenate(buf, axis=0).flatten()
-                        if len(chunk) > self.audio.sample_rate * 0.5:
+                        if len(chunk) > self.audio.sample_rate * 0.3:
                             text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
                             if text:
                                 self._latest_text = text
@@ -144,7 +144,7 @@ class VoiceInputSystem:
                                 self.overlay.update_streaming(clean)
                 except Exception:
                     pass
-                time.sleep(0.3)
+                time.sleep(0.18)
 
         threading.Thread(target=loop, daemon=True).start()
 
