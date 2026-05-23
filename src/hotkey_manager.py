@@ -1,5 +1,5 @@
 """
-快捷键：F2 / 鼠标侧键 / Ctrl+Shift+Space / 右 Ctrl 切换录音（按一下开始，再按一下停止），Esc 取消。
+快捷键：F2 / 鼠标侧键 / 右 Ctrl 切换录音（按一下开始，再按一下停止），Esc 取消。
 """
 
 import os
@@ -8,13 +8,7 @@ import threading
 import keyboard
 import yaml
 from pynput import mouse
-
-
-_KEY_MAP = {
-    "right_ctrl": "right ctrl",
-    "right_shift": "right shift",
-    "right_alt": "right alt",
-}
+from pynput import keyboard as pynput_keyboard
 
 
 class HotkeyManager:
@@ -41,6 +35,7 @@ class HotkeyManager:
         self._lock = threading.Lock()
         self._last_event_time = 0
         self._mouse_listener = None
+        self._pynput_kb_listener = None
         # Map pynput mouse buttons to config names
         self._mouse_buttons = {
             mouse.Button.x1: "xbutton1",
@@ -51,10 +46,6 @@ class HotkeyManager:
         if event.event_type != "down":
             return
         self._trigger_ptt()
-
-    def _on_combo_ptt(self):
-        self._trigger_ptt()
-
 
     def _trigger_ptt(self):
         now = time.time()
@@ -95,15 +86,19 @@ class HotkeyManager:
 
     def start(self):
         mouse_keys = [k for k in self.ptt_keys if k in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
-        combo_keys = [k for k in self.ptt_keys if "+" in k]
-        single_keys = [k for k in self.ptt_keys if k not in mouse_keys and "+" not in k]
+        # pynput distinguishes left/right Ctrl by virtual key code (unlike keyboard lib which uses scan code)
+        pynput_kb_keys = [k for k in self.ptt_keys if k == "right_ctrl"]
+        kb_keys = [k for k in self.ptt_keys if k not in mouse_keys and k != "right_ctrl"]
 
-        for key in single_keys:
-            key_name = _KEY_MAP.get(key, key)
-            keyboard.on_press_key(key_name, self._on_ptt, suppress=True)
+        for key in kb_keys:
+            keyboard.on_press_key(key, self._on_ptt, suppress=True)
 
-        for combo in combo_keys:
-            keyboard.add_hotkey(combo, self._on_combo_ptt, suppress=True)
+        if pynput_kb_keys:
+            def _on_pynput_kb_press(key):
+                if key == pynput_keyboard.Key.ctrl_r:
+                    self._trigger_ptt()
+            self._pynput_kb_listener = pynput_keyboard.Listener(on_press=_on_pynput_kb_press)
+            self._pynput_kb_listener.start()
 
         if mouse_keys:
             self._mouse_listener = mouse.Listener(on_click=self._on_mouse_click)
@@ -122,6 +117,11 @@ class HotkeyManager:
         if self._mouse_listener:
             try:
                 self._mouse_listener.stop()
+            except Exception:
+                pass
+        if self._pynput_kb_listener:
+            try:
+                self._pynput_kb_listener.stop()
             except Exception:
                 pass
 

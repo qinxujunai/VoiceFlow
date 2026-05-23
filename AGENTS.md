@@ -72,9 +72,9 @@ All push-to-talk keys are single keys — no combo keys. Keyboard keys use the `
 | `xbutton2` | mouse | side button (forward) |
 | `escape` | keyboard | cancel recording |
 
-### Hardware Limitation
+### Right Ctrl Implementation
 
-`right_ctrl` cannot be used on most Windows keyboards because left/right Ctrl share the same scan code (29). The `keyboard` library cannot distinguish them, and `suppress=True` on right ctrl blocks *all* Ctrl usage. See commit `7f1a7de`.
+`right_ctrl` is detected via `pynput.keyboard.Listener`, not the `keyboard` library. pynput uses virtual key codes (`VK_RCONTROL` = 0xA3) which are distinct from `VK_LCONTROL` even on keyboards where left/right Ctrl share the same scan code. The `keyboard` library cannot do this because it relies on scan codes only. Since right ctrl is rarely used in typing combos, no suppression is needed — the key press itself produces no character output, and the 0.5s debounce prevents accidental double-fires when used in combinations.
 
 ### Anti-pattern: Combo Keys
 

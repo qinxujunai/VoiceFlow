@@ -247,14 +247,14 @@ function setWidthForText(text) {
         return;
     }
     var est = measureTextWidth(text);
-    var width = clamp(50 + est, MIN_WIDTH, MAX_WIDTH);
+    var width = clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH);
     pill.style.setProperty('--target-width', width + 'px');
     // Also measure actual after layout, refine next frame
     requestAnimationFrame(function() {
         if (txt.textContent === text) {
             var real = txt.scrollWidth;
             if (real > 0) {
-                var w2 = clamp(50 + real, MIN_WIDTH, MAX_WIDTH);
+                var w2 = clamp(50 + real + 36, MIN_WIDTH, MAX_WIDTH);
                 pill.style.setProperty('--target-width', w2 + 'px');
             }
         }
@@ -281,11 +281,15 @@ function updateTickerOffset() {
         const overflow = Math.max(0, txt.scrollWidth - ticker.clientWidth);
         _tickerTarget = -overflow;
         ticker.classList.toggle('overflowing', overflow > 0);
+        if (overflow > 0) {
+            ticker.style.textAlign = 'left';
+        }
         _tickerRaf = requestAnimationFrame(smoothTicker);
     });
 }
 
 function showState(state, label) {
+        ticker.style.textAlign = '';
     pill.className = 'pill ' + state;
     // Reset any inline width lock from previous state.
     pill.style.width = '';
@@ -305,6 +309,7 @@ function showRecording() {
 
 function updateStreaming(text) {
     if (!text) return;
+    ticker.style.textAlign = 'center';
     pill.className = 'pill streaming';
     setWidthForText(text);
     updateTickerOffset();
@@ -315,6 +320,7 @@ function showProcessing() {
 }
 
 function showResult(msg) {
+        ticker.style.textAlign = '';
     pill.className = 'pill success';
     if (msg) {
         setWidthForText(msg);
