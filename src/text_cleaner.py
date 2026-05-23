@@ -188,7 +188,11 @@ class TextCleaner:
         # 去除非打印字符
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
 
-        return text.strip()
+        stripped = text.strip()
+        import unicodedata
+        if stripped and all(unicodedata.category(c).startswith("P") or c.isspace() for c in stripped):
+            return ""
+        return stripped
 
     def _strip_fillers(self, text: str) -> str:
         text = self.filler_pattern.sub("", text)
