@@ -293,7 +293,9 @@ function updateTickerOffset() {
 }
 
 function showState(state, label) {
-    pill.className = `pill ${state}`;
+    pill.className = 'pill ' + state;
+    // Reset any inline width lock from showCompleting
+    pill.style.width = '';
     txt.textContent = label || '';
     pill.style.setProperty('--ticker-offset', '0px');
     if (state === 'listening' || state === 'idle') {
