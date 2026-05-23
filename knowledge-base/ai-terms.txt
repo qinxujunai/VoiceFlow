@@ -1,0 +1,265 @@
+# AI/ML 专业术语热词表
+# 每行一个词，# 开头的行为注释
+# 格式：词汇 或 词汇/权重（权重越高越优先匹配）
+#
+# 更新时间: 2026-05-23
+# 说明: 覆盖 AI 领域高频术语，包括模型名、框架名、技术概念、公司/产品名
+
+# ============================================================
+# 大语言模型 / 基础模型
+# ============================================================
+LLM
+GPT
+GPT-4
+GPT-4o
+GPT-5
+Claude
+Claude 3
+Claude 4
+Gemini
+Gemini Pro
+Gemini Ultra
+LLaMA
+LLaMA 3
+LLaMA 4
+Qwen
+Qwen2
+Qwen3
+Qwen3.6
+DeepSeek
+DeepSeek-V3
+DeepSeek-R1
+MiMo
+Mistral
+Mixtral
+Phi
+Phi-4
+Grok
+Yi
+Baichuan
+GLM
+ChatGLM
+InternLM
+Falcon
+Command-R
+
+# ============================================================
+# 技术概念
+# ============================================================
+Transformer
+Attention
+Self-Attention
+Multi-Head Attention
+RAG
+RAG
+embedding
+vector database
+vector store
+fine-tuning
+fine-tune
+LoRA
+QLoRA
+PEFT
+RLHF
+DPO
+PPO
+SFT
+distillation
+quantization
+GGUF
+GPTQ
+AWQ
+ONNX
+TensorRT
+vLLM
+CUDA
+CUDA
+Flash Attention
+KV Cache
+Mixture of Experts
+MoE
+Chain of Thought
+CoT
+Few-Shot
+Zero-Shot
+In-Context Learning
+ICL
+Function Calling
+Tool Use
+Agent
+Multi-Agent
+ReAct
+Prompt Engineering
+System Prompt
+Temperature
+Top-P
+Top-K
+Token
+Tokenizer
+Context Window
+Context Length
+Hallucination
+Grounding
+Retrieval
+Augmented Generation
+
+# ============================================================
+# 框架和工具
+# ============================================================
+LangChain
+LlamaIndex
+Haystack
+Semantic Kernel
+AutoGen
+CrewAI
+DSPy
+Ollama
+llama.cpp
+vLLM
+TGI
+Triton
+ONNX Runtime
+TensorRT-LLM
+Hugging Face
+HuggingFace
+Transformers
+PyTorch
+TensorFlow
+JAX
+Keras
+scikit-learn
+XGBoost
+LightGBM
+CatBoost
+
+# ============================================================
+# 向量数据库 / 数据基础设施
+# ============================================================
+Milvus
+Pinecone
+Weaviate
+Qdrant
+Chroma
+ChromaDB
+pgvector
+FAISS
+Elasticsearch
+OpenSearch
+Redis
+Kafka
+Spark
+Flink
+Airflow
+dbt
+DuckDB
+ClickHouse
+Snowflake
+BigQuery
+Databricks
+
+# ============================================================
+# 多模态 / 图像 / 视频 / 音频
+# ============================================================
+Stable Diffusion
+SDXL
+DALL-E
+Midjourney
+ComfyUI
+Automatic1111
+Flux
+ControlNet
+LoRA
+CLIP
+BLIP
+SAM
+Segment Anything
+YOLO
+ResNet
+ViT
+Vision Transformer
+Whisper
+SenseVoice
+FireRedASR
+TTS
+ASR
+STT
+VAD
+Mel
+spectrogram
+MFCC
+
+# ============================================================
+# 云服务 / API
+# ============================================================
+OpenAI
+Anthropic
+Google AI
+Google Cloud
+Azure
+AWS
+AWS Bedrock
+Claude API
+GPT API
+Vertex AI
+SageMaker
+Replicate
+Together AI
+Groq
+Fireworks AI
+OpenRouter
+Cohere
+AI21
+Mistral API
+DeepSeek API
+
+# ============================================================
+# 开发工具 / 平台
+# ============================================================
+GitHub Copilot
+Cursor
+Windsurf
+Replit
+Vercel
+Next.js
+React
+FastAPI
+Flask
+Django
+Streamlit
+Gradio
+Chainlit
+Docker
+Kubernetes
+Terraform
+Ansible
+Jenkins
+GitHub Actions
+CI/CD
+
+# ============================================================
+# 中文语境高频词
+# ============================================================
+大模型
+大语言模型
+预训练
+微调
+推理
+部署
+蒸馏
+量化
+向量数据库
+知识库
+智能体
+提示词
+提示工程
+幻觉
+对齐
+安全
+护栏
+多模态
+语音识别
+语音合成
+图像生成
+文生图
+文生视频
+图生视频

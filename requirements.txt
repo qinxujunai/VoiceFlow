@@ -1,0 +1,29 @@
+# Local STT Toolkit - Python 依赖
+# 安装: pip install -r requirements.txt
+
+# 核心推理框架
+sherpa-onnx>=1.10.0
+
+# 音频采集
+sounddevice>=0.4.6
+soundfile>=0.12.1
+
+# 全局快捷键（真正拦截输入法）
+keyboard>=0.13.0
+
+# 文字输出
+pyautogui>=0.9.54
+pyperclip>=1.8.2
+
+# 配置文件
+pyyaml>=6.0
+
+# 模型下载
+huggingface_hub>=0.20.0
+
+# 音频处理（可选，用于重采样等）
+numpy>=1.24.0
+
+# UI 界面
+PyQt6>=6.5.0
+PyQt6-WebEngine>=6.5.0
