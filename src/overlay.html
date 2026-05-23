@@ -84,6 +84,11 @@ body {
     border-color: rgba(255, 179, 64, 0.22);
 }
 
+.pill.success {
+    animation: confirm 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-color: rgba(50, 215, 75, 0.22);
+}
+
 .pill.canceled {
     --target-width: 100px;
 }
@@ -108,17 +113,23 @@ body {
 .mark span:nth-child(2) { height: 12px; }
 .mark span:nth-child(3) { height: 8px; }
 
-.listening .mark span,
-.streaming .mark span {
+.listening .mark span:nth-child(1),
+.streaming .mark span:nth-child(1) {
     background: var(--red);
-    animation: voice 860ms ease-in-out infinite;
+    animation: bar1 720ms ease-in-out infinite;
 }
-
 .listening .mark span:nth-child(2),
-.streaming .mark span:nth-child(2) { animation-delay: 90ms; }
-
+.streaming .mark span:nth-child(2) {
+    background: var(--red);
+    animation: bar2 880ms ease-in-out infinite;
+    animation-delay: 140ms;
+}
 .listening .mark span:nth-child(3),
-.streaming .mark span:nth-child(3) { animation-delay: 180ms; }
+.streaming .mark span:nth-child(3) {
+    background: var(--red);
+    animation: bar3 790ms ease-in-out infinite;
+    animation-delay: 260ms;
+}
 
 .processing .mark span {
     background: var(--blue);
@@ -133,7 +144,7 @@ body {
     min-width: 0;
     color: var(--text);
     font-size: 13px;
-    font-weight: 450;
+    font-weight: 470;
     line-height: 1;
     white-space: nowrap;
 }
@@ -146,7 +157,6 @@ body {
 .ticker-text {
     display: inline-block;
     transform: translateX(var(--ticker-offset));
-    transition: transform 150ms linear;
 }
 
 .listening .ticker,
@@ -163,14 +173,55 @@ body {
     color: var(--text);
 }
 
-@keyframes voice {
-    0%, 100% { transform: scaleY(0.55); opacity: 0.62; }
-    50% { transform: scaleY(1.18); opacity: 1; }
+@keyframes bar1 {
+    0%, 100% { transform: scaleY(0.55); opacity: 0.55; }
+    50% { transform: scaleY(1.22); opacity: 1; }
+}
+@keyframes bar2 {
+    0%, 100% { transform: scaleY(0.60); opacity: 0.50; }
+    55% { transform: scaleY(1.15); opacity: 1; }
+}
+@keyframes bar3 {
+    0%, 100% { transform: scaleY(0.50); opacity: 0.60; }
+    45% { transform: scaleY(1.28); opacity: 1; }
+}
+
+@keyframes confirm {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.028); }
+    100% { transform: scale(1); }
 }
 
 @keyframes breathe {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.38; }
+}
+
+.processing .mark span {
+    background: var(--blue);
+    animation: spinPulse 900ms ease-in-out infinite;
+}
+.processing .mark span:nth-child(2) { animation-delay: 160ms; }
+.processing .mark span:nth-child(3) { animation-delay: 320ms; }
+
+@keyframes spinPulse {
+    0%, 70%, 100% { opacity: 0.28; transform: scaleY(0.6); }
+    35% { opacity: 1; transform: scaleY(1.0); }
+}
+
+.pill.completing {
+    border-color: rgba(100, 167, 255, 0.2);
+}
+
+.completing .mark span {
+    background: var(--blue);
+    animation: spinPulse 900ms ease-in-out infinite;
+}
+.completing .mark span:nth-child(2) { animation-delay: 160ms; }
+.completing .mark span:nth-child(3) { animation-delay: 320ms; }
+
+.completing .ticker {
+    color: var(--muted);
 }
 </style>
 </head>
@@ -203,11 +254,27 @@ function setWidthForText(text) {
     pill.style.setProperty('--target-width', `${width}px`);
 }
 
+let _tickerTarget = 0;
+let _tickerCurrent = 0;
+let _tickerRaf = 0;
+
+function smoothTicker() {
+    _tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;
+    pill.style.setProperty('--ticker-offset', `${_tickerCurrent}px`);
+    if (Math.abs(_tickerTarget - _tickerCurrent) > 0.4) {
+        _tickerRaf = requestAnimationFrame(smoothTicker);
+    } else {
+        pill.style.setProperty('--ticker-offset', `${_tickerTarget}px`);
+    }
+}
+
 function updateTickerOffset() {
+    cancelAnimationFrame(_tickerRaf);
     requestAnimationFrame(() => {
         const overflow = Math.max(0, txt.scrollWidth - ticker.clientWidth);
-        pill.style.setProperty('--ticker-offset', `${-overflow}px`);
+        _tickerTarget = -overflow;
         ticker.classList.toggle('overflowing', overflow > 0);
+        _tickerRaf = requestAnimationFrame(smoothTicker);
     });
 }
 
@@ -229,9 +296,12 @@ function showRecording() {
 
 function updateStreaming(text) {
     if (!text) return;
+    // Strip punctuation for clean streaming display
+    var display = text.replace(/[，。！？、；：""''…—~.,!?;:'"\-]/g, '').trim();
+    if (!display) return;
     pill.className = 'pill streaming';
-    txt.textContent = text;
-    setWidthForText(text);
+    txt.textContent = display;
+    setWidthForText(display);
     updateTickerOffset();
 }
 
@@ -239,8 +309,29 @@ function showProcessing() {
     showState('processing', '处理中');
 }
 
-function showResult(text) {
-    showState('success', '');
+function showCompleting() {
+    // Lock current width, switch bars to spinner, text stays or shows "..."
+    pill.className = 'pill completing';
+    var curWidth = pill.offsetWidth;
+    pill.style.setProperty('--target-width', curWidth + 'px');
+    pill.style.width = curWidth + 'px';
+    if (!txt.textContent) {
+        txt.textContent = '';
+    }
+    pill.style.setProperty('--ticker-offset', '0px');
+}
+
+function showResult(msg) {
+    pill.className = 'pill success';
+    if (msg) {
+        txt.textContent = msg;
+        setWidthForText(msg);
+        updateTickerOffset();
+    } else {
+        txt.textContent = '';
+        pill.style.setProperty('--ticker-offset', '0px');
+        setWidthForText('');
+    }
 }
 
 function showError(message) {
