@@ -35,15 +35,19 @@ class OverlayWindow:
         self._on_copy_last = None
         self._on_repaste_last = None
         self._on_open_dictionary = None
+        self._on_quit = None
         self._html_path = os.path.join(os.path.dirname(__file__), "overlay.html")
         self._on_ready = None
         self._window_width = 380
         self._window_height = 48
+        self._tray_menu = None
+        self._tray_actions = []
 
-    def set_actions(self, on_copy_last=None, on_repaste_last=None, on_open_dictionary=None):
+    def set_actions(self, on_copy_last=None, on_repaste_last=None, on_open_dictionary=None, on_quit=None):
         self._on_copy_last = on_copy_last
         self._on_repaste_last = on_repaste_last
         self._on_open_dictionary = on_open_dictionary
+        self._on_quit = on_quit
 
     def start(self, on_ready=None):
         self._on_ready = on_ready
@@ -116,24 +120,37 @@ class OverlayWindow:
         self._tray.setToolTip("VoiceFlow")
         self._tray.setVisible(True)
 
-        menu = QMenu()
-        show_act = QAction("显示窗口")
+        self._tray_menu = QMenu()
+        self._tray_actions = []
+
+        show_act = QAction("显示窗口", self._tray_menu)
         show_act.triggered.connect(self._show)
-        menu.addAction(show_act)
-        copy_last_act = QAction("复制上一次结果")
+        self._tray_menu.addAction(show_act)
+        self._tray_actions.append(show_act)
+
+        copy_last_act = QAction("复制上一次结果", self._tray_menu)
         copy_last_act.triggered.connect(self._copy_last)
-        menu.addAction(copy_last_act)
-        repaste_last_act = QAction("重新粘贴上一次结果")
+        self._tray_menu.addAction(copy_last_act)
+        self._tray_actions.append(copy_last_act)
+
+        repaste_last_act = QAction("重新粘贴上一次结果", self._tray_menu)
         repaste_last_act.triggered.connect(self._repaste_last)
-        menu.addAction(repaste_last_act)
-        dictionary_act = QAction("打开词库")
+        self._tray_menu.addAction(repaste_last_act)
+        self._tray_actions.append(repaste_last_act)
+
+        dictionary_act = QAction("打开词库", self._tray_menu)
         dictionary_act.triggered.connect(self._open_dictionary)
-        menu.addAction(dictionary_act)
-        menu.addSeparator()
-        quit_act = QAction("退出")
+        self._tray_menu.addAction(dictionary_act)
+        self._tray_actions.append(dictionary_act)
+
+        self._tray_menu.addSeparator()
+
+        quit_act = QAction("退出", self._tray_menu)
         quit_act.triggered.connect(self.quit)
-        menu.addAction(quit_act)
-        self._tray.setContextMenu(menu)
+        self._tray_menu.addAction(quit_act)
+        self._tray_actions.append(quit_act)
+
+        self._tray.setContextMenu(self._tray_menu)
         self._tray.activated.connect(self._on_tray_activated)
 
     def _on_tray_activated(self, reason):
@@ -191,7 +208,11 @@ class OverlayWindow:
     def quit(self):
         if self._tray:
             self._tray.setVisible(False)
-        QApplication.instance().quit()
+        if self._on_quit:
+            self._on_quit()
+        app = QApplication.instance()
+        if app:
+            app.quit()
 
     # ============================================================
     # 对外接口 — 线程安全（通过 _Bridge 信号）
@@ -217,14 +238,6 @@ class OverlayWindow:
         display = display_for_state(UiState.PROCESSING)
         self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
 
-
-    def show_done(self):
-        self._tray_state(TRAY_ICON_IDLE)
-        self._js("showDone()")
-
-    def show_completing(self):
-        self._tray_state(TRAY_ICON_PROCESSING)
-        self._js("showCompleting()")
 
     def show_result(self, text):
         self._js(f"showResult({json.dumps(text, ensure_ascii=False)})")

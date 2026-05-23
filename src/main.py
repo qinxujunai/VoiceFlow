@@ -41,7 +41,7 @@ class _InitWorker(threading.Thread):
 class VoiceInputSystem:
 
     def __init__(self, config_path=None):
-        self.base_dir = os.path.dirname(os.path.dirname(__file__))
+        self.base_dir = self._resolve_base_dir(config_path)
         if config_path is None:
             config_path = os.path.join(self.base_dir, "config.yaml")
         with open(config_path, "r", encoding="utf-8") as f:
@@ -50,10 +50,29 @@ class VoiceInputSystem:
         self.config_path = config_path
         self._is_processing = False
         self._actively_recording = False
+        self._shutdown_started = False
         self._streaming = False
         self._latest_text = ""  # 后台转写的最新结果
         self.overlay = OverlayWindow()
         self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
+
+    def _resolve_base_dir(self, config_path=None):
+        if config_path:
+            return os.path.dirname(os.path.abspath(config_path))
+
+        dev_root = os.path.dirname(os.path.dirname(__file__))
+        if not getattr(sys, "frozen", False):
+            return dev_root
+
+        candidates = [
+            os.getcwd(),
+            os.path.dirname(sys.executable),
+            getattr(sys, "_MEIPASS", ""),
+        ]
+        for candidate in candidates:
+            if candidate and os.path.exists(os.path.join(candidate, "config.yaml")):
+                return candidate
+        return os.path.dirname(sys.executable)
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
@@ -74,6 +93,7 @@ class VoiceInputSystem:
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
             on_open_dictionary=self._open_dictionary,
+            on_quit=self.shutdown,
         )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
@@ -92,6 +112,7 @@ class VoiceInputSystem:
             self._start_streaming()
             print("[录音] 开始", flush=True)
         except Exception as e:
+            self._actively_recording = False
             self.overlay.show_error(str(e))
             print(f"[错误] {e}", flush=True)
 
@@ -153,7 +174,17 @@ class VoiceInputSystem:
                     if buf:
                         chunk = np.concatenate(buf, axis=0).flatten()
                         new_samples = len(chunk) - last_len
-                        if new_samples > self.audio.sample_rate * 0.6 or last_len == 0:
+                        elapsed = len(chunk) / self.audio.sample_rate
+                        if elapsed < 30:
+                            min_new_seconds = 0.6
+                        elif elapsed < 120:
+                            min_new_seconds = 2.0
+                        elif elapsed < 300:
+                            min_new_seconds = 8.0
+                        else:
+                            min_new_seconds = 20.0
+
+                        if new_samples > self.audio.sample_rate * min_new_seconds or last_len == 0:
                             # Energy gate: skip transcription on silence
                             new_audio = chunk[last_len:] if last_len > 0 else chunk
                             window = min(len(new_audio), self.audio.sample_rate // 2)
@@ -223,8 +254,26 @@ class VoiceInputSystem:
         engine = self.config.get("engine", {}).get("active", "sensevoice")
         print(f"\n  VoiceFlow | {engine} | {ptt.upper()}=录音/停止  Esc=取消\n", flush=True)
 
+        self._install_console_handler()
         self.overlay.start(on_ready=self._on_overlay_ready)
         self.shutdown()
+
+    def _install_console_handler(self):
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+
+            handler_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
+
+            def handler(ctrl_type):
+                self.shutdown()
+                return False
+
+            self._console_handler_ref = handler_type(handler)
+            ctypes.windll.kernel32.SetConsoleCtrlHandler(self._console_handler_ref, True)
+        except Exception:
+            pass
 
     def _on_overlay_ready(self):
         from PyQt6.QtCore import QTimer
@@ -255,6 +304,18 @@ class VoiceInputSystem:
         self.hotkey_mgr.start()
 
     def shutdown(self):
+        if self._shutdown_started:
+            return
+        self._shutdown_started = True
+
+        self._stop_streaming()
+        if self._actively_recording and hasattr(self, "session"):
+            try:
+                self.session.cancel()
+            except Exception:
+                pass
+            self._actively_recording = False
+
         if hasattr(self, "hotkey_mgr"):
             self.hotkey_mgr.stop()
         print("\n[系统] 已退出", flush=True)

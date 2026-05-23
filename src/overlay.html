@@ -197,46 +197,6 @@ body {
     50% { opacity: 0.38; }
 }
 
-.processing .mark span {
-    background: var(--blue);
-    animation: spinPulse 900ms ease-in-out infinite;
-}
-.processing .mark span:nth-child(2) { animation-delay: 160ms; }
-.processing .mark span:nth-child(3) { animation-delay: 320ms; }
-
-@keyframes spinPulse {
-    0%, 70%, 100% { opacity: 0.28; transform: scaleY(0.6); }
-    35% { opacity: 1; transform: scaleY(1.0); }
-}
-
-.pill.completing {
-    border-color: rgba(100, 167, 255, 0.2);
-}
-
-.completing .mark span {
-    background: var(--blue);
-    animation: spinPulse 900ms ease-in-out infinite;
-}
-.completing .mark span:nth-child(2) { animation-delay: 160ms; }
-.completing .mark span:nth-child(3) { animation-delay: 320ms; }
-
-
-.pill.done {
-    border-color: rgba(50, 215, 75, 0.22);
-}
-
-.done .mark span {
-    background: var(--green);
-    animation: none;
-    opacity: 1;
-}
-.done .mark span:nth-child(1) { height: 8px; }
-.done .mark span:nth-child(2) { height: 12px; }
-.done .mark span:nth-child(3) { height: 7px; }
-
-.completing .ticker {
-    color: var(--muted);
-}
 </style>
 </head>
 <body>
@@ -281,6 +241,7 @@ function measureTextWidth(text) {
 }
 
 function setWidthForText(text) {
+    txt.textContent = text || '';
     if (!text) {
         pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
         return;
@@ -326,7 +287,7 @@ function updateTickerOffset() {
 
 function showState(state, label) {
     pill.className = 'pill ' + state;
-    // Reset any inline width lock from showCompleting
+    // Reset any inline width lock from previous state.
     pill.style.width = '';
     txt.textContent = label || '';
     pill.style.setProperty('--ticker-offset', '0px');
@@ -351,29 +312,6 @@ function updateStreaming(text) {
 
 function showProcessing() {
     showState('processing', '处理中');
-}
-
-function showCompleting() {
-    // Lock current width, switch bars to spinner, text stays
-    pill.className = 'pill completing';
-    var curWidth = pill.offsetWidth;
-    pill.style.setProperty('--target-width', curWidth + 'px');
-    pill.style.width = curWidth + 'px';
-    if (!txt.textContent) {
-        txt.textContent = '';
-    }
-    pill.style.setProperty('--ticker-offset', '0px');
-}
-
-function showDone() {
-    // Green checkmark bars, keep width locked, then hide
-    pill.className = 'pill done';
-    txt.textContent = '';
-    pill.style.setProperty('--ticker-offset', '0px');
-    setWidthForText('');
-    setTimeout(function() {
-        pill.className = 'pill idle';
-    }, 300);
 }
 
 function showResult(msg) {

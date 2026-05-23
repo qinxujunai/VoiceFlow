@@ -12,7 +12,6 @@ import time
 import yaml
 import pyperclip
 import pyautogui
-import threading
 
 # 禁用 pyautogui 的安全暂停（我们自己控制）
 pyautogui.PAUSE = 0.01

@@ -11,7 +11,7 @@ echo  ========================================
 echo.
 echo    Free - Open Source - Offline
 echo.
-echo    [F2 / MouseSideBtn] Start / Stop dictation
+echo    [F2 / MouseSideButtons] Start / Stop dictation
 echo    [Esc] Cancel
 echo.
 echo  ========================================
