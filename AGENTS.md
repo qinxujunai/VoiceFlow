@@ -131,7 +131,9 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Known Issues
 
-- **Pill flash on new recording.** After a recording ends and the pill hides, starting a new recording may briefly show the pill at the previous width before it snaps to the minimum listening width. Root cause involves the timing between Qt window visibility and WebEngine JavaScript execution. `_hide_and_idle` uses `runJavaScript` with a callback to set idle state before hiding, and `showState` now calls `removeProperty('--target-width')` to clear inline width. The issue persists in some fast-restart scenarios. Future investigation should focus on ensuring the pill CSS `--target-width` is reset synchronously before `window.show()`.
+- **Pill flash on new recording.** After a recording ends and the pill hides, starting a new recording may briefly show the pill at the previous width before it snaps to the minimum listening width. Root cause involves the timing between Qt window visibility and WebEngine JavaScript execution. Future investigation should focus on ensuring the pill CSS `--target-width` is reset synchronously before `window.show()`.
+
+- **Final text overwritten by streaming preview.** The streaming thread could send one last `updateStreaming` after `_stop_streaming()` returned, overwriting the final transcription shown by `show_result`. Fixed: `_start_streaming` saves the thread as `self._stream_thread`; `_stop_streaming` now calls `self._stream_thread.join(timeout=2.0)` to wait for the streaming loop to fully exit before proceeding to final transcription and result display.
 
 ## Coding Rules
 
