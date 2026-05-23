@@ -9,6 +9,8 @@
 import re
 import os
 
+from vocabulary import Vocabulary
+
 
 class TextCleaner:
     """ASR 输出文本清理器。所有规则通过 config.yaml 控制开关。"""
@@ -35,6 +37,11 @@ class TextCleaner:
             r"(?<=[a-zA-Z0-9])(?=[\u4e00-\u9fff\u3400-\u4dbf])"
         )
 
+        self.vocabulary = None
+        if base_dir:
+            hotword_files = config.get("hotwords", {}).get("files") if config else None
+            self.vocabulary = Vocabulary(base_dir, files=hotword_files)
+
         # --- 修正词表：音近词 → 正确形式 ---
         self.corrections = self._build_corrections(base_dir)
 
@@ -55,16 +62,14 @@ class TextCleaner:
         corrections = {
             # 开发工具 / AI 产品
             "科瑟": "Cursor", "扣瑟": "Cursor", "克瑟": "Cursor",
-            "cursor": "Cursor", "coach": "Cursor",
+            "coach": "Cursor",
             "云代码": "Cloud Code", "cloud code": "Cloud Code", "cloudcode": "Cloud Code",
-            "克劳德": "Claude", "cloud": "Claude",
+            "克劳德": "Claude",
             "开放代码": "OpenCode", "open code": "OpenCode", "opencode": "OpenCode",
             "coach code": "Codex", "扣dex": "Codex", "扣戴克斯": "Codex",
             "且gpt": "ChatGPT", "chat gpt": "ChatGPT",
-            "扣派乐特": "Copilot", "copilot": "Copilot", "copilot": "Copilot",
+            "扣派乐特": "Copilot", "copilot": "Copilot",
             "哈斯": "Hermes", "赫密斯": "Hermes",
-            "赫讯": "赫讯",  # 飞书机器人名
-            "小龙虾": "小龙虾",
             "温德瑟夫": "Windsurf",
 
             # 大模型 / AI
@@ -85,10 +90,9 @@ class TextCleaner:
             "go浪": "Golang", "狗浪": "Golang",
             "js": "JavaScript",
             "ts": "TypeScript",
-            "rest": "Rust", "拉斯特": "Rust",
+            "拉斯特": "Rust",
             "c加加": "C++", "c plus plus": "C++",
             "react": "React",
-            "view": "Vue",
             "next js": "Next.js", "nex js": "Next.js",
             "fast api": "FastAPI", "fastapi": "FastAPI",
             "docker": "Docker", "多克": "Docker",
@@ -104,7 +108,7 @@ class TextCleaner:
             "微调": "微调", "fine tuning": "fine-tuning",
             "劳拉": "LoRA", "lora": "LoRA",
             "库达": "CUDA", "cuda": "CUDA",
-            "托肯": "token", "token": "token",
+            "托肯": "token",
             "哈鲁斯内选": "hallucination", "幻觉": "幻觉",
             "语音识别": "ASR", "asr": "ASR",
             "stt": "STT",
@@ -131,24 +135,8 @@ class TextCleaner:
             "sql": "SQL",
         }
 
-        # --- 从 knowledge-base 加载自定义修正 ---
-        if base_dir:
-            kw_dir = os.path.join(base_dir, "knowledge-base")
-            custom_path = os.path.join(kw_dir, "user-custom.txt")
-            if os.path.exists(custom_path):
-                for line in self._read_lines(custom_path):
-                    if "=" in line:
-                        wrong, correct = line.split("=", 1)
-                        corrections[wrong.strip().lower()] = correct.strip()
-
-            # 也从 ai-terms.txt 加载：每个词如果小写后长度足够，也作为自身修正
-            ai_terms = os.path.join(kw_dir, "ai-terms.txt")
-            if os.path.exists(ai_terms):
-                for word in self._read_lines(ai_terms):
-                    if len(word) > 2 and " " not in word:
-                        lw = word.lower()
-                        if word != lw:
-                            corrections[lw] = word
+        if self.vocabulary:
+            corrections.update(self.vocabulary.corrections)
 
         return corrections
 
@@ -164,10 +152,12 @@ class TextCleaner:
         return lines
 
     def add_correction(self, wrong: str, correct: str, base_dir=None):
-        """运行时添加修正对，持久化到 user-custom.txt"""
-        self.corrections[wrong.lower().strip()] = correct.strip()
-        if base_dir:
-            path = os.path.join(base_dir, "knowledge-base", "user-custom.txt")
+        """运行时添加修正对，持久化到 corrections.txt"""
+        self.corrections[wrong.strip()] = correct.strip()
+        if self.vocabulary:
+            self.vocabulary.add_correction(wrong, correct)
+        elif base_dir:
+            path = os.path.join(base_dir, "knowledge-base", "corrections.txt")
             with open(path, "a", encoding="utf-8") as f:
                 f.write(f"{wrong}={correct}\n")
 

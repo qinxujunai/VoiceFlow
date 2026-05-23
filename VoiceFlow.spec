@@ -8,7 +8,7 @@ VoiceFlow PyInstaller 打包配置
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(SPECPATH)
 
 a = Analysis(
     [str(PROJECT_ROOT / "src" / "main.py")],
@@ -28,7 +28,7 @@ a = Analysis(
         "sherpa_onnx",
         "sounddevice",
         "numpy",
-        "pynput",
+        "keyboard",
         "pyperclip",
         "pyautogui",
         "yaml",
@@ -37,7 +37,6 @@ a = Analysis(
         "PyQt6.QtCore",
         "PyQt6.QtGui",
         "PyQt6.QtWidgets",
-        "tkinter",
     ],
     hookspath=[],
     hooksconfig={},
@@ -76,5 +75,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # TODO: 加图标
+    icon=None,  # runtime tray icon is generated in src/tray_icon.py
 )

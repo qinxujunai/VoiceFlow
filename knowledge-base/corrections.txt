@@ -1,0 +1,14 @@
+# ASR correction pairs.
+# Format: wrong=correct
+科瑟=Cursor
+扣瑟=Cursor
+克瑟=Cursor
+迪普斯克=DeepSeek
+迪普西克=DeepSeek
+扣问=Qwen
+千问=Qwen
+兰钦=LangChain
+拍桑=Python
+拍森=Python
+快思考=Claude
+扣戴克斯=Codex

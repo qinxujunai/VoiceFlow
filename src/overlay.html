@@ -4,173 +4,239 @@
 <meta charset="utf-8"/>
 <style>
 :root {
-    --bg: rgba(30,30,32,0.96);
-    --red: #ff375f;
-    --green: #30d158;
-    --gold: #ff9f0a;
+    --bg: rgba(24, 24, 26, 0.88);
+    --line: rgba(255, 255, 255, 0.09);
     --text: #f5f5f7;
-    --muted: #8e8e93;
+    --muted: rgba(245, 245, 247, 0.54);
+    --red: #ff453a;
+    --blue: #64a7ff;
+    --gold: #ffb340;
+    --green: #32d74b;
+    --target-width: 92px;
+    --ticker-offset: 0px;
 }
 
-* { margin:0; padding:0; box-sizing:border-box; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+}
 
 body {
-    font-family: -apple-system, 'SF Pro Display', 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    background: transparent; overflow: hidden; user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
+    user-select: none;
 }
 
 .pill {
-    display: inline-flex; align-items: center; gap: 10px;
-    height: 46px; padding: 0 16px;
+    width: var(--target-width);
+    height: 34px;
+    max-width: 340px;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-radius: 17px;
     background: var(--bg);
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
-    border-radius: 23px;
-    border: 0.5px solid rgba(255,255,255,0.08);
+    border: 0.5px solid var(--line);
     box-shadow:
-        0 8px 32px rgba(0,0,0,0.4),
-        inset 0 0.5px 0 rgba(255,255,255,0.04);
-    min-width: 150px; max-width: 650px;
-    transition: min-width 0.25s cubic-bezier(0.22,0.61,0.36,1), box-shadow 0.3s ease, border-color 0.3s ease;
+        0 5px 14px rgba(0, 0, 0, 0.20),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    transform-origin: center center;
+    transition:
+        width 150ms cubic-bezier(0.22, 0.72, 0.22, 1),
+        border-color 140ms ease,
+        opacity 120ms ease;
 }
 
-.pill.rec  { border-color: rgba(255,55,95,0.2); }
-.pill.proc { border-color: rgba(255,159,10,0.2); }
-.pill.done { border-color: rgba(48,209,88,0.15); }
-
-/* ---- 波形 ---- */
-.wave {
-    display: flex; align-items: flex-end; gap: 2.5px; height: 22px; flex-shrink: 0;
+.pill.idle {
+    opacity: 0;
 }
-.wave .b {
-    width: 3px; border-radius: 1.5px;
+
+.pill.listening {
+    --target-width: 86px;
+    border-color: rgba(255, 69, 58, 0.18);
+}
+
+.pill.streaming {
+    border-color: rgba(255, 69, 58, 0.16);
+}
+
+.pill.processing {
+    --target-width: 112px;
+    border-color: rgba(100, 167, 255, 0.18);
+}
+
+.pill.error {
+    --target-width: 210px;
+    border-color: rgba(255, 179, 64, 0.22);
+}
+
+.pill.canceled {
+    --target-width: 100px;
+}
+
+.mark {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.mark span {
+    width: 2px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--muted);
+    transition: height 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.mark span:nth-child(2) { height: 12px; }
+.mark span:nth-child(3) { height: 8px; }
+
+.listening .mark span,
+.streaming .mark span {
     background: var(--red);
-    animation: w 1.4s ease-in-out infinite;
-}
-.wave .b:nth-child(1){height:6px;animation-delay:0.00s}
-.wave .b:nth-child(2){height:14px;animation-delay:0.10s}
-.wave .b:nth-child(3){height:20px;animation-delay:0.20s}
-.wave .b:nth-child(4){height:12px;animation-delay:0.30s}
-.wave .b:nth-child(5){height:18px;animation-delay:0.40s}
-.wave .b:nth-child(6){height:8px;animation-delay:0.50s}
-.wave .b:nth-child(7){height:16px;animation-delay:0.60s}
-.wave .b:nth-child(8){height:10px;animation-delay:0.70s}
-.wave .b:nth-child(9){height:15px;animation-delay:0.80s}
-
-@keyframes w {
-    0%,100%{transform:scaleY(0.4);opacity:0.6}
-    50%{transform:scaleY(1.15);opacity:1}
-}
-.pill.proc .wave .b { background: var(--gold); }
-
-/* ---- 圆点 ---- */
-.dot {
-    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
-    transition: background 0.3s, box-shadow 0.3s;
-}
-.dot.rec {
-    background: var(--red); box-shadow: 0 0 6px rgba(255,55,95,0.5);
-    animation: pu 1.2s ease-in-out infinite;
-}
-.dot.proc {
-    background: var(--gold); box-shadow: 0 0 6px rgba(255,159,10,0.5);
-    animation: pu 0.7s ease-in-out infinite;
-}
-.dot.ok  { background: var(--green); }
-.dot.err { background: var(--red); }
-@keyframes pu { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.25;transform:scale(0.5)} }
-
-/* ---- 文字 ---- */
-.text {
-    font-size: 14px; font-weight: 430; letter-spacing: 0.1px;
-    color: var(--text); white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; min-width: 0; line-height: 1.1;
-}
-.text.hint { color: var(--muted); font-size: 13px; }
-.text.result { color: var(--green); }
-.text.stream { direction: rtl; text-align: left; }
-
-/* ---- 分隔 ---- */
-.sep {
-    width: 0.5px; height: 16px; background: rgba(255,255,255,0.1);
-    border-radius: 1px; flex-shrink: 0;
+    animation: voice 860ms ease-in-out infinite;
 }
 
-.hidden { display: none !important; }
+.listening .mark span:nth-child(2),
+.streaming .mark span:nth-child(2) { animation-delay: 90ms; }
 
-/* 文字逐个出现的闪烁光标（打字感） */
-.text.stream::after {
-    content: '';
-    display: inline-block; width: 1.5px; height: 14px;
-    background: rgba(255,255,255,0.5);
-    margin-left: 1px; vertical-align: middle;
-    animation: blink 0.5s step-end infinite;
+.listening .mark span:nth-child(3),
+.streaming .mark span:nth-child(3) { animation-delay: 180ms; }
+
+.processing .mark span {
+    background: var(--blue);
+    animation: breathe 760ms ease-in-out infinite;
 }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.error .mark span { background: var(--gold); }
+.canceled .mark span { background: var(--muted); }
+
+.ticker {
+    overflow: hidden;
+    min-width: 0;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.ticker-text {
+    display: inline-block;
+    transform: translateX(var(--ticker-offset));
+    transition: transform 150ms linear;
+}
+
+.listening .ticker,
+.idle .ticker {
+    color: transparent;
+}
+
+.processing .ticker,
+.canceled .ticker {
+    color: var(--muted);
+}
+
+.error .ticker {
+    color: var(--text);
+}
+
+@keyframes voice {
+    0%, 100% { transform: scaleY(0.55); opacity: 0.62; }
+    50% { transform: scaleY(1.18); opacity: 1; }
+}
+
+@keyframes breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.38; }
+}
 </style>
 </head>
 <body>
-
-<div id="pill" class="pill rec">
-    <div id="wave" class="wave">
-        <div class="b"></div><div class="b"></div><div class="b"></div>
-        <div class="b"></div><div class="b"></div><div class="b"></div>
-        <div class="b"></div><div class="b"></div><div class="b"></div>
+<div id="pill" class="pill idle">
+    <div class="mark" aria-hidden="true">
+        <span></span><span></span><span></span>
     </div>
-    <div id="dot" class="dot hidden"></div>
-    <div id="sep" class="sep hidden"></div>
-    <div id="txt" class="text hint">聆听中...</div>
+    <div id="ticker" class="ticker">
+        <span id="txt" class="ticker-text"></span>
+    </div>
 </div>
 
 <script>
-const pill=document.getElementById('pill'), wave=document.getElementById('wave'),
-      dot=document.getElementById('dot'), sep=document.getElementById('sep'),
-      txt=document.getElementById('txt');
+const pill = document.getElementById('pill');
+const ticker = document.getElementById('ticker');
+const txt = document.getElementById('txt');
 
-function reset() {
-    pill.className='pill rec'; wave.classList.remove('hidden');
-    dot.classList.add('hidden'); dot.className='dot';
-    sep.classList.add('hidden');
-    txt.className='text hint'; txt.textContent='聆听中...';
-    txt.style.direction=''; txt.style.textAlign='';
+const MIN_WIDTH = 86;
+const MAX_WIDTH = 340;
+const TEXT_START = 108;
+const CHAR_WIDTH = 8.2;
+
+function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
 }
-function showRecording() { reset(); }
 
-function updateStreaming(t) {
-    if (!t) return;
-    wave.classList.add('hidden');
-    dot.classList.remove('hidden'); dot.className='dot rec';
-    sep.classList.remove('hidden');
-    txt.className='text stream';
-    txt.style.direction='rtl'; txt.style.textAlign='left';
-    txt.textContent = t;
+function setWidthForText(text) {
+    const width = text ? clamp(TEXT_START + text.length * CHAR_WIDTH, MIN_WIDTH, MAX_WIDTH) : MIN_WIDTH;
+    pill.style.setProperty('--target-width', `${width}px`);
+}
+
+function updateTickerOffset() {
+    requestAnimationFrame(() => {
+        const overflow = Math.max(0, txt.scrollWidth - ticker.clientWidth);
+        pill.style.setProperty('--ticker-offset', `${-overflow}px`);
+    });
+}
+
+function showState(state, label) {
+    pill.className = `pill ${state}`;
+    txt.textContent = label || '';
+    pill.style.setProperty('--ticker-offset', '0px');
+    if (state === 'listening' || state === 'idle') {
+        setWidthForText('');
+    } else {
+        setWidthForText(label || '');
+        updateTickerOffset();
+    }
+}
+
+function showRecording() {
+    showState('listening', '');
+}
+
+function updateStreaming(text) {
+    if (!text) return;
+    pill.className = 'pill streaming';
+    txt.textContent = text;
+    setWidthForText(text);
+    updateTickerOffset();
 }
 
 function showProcessing() {
-    pill.className='pill proc';
-    wave.classList.remove('hidden'); dot.classList.add('hidden');
-    sep.classList.add('hidden');
-    txt.className='text hint'; txt.textContent='处理中...';
-    txt.style.direction=''; txt.style.textAlign='';
+    showState('processing', '处理中');
 }
 
-function showResult(t) {
-    pill.className='pill done';
-    wave.classList.add('hidden');
-    dot.classList.remove('hidden'); dot.className='dot ok';
-    sep.classList.remove('hidden');
-    txt.style.direction=''; txt.style.textAlign='';
-    txt.className='text result'; txt.textContent = t || '';
+function showResult(text) {
+    showState('success', '');
 }
 
-function showError(m) {
-    pill.className='pill rec';
-    wave.classList.add('hidden');
-    dot.classList.remove('hidden'); dot.className='dot err';
-    sep.classList.remove('hidden');
-    txt.style.direction=''; txt.style.textAlign='';
-    txt.className='text'; txt.textContent = m;
+function showError(message) {
+    showState('error', message || '出错了');
 }
 </script>
 </body>

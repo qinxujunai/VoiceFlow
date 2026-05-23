@@ -11,8 +11,7 @@ echo  ========================================
 echo.
 echo    Free - Open Source - Offline
 echo.
-echo    [Ctrl_R] Push-to-Talk
-echo    [Ctrl+Shift+Win] Toggle
+echo    [F2] Start / Stop dictation
 echo    [Esc] Cancel
 echo.
 echo  ========================================
