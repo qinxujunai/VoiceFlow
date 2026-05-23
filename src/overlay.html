@@ -291,13 +291,13 @@ function showState(state, label) {
     txt.textContent = label || '';
     pill.style.setProperty('--ticker-offset', '0px');
     pill.offsetHeight; // force reflow
-    pill.style.transition = '';
     if (state === 'listening' || state === 'idle') {
         setWidthForText('');
     } else {
         setWidthForText(label || '');
         updateTickerOffset();
     }
+    pill.style.transition = '';
 }
 
 function showRecording() {

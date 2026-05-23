@@ -109,20 +109,12 @@ class OverlayWindow:
 
     def _setup_tray(self):
         self._tray = QSystemTrayIcon()
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "voiceflow.ico")
-        if os.path.exists(icon_path):
-            app_icon = QIcon(icon_path)
-            self._tray_icons = dict.fromkeys(
-                [TRAY_ICON_IDLE, TRAY_ICON_RECORDING, TRAY_ICON_PROCESSING, TRAY_ICON_ERROR],
-                app_icon,
-            )
-        else:
-            self._tray_icons = {
-                TRAY_ICON_IDLE: build_tray_icon(TRAY_ICON_IDLE),
-                TRAY_ICON_RECORDING: build_tray_icon(TRAY_ICON_RECORDING),
-                TRAY_ICON_PROCESSING: build_tray_icon(TRAY_ICON_PROCESSING),
-                TRAY_ICON_ERROR: build_tray_icon(TRAY_ICON_ERROR),
-            }
+        self._tray_icons = {
+            TRAY_ICON_IDLE: build_tray_icon(TRAY_ICON_IDLE),
+            TRAY_ICON_RECORDING: build_tray_icon(TRAY_ICON_RECORDING),
+            TRAY_ICON_PROCESSING: build_tray_icon(TRAY_ICON_PROCESSING),
+            TRAY_ICON_ERROR: build_tray_icon(TRAY_ICON_ERROR),
+        }
 
         self._tray.setIcon(self._tray_icons[TRAY_ICON_IDLE])
         self._tray.setToolTip("VoiceFlow")
