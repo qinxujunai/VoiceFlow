@@ -2,7 +2,7 @@
 
 ## Project Identity
 
-VoiceFlow is a Windows local-first dictation layer. Press **F2** or a configured mouse side button to start recording, press again to stop, and cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
+VoiceFlow is a Windows local-first dictation layer. Press **F2**, **Right Ctrl**, or a mouse side button to start recording, press again to stop, and cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
 
 The current target is stability: no orphan processes, working tray exit, complete final transcription, clipboard fallback, and truthful docs.
 
@@ -48,7 +48,7 @@ src/
 - Do not restore the previous clipboard after dictation.
 - Final output must use the complete stopped audio buffer; streaming preview is only preview.
 - Streaming preview may be throttled for long recordings, but final transcription must remain complete.
-- Default triggers are `f2`, `xbutton1`, and `xbutton2`; avoid adding more default keys.
+- Default triggers are `f2`, `right_ctrl`, `xbutton1`, and `xbutton2`. Do not add combo keys as defaults — suppress=True blocks the individual keys from normal use.
 - Tray right-click menu must keep a working `退出` action.
 - Keep the overlay small, centered, and quiet.
 - If docs disagree with runtime behavior, fix the docs or the code immediately.
@@ -57,11 +57,25 @@ src/
 
 ```yaml
 hotkeys:
-  push_to_talk: ["f2", "xbutton1", "xbutton2"]
+  push_to_talk: ["f2", "xbutton1", "xbutton2", "right_ctrl"]
   cancel: "escape"
 ```
 
-Keyboard keys use the `keyboard` package and are suppressed. Mouse side buttons use `pynput` and are not suppressed.
+All push-to-talk keys are single keys — no combo keys. Keyboard keys use the `keyboard` package and are suppressed. Mouse side buttons use `pynput` and are not suppressed.
+
+### Key Reference
+
+| Key | Type | Notes |
+|---|---|---|
+| `f2` | keyboard | Windows default |
+| `right_ctrl` | keyboard | macOS-friendly, also works on Windows |
+| `xbutton1` | mouse | side button (back) |
+| `xbutton2` | mouse | side button (forward) |
+| `escape` | keyboard | cancel recording |
+
+### Anti-pattern: Combo Keys
+
+Never add combo keys like `ctrl+shift+space` via `keyboard.add_hotkey` with `suppress=True`. The `keyboard` library will suppress *every individual key in the combo* (Ctrl, Shift, Space), breaking copy/paste, input methods, and normal typing.
 
 ## Output Contract
 
@@ -95,6 +109,14 @@ Use `wrong=correct` only in correction files.
 - `scripts\generate_icon.py` creates `assets\voiceflow.ico`.
 - `scripts\create_shortcut.ps1` creates a desktop shortcut.
 - `VoiceFlow.spec` is the windowed release build. It includes overlay/config/knowledge-base/icon, but not large model files.
+
+## Troubleshooting
+
+- **Desktop shortcut runs stale code:** The shortcut points to `start.bat` which uses source code directly. But if an old process is still running, it holds the old config in memory. After changing `config.yaml` or `hotkey_manager.py`, kill all Python processes before restarting:
+  ```powershell
+  Stop-Process -Name python -Force
+  ```
+- **`dist/VoiceFlow.exe` is a frozen snapshot.** If the desktop shortcut ever points to the exe instead of `start.bat`, the exe must be rebuilt with `venv\Scripts\pyinstaller.exe VoiceFlow.spec` to pick up config changes.
 
 ## Coding Rules
 
