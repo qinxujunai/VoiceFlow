@@ -249,16 +249,6 @@ function setWidthForText(text) {
     var est = measureTextWidth(text);
     var width = clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH);
     pill.style.setProperty('--target-width', width + 'px');
-    // Also measure actual after layout, refine next frame
-    requestAnimationFrame(function() {
-        if (txt.textContent === text) {
-            var real = txt.scrollWidth;
-            if (real > 0) {
-                var w2 = clamp(50 + real + 36, MIN_WIDTH, MAX_WIDTH);
-                pill.style.setProperty('--target-width', w2 + 'px');
-            }
-        }
-    });
 }
 
 let _tickerTarget = 0;
