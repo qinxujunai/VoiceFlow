@@ -208,10 +208,14 @@ class VoiceInputSystem:
                     pass
                 time.sleep(0.25)
 
-        threading.Thread(target=loop, daemon=True).start()
+        self._stream_thread = threading.Thread(target=loop, daemon=True)
+        self._stream_thread.start()
 
     def _stop_streaming(self):
         self._streaming = False
+        if hasattr(self, "_stream_thread") and self._stream_thread:
+            self._stream_thread.join(timeout=2.0)
+            self._stream_thread = None
 
     def _final_text_from_cache(self):
         raw_text = (self._latest_text or "").strip()
