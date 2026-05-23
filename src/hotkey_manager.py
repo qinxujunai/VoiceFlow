@@ -1,5 +1,5 @@
 """
-快捷键：F2 切换录音（按一下开始，再按一下停止），Esc 取消。
+快捷键：F2 / 鼠标侧键 / Ctrl+Shift+Space / 右 Ctrl 切换录音（按一下开始，再按一下停止），Esc 取消。
 """
 
 import os
@@ -8,6 +8,13 @@ import threading
 import keyboard
 import yaml
 from pynput import mouse
+
+
+_KEY_MAP = {
+    "right_ctrl": "right ctrl",
+    "right_shift": "right shift",
+    "right_alt": "right alt",
+}
 
 
 class HotkeyManager:
@@ -44,6 +51,10 @@ class HotkeyManager:
         if event.event_type != "down":
             return
         self._trigger_ptt()
+
+    def _on_combo_ptt(self):
+        self._trigger_ptt()
+
 
     def _trigger_ptt(self):
         now = time.time()
@@ -84,14 +95,23 @@ class HotkeyManager:
 
     def start(self):
         mouse_keys = [k for k in self.ptt_keys if k in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
-        kb_keys = [k for k in self.ptt_keys if k not in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
-        for key in kb_keys:
-            keyboard.on_press_key(key, self._on_ptt, suppress=True)
+        combo_keys = [k for k in self.ptt_keys if "+" in k]
+        single_keys = [k for k in self.ptt_keys if k not in mouse_keys and "+" not in k]
+
+        for key in single_keys:
+            key_name = _KEY_MAP.get(key, key)
+            keyboard.on_press_key(key_name, self._on_ptt, suppress=True)
+
+        for combo in combo_keys:
+            keyboard.add_hotkey(combo, self._on_combo_ptt, suppress=True)
+
         if mouse_keys:
             self._mouse_listener = mouse.Listener(on_click=self._on_mouse_click)
             self._mouse_listener.start()
+
         keyboard.add_hotkey(self.cancel_key, self._on_cancel, suppress=False)
-        display_keys = "+".join(k.upper() for k in self.ptt_keys)
+
+        display_keys = " / ".join(k.upper() for k in self.ptt_keys)
         print(f"[热键] {display_keys}=录音, {self.cancel_key.upper()}=取消", flush=True)
 
     def stop(self):
