@@ -4,12 +4,12 @@
 <meta charset="utf-8"/>
 <style>
 :root {
-    --bg: rgba(28,28,30,0.95);
-    --red: #ff3b5c;
-    --green: #34c759;
+    --bg: rgba(30,30,32,0.96);
+    --red: #ff375f;
+    --green: #30d158;
     --gold: #ff9f0a;
     --text: #f5f5f7;
-    --muted: #98989d;
+    --muted: #8e8e93;
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -20,111 +20,100 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ---- 胶囊 ---- */
 .pill {
-    display: flex; align-items: center; gap: 14px;
-    height: 52px; padding: 0 20px;
+    display: inline-flex; align-items: center; gap: 10px;
+    height: 46px; padding: 0 16px;
     background: var(--bg);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border-radius: 26px;
-    border: 0.5px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border-radius: 23px;
+    border: 0.5px solid rgba(255,255,255,0.08);
     box-shadow:
-        0 0 0 1px rgba(255,255,255,0.03),
-        0 12px 40px rgba(0,0,0,0.45),
-        0 4px 12px rgba(0,0,0,0.25);
-    min-width: 180px; max-width: 680px;
-    justify-content: center;
-    transition: min-width 0.25s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        0 8px 32px rgba(0,0,0,0.4),
+        inset 0 0.5px 0 rgba(255,255,255,0.04);
+    min-width: 150px; max-width: 650px;
+    transition: min-width 0.25s cubic-bezier(0.22,0.61,0.36,1), box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
-/* 状态辉光 */
-.pill.rec {
-    border-color: rgba(255,59,92,0.25);
-    box-shadow: 0 0 28px rgba(255,59,92,0.1), 0 12px 40px rgba(0,0,0,0.45);
-}
-.pill.proc {
-    border-color: rgba(255,159,10,0.25);
-    box-shadow: 0 0 24px rgba(255,159,10,0.08), 0 12px 40px rgba(0,0,0,0.45);
-}
-.pill.done {
-    border-color: rgba(52,199,89,0.2);
-    box-shadow: 0 0 20px rgba(52,199,89,0.06), 0 12px 40px rgba(0,0,0,0.45);
-}
+.pill.rec  { border-color: rgba(255,55,95,0.2); }
+.pill.proc { border-color: rgba(255,159,10,0.2); }
+.pill.done { border-color: rgba(48,209,88,0.15); }
 
 /* ---- 波形 ---- */
-.waveform {
-    display: flex; align-items: flex-end; gap: 3px;
-    height: 26px; flex-shrink: 0;
+.wave {
+    display: flex; align-items: flex-end; gap: 2.5px; height: 22px; flex-shrink: 0;
 }
-.waveform .b {
-    width: 3.5px; border-radius: 2px;
+.wave .b {
+    width: 3px; border-radius: 1.5px;
     background: var(--red);
-    animation: wa 0.85s ease-in-out infinite;
+    animation: w 1.4s ease-in-out infinite;
 }
-.waveform .b:nth-child(1){height:8px;animation-delay:0.00s}
-.waveform .b:nth-child(2){height:16px;animation-delay:0.06s}
-.waveform .b:nth-child(3){height:24px;animation-delay:0.12s}
-.waveform .b:nth-child(4){height:14px;animation-delay:0.18s}
-.waveform .b:nth-child(5){height:22px;animation-delay:0.24s}
-.waveform .b:nth-child(6){height:10px;animation-delay:0.30s}
-.waveform .b:nth-child(7){height:20px;animation-delay:0.36s}
-.waveform .b:nth-child(8){height:12px;animation-delay:0.42s}
-.waveform .b:nth-child(9){height:18px;animation-delay:0.48s}
+.wave .b:nth-child(1){height:6px;animation-delay:0.00s}
+.wave .b:nth-child(2){height:14px;animation-delay:0.10s}
+.wave .b:nth-child(3){height:20px;animation-delay:0.20s}
+.wave .b:nth-child(4){height:12px;animation-delay:0.30s}
+.wave .b:nth-child(5){height:18px;animation-delay:0.40s}
+.wave .b:nth-child(6){height:8px;animation-delay:0.50s}
+.wave .b:nth-child(7){height:16px;animation-delay:0.60s}
+.wave .b:nth-child(8){height:10px;animation-delay:0.70s}
+.wave .b:nth-child(9){height:15px;animation-delay:0.80s}
 
-@keyframes wa { 0%,100%{transform:scaleY(0.5)} 50%{transform:scaleY(1.25)} }
-
-/* 处理后波形转金色 */
-.pill.proc .waveform .b { background: var(--gold); }
+@keyframes w {
+    0%,100%{transform:scaleY(0.4);opacity:0.6}
+    50%{transform:scaleY(1.15);opacity:1}
+}
+.pill.proc .wave .b { background: var(--gold); }
 
 /* ---- 圆点 ---- */
 .dot {
-    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
 }
 .dot.rec {
-    background: var(--red);
-    box-shadow: 0 0 10px rgba(255,59,92,0.5);
-    animation: pu 0.8s ease-in-out infinite;
+    background: var(--red); box-shadow: 0 0 6px rgba(255,55,95,0.5);
+    animation: pu 1.2s ease-in-out infinite;
 }
 .dot.proc {
-    background: var(--gold);
-    box-shadow: 0 0 10px rgba(255,159,10,0.5);
-    animation: pu 0.5s ease-in-out infinite;
+    background: var(--gold); box-shadow: 0 0 6px rgba(255,159,10,0.5);
+    animation: pu 0.7s ease-in-out infinite;
 }
-.dot.ok {
-    background: var(--green);
-    box-shadow: 0 0 6px rgba(52,199,89,0.3);
-}
+.dot.ok  { background: var(--green); }
 .dot.err { background: var(--red); }
-@keyframes pu { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.55)} }
+@keyframes pu { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.25;transform:scale(0.5)} }
 
 /* ---- 文字 ---- */
 .text {
-    font-size: 15px; font-weight: 440; letter-spacing: 0.1px;
+    font-size: 14px; font-weight: 430; letter-spacing: 0.1px;
     color: var(--text); white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; min-width: 0; line-height: 1.2;
+    text-overflow: ellipsis; min-width: 0; line-height: 1.1;
 }
-.text.hint { color: var(--muted); font-size: 14px; }
+.text.hint { color: var(--muted); font-size: 13px; }
 .text.result { color: var(--green); }
-
-/* 流式：文字从右往左溢出 */
-.text.stream {
-    direction: rtl; text-align: left;
-}
+.text.stream { direction: rtl; text-align: left; }
 
 /* ---- 分隔 ---- */
 .sep {
-    width: 0.5px; height: 18px; background: rgba(255,255,255,0.12);
+    width: 0.5px; height: 16px; background: rgba(255,255,255,0.1);
     border-radius: 1px; flex-shrink: 0;
 }
 
 .hidden { display: none !important; }
+
+/* 文字逐个出现的闪烁光标（打字感） */
+.text.stream::after {
+    content: '';
+    display: inline-block; width: 1.5px; height: 14px;
+    background: rgba(255,255,255,0.5);
+    margin-left: 1px; vertical-align: middle;
+    animation: blink 0.5s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 </style>
 </head>
 <body>
 
 <div id="pill" class="pill rec">
-    <div id="wave" class="waveform">
+    <div id="wave" class="wave">
         <div class="b"></div><div class="b"></div><div class="b"></div>
         <div class="b"></div><div class="b"></div><div class="b"></div>
         <div class="b"></div><div class="b"></div><div class="b"></div>
@@ -146,11 +135,8 @@ function reset() {
     txt.className='text hint'; txt.textContent='聆听中...';
     txt.style.direction=''; txt.style.textAlign='';
 }
+function showRecording() { reset(); }
 
-// 录音中 — 波形
-function showRecording(){ reset(); }
-
-// 流式文字 — 波形换红点 + 分隔 + 文字，胶囊随文字扩宽
 function updateStreaming(t) {
     if (!t) return;
     wave.classList.add('hidden');
@@ -161,35 +147,30 @@ function updateStreaming(t) {
     txt.textContent = t;
 }
 
-// 处理中 — 波形变金
 function showProcessing() {
     pill.className='pill proc';
-    wave.classList.remove('hidden');
-    dot.classList.add('hidden');
+    wave.classList.remove('hidden'); dot.classList.add('hidden');
     sep.classList.add('hidden');
     txt.className='text hint'; txt.textContent='处理中...';
     txt.style.direction=''; txt.style.textAlign='';
 }
 
-// 完成 — 绿点 + 分隔 + 结果
 function showResult(t) {
     pill.className='pill done';
     wave.classList.add('hidden');
     dot.classList.remove('hidden'); dot.className='dot ok';
     sep.classList.remove('hidden');
     txt.style.direction=''; txt.style.textAlign='';
-    txt.className='text result';
-    txt.textContent = t || '';
+    txt.className='text result'; txt.textContent = t || '';
 }
 
-// 错误
 function showError(m) {
     pill.className='pill rec';
     wave.classList.add('hidden');
     dot.classList.remove('hidden'); dot.className='dot err';
     sep.classList.remove('hidden');
     txt.style.direction=''; txt.style.textAlign='';
-    txt.className='text'; txt.textContent=m;
+    txt.className='text'; txt.textContent = m;
 }
 </script>
 </body>

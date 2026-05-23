@@ -39,13 +39,15 @@ class OverlayWindow:
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
+            | Qt.WindowType.NoDropShadowWindowHint
         )
         self.window.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.window.setFixedSize(QSize(440, 56))
+        self.window.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.window.setFixedSize(QSize(700, 56))
 
         screen = app.primaryScreen()
         geo = screen.availableGeometry()
-        x = (geo.width() - 440) // 2 + geo.x()
+        x = (geo.width() - 700) // 2 + geo.x()
         y = geo.y() + geo.height() - 56 - 60
         self.window.move(x, y)
 
@@ -155,8 +157,6 @@ class OverlayWindow:
             self._bridge.show_requested.emit()
 
     def hide_after(self, ms=2000):
-        if self._tray is None:
-            return
         QTimer.singleShot(ms, self._hide)
 
 
