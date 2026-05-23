@@ -111,12 +111,20 @@ class VoiceInputSystem:
                 self._is_processing = False
                 return
 
-            raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
-            text = self.cleaner.clean(raw_text) if raw_text else ""
+            duration = result.duration or (len(data) / self.audio.sample_rate)
+            streaming_text = (self._latest_text or "").strip()
 
-            # If streaming had text but final differs (tail processed), show completing
-            if text and self._latest_text and text != self._latest_text:
+            # Short recording or streaming caught up: instant paste
+            if duration < 3.0 or not streaming_text:
+                raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
+                text = self.cleaner.clean(raw_text) if raw_text else ""
+            else:
+                # Long recording: show spinner, transcribe tail, then checkmark
                 self.overlay.show_completing()
+                raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
+                text = self.cleaner.clean(raw_text) if raw_text else ""
+                if text:
+                    self.overlay.show_done()
 
             if text:
                 duration = result.duration or (len(data) / self.audio.sample_rate)

@@ -220,6 +220,20 @@ body {
 .completing .mark span:nth-child(2) { animation-delay: 160ms; }
 .completing .mark span:nth-child(3) { animation-delay: 320ms; }
 
+
+.pill.done {
+    border-color: rgba(50, 215, 75, 0.22);
+}
+
+.done .mark span {
+    background: var(--green);
+    animation: none;
+    opacity: 1;
+}
+.done .mark span:nth-child(1) { height: 8px; }
+.done .mark span:nth-child(2) { height: 12px; }
+.done .mark span:nth-child(3) { height: 7px; }
+
 .completing .ticker {
     color: var(--muted);
 }
@@ -310,7 +324,7 @@ function showProcessing() {
 }
 
 function showCompleting() {
-    // Lock current width, switch bars to spinner, text stays or shows "..."
+    // Lock current width, switch bars to spinner, text stays
     pill.className = 'pill completing';
     var curWidth = pill.offsetWidth;
     pill.style.setProperty('--target-width', curWidth + 'px');
@@ -319,6 +333,17 @@ function showCompleting() {
         txt.textContent = '';
     }
     pill.style.setProperty('--ticker-offset', '0px');
+}
+
+function showDone() {
+    // Green checkmark bars, keep width locked, then hide
+    pill.className = 'pill done';
+    txt.textContent = '';
+    pill.style.setProperty('--ticker-offset', '0px');
+    setWidthForText('');
+    setTimeout(function() {
+        pill.className = 'pill idle';
+    }, 300);
 }
 
 function showResult(msg) {
