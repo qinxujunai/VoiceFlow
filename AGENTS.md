@@ -57,7 +57,7 @@ src/
 
 ```yaml
 hotkeys:
-  push_to_talk: ["f2", "xbutton1", "xbutton2", "right_ctrl"]
+  push_to_talk: ["f2", "xbutton1", "xbutton2"]
   cancel: "escape"
 ```
 
@@ -68,10 +68,13 @@ All push-to-talk keys are single keys — no combo keys. Keyboard keys use the `
 | Key | Type | Notes |
 |---|---|---|
 | `f2` | keyboard | Windows default |
-| `right_ctrl` | keyboard | macOS-friendly, also works on Windows |
 | `xbutton1` | mouse | side button (back) |
 | `xbutton2` | mouse | side button (forward) |
 | `escape` | keyboard | cancel recording |
+
+### Hardware Limitation
+
+`right_ctrl` cannot be used on most Windows keyboards because left/right Ctrl share the same scan code (29). The `keyboard` library cannot distinguish them, and `suppress=True` on right ctrl blocks *all* Ctrl usage. See commit `7f1a7de`.
 
 ### Anti-pattern: Combo Keys
 
