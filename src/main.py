@@ -114,6 +114,10 @@ class VoiceInputSystem:
             raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
             text = self.cleaner.clean(raw_text) if raw_text else ""
 
+            # Safety: if final transcription empty but streaming had text, use streaming text
+            if not text and self._latest_text:
+                text = self.cleaner.clean(self._latest_text)
+
             if text:
                 duration = result.duration or (len(data) / self.audio.sample_rate)
                 print(f"[杞啓] {text} ({duration:.1f}s)", flush=True)
