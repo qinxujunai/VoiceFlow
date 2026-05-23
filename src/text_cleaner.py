@@ -55,6 +55,7 @@ class TextCleaner:
             (r"(比如|例如|像)(\s*)", r"\1，"),
         ]
         self._compiled_punct = [(re.compile(p), r) for p, r in self.punctuation_map]
+        self._ctrl_re = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
     def _build_corrections(self, base_dir):
         """构建修正词表：内置映射 + knowledge-base 自定义文件"""
@@ -186,13 +187,32 @@ class TextCleaner:
         text = re.sub(r"，{2,}", "，", text)
         text = re.sub(r"。{2,}", "。", text)
         # 去除非打印字符
-        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+        text = self._ctrl_re.sub("", text)
 
         stripped = text.strip()
+        if not stripped:
+            return ""
         import unicodedata
-        if stripped and all(unicodedata.category(c).startswith("P") or c.isspace() for c in stripped):
+        meaningful = ''.join(c for c in stripped if not unicodedata.category(c).startswith("P") and not c.isspace())
+        if len(meaningful) <= 1:
             return ""
         return stripped
+
+
+    def clean_streaming(self, text: str) -> str:
+        """Clean for streaming display: strip all punctuation for smooth flow."""
+        if not text or not text.strip():
+            return text
+        text = text.strip()
+        if self.remove_fillers:
+            text = self._strip_fillers(text)
+        if self.fix_mistakes:
+            text = self._fix_mistakes(text)
+        # Strip all punctuation for streaming
+        import unicodedata
+        text = ''.join(c for c in text if not unicodedata.category(c).startswith('P') and c != '\uff0c' and c != '\u3002' and c != '\uff01' and c != '\uff1f' and c != '\u3001' and c != '\uff1b' and c != '\uff1a' and c != '\u2026' and c != '\u2014' and c != '\u2018' and c != '\u2019' and c != '\u201c' and c != '\u201d')
+        text = re.sub(r" {2,}", " ", text)
+        return text.strip()
 
     def _strip_fillers(self, text: str) -> str:
         text = self.filler_pattern.sub("", text)

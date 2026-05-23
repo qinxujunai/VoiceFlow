@@ -215,6 +215,11 @@ class OverlayWindow:
         display = display_for_state(UiState.PROCESSING)
         self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
 
+
+    def show_completing(self):
+        self._tray_state(TRAY_ICON_PROCESSING)
+        self._js("showCompleting()")
+
     def show_result(self, text):
         self._js(f"showResult({json.dumps(text, ensure_ascii=False)})")
         self._tray_state(TRAY_ICON_IDLE)

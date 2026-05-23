@@ -49,6 +49,7 @@ class VoiceInputSystem:
 
         self.config_path = config_path
         self._is_processing = False
+        self._actively_recording = False
         self._streaming = False
         self._latest_text = ""  # 后台转写的最新结果
         self.overlay = OverlayWindow()
@@ -80,8 +81,9 @@ class VoiceInputSystem:
     # ---- 录音 ----
 
     def _on_record_start(self):
-        if self._is_processing:
+        if self._is_processing or self._actively_recording:
             return
+        self._actively_recording = True
         try:
             self.session.start()
             self.overlay.show_window()
@@ -94,8 +96,9 @@ class VoiceInputSystem:
             print(f"[错误] {e}", flush=True)
 
     def _on_record_stop(self):
-        if not self.audio.is_recording:
+        if not self._actively_recording:
             return
+        self._actively_recording = False
         self._is_processing = True
         self._stop_streaming()
 
@@ -108,27 +111,26 @@ class VoiceInputSystem:
                 self._is_processing = False
                 return
 
-            duration = result.duration or (len(data) / self.audio.sample_rate)
-            raw_text, text, cached = self._final_text_from_cache()
-            if not cached:
-                self.overlay.show_processing()
-                raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
-                text = self.cleaner.clean(raw_text) if raw_text else ""
+            raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
+            text = self.cleaner.clean(raw_text) if raw_text else ""
+
+            # If streaming had text but final differs (tail processed), show completing
+            if text and self._latest_text and text != self._latest_text:
+                self.overlay.show_completing()
 
             if text:
-                rtf = (time.time() - duration) / duration if duration > 0 else 0
-                source = "缓存" if cached else "最终"
-                print(f"[转写] ({source}) {text} ({duration:.1f}s)", flush=True)
+                duration = result.duration or (len(data) / self.audio.sample_rate)
+                print(f"[杞啓] {text} ({duration:.1f}s)", flush=True)
                 output_status = self.output_handler.output(text)
                 self.history.append(
                     raw_text=raw_text,
                     clean_text=text,
                     output_status=output_status,
                 )
-                self.overlay.hide_after(0)
+                self.overlay.show_result(text)
+                self.overlay.hide_after(280)
             else:
-                self.overlay.show_error("无识别结果")
-                self.overlay.hide_after(2000)
+                self.overlay.hide_after(0)
 
         except Exception as e:
             self.overlay.show_error(str(e))
@@ -142,21 +144,27 @@ class VoiceInputSystem:
         """后台 ASR 线程：录音期间持续转写，停止时结果已就绪"""
         self._streaming = True
 
+        last_len = 0
         def loop():
+            nonlocal last_len
             while self._streaming:
                 try:
                     buf = self.audio._audio_buffer
                     if buf:
                         chunk = np.concatenate(buf, axis=0).flatten()
-                        if len(chunk) > self.audio.sample_rate * 0.3:
+                        new_samples = len(chunk) - last_len
+                        if new_samples > self.audio.sample_rate * 0.6 or last_len == 0:
                             text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
+                            last_len = len(chunk)
                             if text:
                                 self._latest_text = text
-                                clean = self.cleaner.clean(text)
-                                self.overlay.update_streaming(clean)
+                                # Use streaming-specific clean (no punctuation)
+                                clean = self.cleaner.clean_streaming(text)
+                                if clean:
+                                    self.overlay.update_streaming(clean)
                 except Exception:
                     pass
-                time.sleep(0.18)
+                time.sleep(0.25)
 
         threading.Thread(target=loop, daemon=True).start()
 
@@ -170,7 +178,8 @@ class VoiceInputSystem:
         return raw_text, self.cleaner.clean(raw_text), True
 
     def _on_record_cancel(self):
-        if self.audio.is_recording:
+        if self._actively_recording:
+            self._actively_recording = False
             self._stop_streaming()
             self.session.cancel()
             self.overlay.show_canceled()

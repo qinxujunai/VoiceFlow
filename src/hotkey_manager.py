@@ -20,7 +20,12 @@ class HotkeyManager:
             config = yaml.safe_load(f)
 
         hk_cfg = config.get("hotkeys", {})
-        self.ptt_key = hk_cfg.get("push_to_talk", "f2").lower().strip()
+        ptt_raw = hk_cfg.get("push_to_talk", "f2")
+        if isinstance(ptt_raw, list):
+            self.ptt_keys = [k.lower().strip() for k in ptt_raw]
+        else:
+            self.ptt_keys = [ptt_raw.lower().strip()]
+        self.ptt_key = self.ptt_keys[0]  # primary key for display
         self.cancel_key = hk_cfg.get("cancel", "escape").lower().strip()
 
         self.callbacks = callbacks or {}
@@ -28,7 +33,7 @@ class HotkeyManager:
         self._lock = threading.Lock()
         self._last_event_time = 0
 
-    def _on_f2(self, event):
+    def _on_ptt(self, event):
         if event.event_type != "down":
             return
         now = time.time()
