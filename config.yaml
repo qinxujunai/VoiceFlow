@@ -48,7 +48,7 @@ vad:
 # 快捷键配置
 hotkeys:
   # 录音：按 F2 开始说话，安静 1.5 秒自动停止并粘贴文字
-  push_to_talk: ["f2", "xbutton1"]  # F2 + 鼠标上侧键(后退键)
+  push_to_talk: ["f2", "xbutton1", "xbutton2", "left alt"]  # F2 + 鼠标双侧键 + 左Alt
 
   # 取消本次录音（不输出文字）
   cancel: "escape"
