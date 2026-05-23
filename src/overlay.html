@@ -284,11 +284,14 @@ function updateTickerOffset() {
 
 function showState(state, label) {
         ticker.style.textAlign = '';
+    // Snap without transition to avoid visible width-shrink animation
+    pill.style.transition = 'none';
     pill.className = 'pill ' + state;
-    // Reset any inline width lock from previous state.
     pill.style.width = '';
     txt.textContent = label || '';
     pill.style.setProperty('--ticker-offset', '0px');
+    pill.offsetHeight; // force reflow
+    pill.style.transition = '';
     if (state === 'listening' || state === 'idle') {
         setWidthForText('');
     } else {
