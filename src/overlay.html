@@ -282,6 +282,7 @@ function updateTickerOffset() {
 }
 
 function showState(state, label) {
+    pill.style.removeProperty('--target-width');
         ticker.style.textAlign = '';
     pill.className = 'pill ' + state;
     pill.style.width = '';
