@@ -114,7 +114,7 @@ class VoiceInputSystem:
                 print(f"[转写] {text} ({duration:.1f}s)", flush=True)
                 self.overlay.show_result(text)
                 self.output_handler.output(text)
-                self.overlay.hide_after(3000)
+                self.overlay.hide_after(0)
             else:
                 self.overlay.show_error("无识别结果")
                 self.overlay.hide_after(2000)

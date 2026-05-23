@@ -3,76 +3,192 @@
 <head>
 <meta charset="utf-8"/>
 <style>
+:root {
+    --bg: #1a1a1f;
+    --red: #ff3b5c;
+    --green: #34d399;
+    --gold: #f59e0b;
+    --text: #f1f1f3;
+    --muted: #8e8e93;
+}
+
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system,'SF Pro Text','Segoe UI','Microsoft YaHei',sans-serif; background:transparent; overflow:hidden; user-select:none; }
 
+body {
+    font-family: -apple-system, 'SF Pro Display', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- 基础胶囊 ---- */
 .pill {
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    height:48px; min-width:180px;
-    background:#1c1c1e; border-radius:24px;
-    border:0.5px solid rgba(255,255,255,0.1);
-    box-shadow:0 4px 24px rgba(0,0,0,0.5);
-    padding:0 20px; transition:min-width 0.3s;
+    display: flex; align-items: center; gap: 12px;
+    height: 54px; padding: 0 22px;
+    background: var(--bg);
+    border-radius: 27px;
+    border: 0.5px solid rgba(255,255,255,0.08);
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.02),
+        0 8px 32px rgba(0,0,0,0.5),
+        0 2px 8px rgba(0,0,0,0.3);
+    min-width: 200px;
+    justify-content: center;
+    transition: all 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.pill.wide { min-width:300px; padding:0 18px; justify-content:flex-start; }
 
-/* 声波 */
-.wave { display:flex; align-items:center; gap:2px; flex-shrink:0; }
-.wave .b {
-    width:3px; height:8px; background:#FF453A; border-radius:2px;
-    animation:wa 1.2s ease-in-out infinite;
+/* 录音中 — 红色辉光 */
+.pill.recording {
+    border-color: rgba(255,59,92,0.3);
+    box-shadow:
+        0 0 24px rgba(255,59,92,0.12),
+        0 8px 32px rgba(0,0,0,0.5);
 }
-.wave .b:nth-child(1){animation-delay:0.0s}
-.wave .b:nth-child(2){animation-delay:0.12s}
-.wave .b:nth-child(3){animation-delay:0.24s}
-.wave .b:nth-child(4){animation-delay:0.36s}
-.wave .b:nth-child(5){animation-delay:0.48s}
-@keyframes wa { 0%,100%{height:6px} 50%{height:22px} }
 
-/* 圆点 */
-.dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-.dot.rec { background:#FF453A; animation:pu 1s ease-in-out infinite; }
-.dot.proc { background:#FF9F0A; animation:pu 0.6s ease-in-out infinite; }
-.dot.ok { background:#30D158; }
-.dot.err { background:#FF453A; }
-@keyframes pu { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.6)} }
+/* 处理中 — 金色辉光 */
+.pill.processing {
+    border-color: rgba(245,158,11,0.3);
+    box-shadow:
+        0 0 24px rgba(245,158,11,0.1),
+        0 8px 32px rgba(0,0,0,0.5);
+}
 
-/* 文字 */
-.txt { font-size:14px; color:rgba(255,255,255,0.85); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.txt.hint { color:rgba(255,255,255,0.3); font-size:13px; }
+/* 完成 — 绿色辉光 */
+.pill.done {
+    border-color: rgba(52,211,153,0.25);
+    box-shadow:
+        0 0 20px rgba(52,211,153,0.08),
+        0 8px 32px rgba(0,0,0,0.5);
+}
 
-.hidden { display:none !important; }
+/* 有文字结果时加宽 */
+.pill.wide { min-width: 380px; padding:0 22px; justify-content:flex-start; }
+
+/* ---- 波形 ---- */
+.waveform {
+    display: flex; align-items: flex-end; gap: 3px;
+    height: 28px; flex-shrink: 0;
+}
+.waveform .bar {
+    width: 4px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--red), #ff6b81);
+    animation: wave 0.8s ease-in-out infinite;
+}
+.waveform .bar:nth-child(1) { height: 10px; animation-delay: 0.00s; }
+.waveform .bar:nth-child(2) { height: 18px; animation-delay: 0.08s; }
+.waveform .bar:nth-child(3) { height: 26px; animation-delay: 0.16s; }
+.waveform .bar:nth-child(4) { height: 16px; animation-delay: 0.24s; }
+.waveform .bar:nth-child(5) { height: 24px; animation-delay: 0.32s; }
+.waveform .bar:nth-child(6) { height: 12px; animation-delay: 0.40s; }
+.waveform .bar:nth-child(7) { height: 20px; animation-delay: 0.48s; }
+.waveform .bar:nth-child(8) { height: 14px; animation-delay: 0.56s; }
+.waveform .bar:nth-child(9) { height: 22px; animation-delay: 0.64s; }
+
+@keyframes wave {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1.3); }
+}
+
+/* 处理中波形换成金色渐变 */
+.pill.processing .waveform .bar {
+    background: linear-gradient(180deg, var(--gold), #fbbf24);
+}
+
+/* ---- 圆点 ---- */
+.dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+.dot.rec { background: var(--red); box-shadow: 0 0 8px rgba(255,59,92,0.5); animation: pulse 0.8s ease-in-out infinite; }
+.dot.proc { background: var(--gold); box-shadow: 0 0 8px rgba(245,158,11,0.5); animation: pulse 0.5s ease-in-out infinite; }
+.dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+@keyframes pulse {
+    0%, 100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.4; transform:scale(0.65); }
+}
+
+/* ---- 文字 ---- */
+.text {
+    font-size: 15px; font-weight: 450; letter-spacing: 0.1px;
+    color: var(--text); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; min-width: 0; line-height: 1;
+}
+.text.hint { color: var(--muted); font-size: 14px; }
+.text.result { color: var(--green); }
+
+/* ---- 分隔线 ---- */
+.divider {
+    width: 0.5px; height: 20px; background: rgba(255,255,255,0.1);
+    border-radius: 1px; flex-shrink: 0;
+}
+
+.hidden { display: none !important; }
 </style>
 </head>
 <body>
-<div id="pill" class="pill">
-    <div id="wave" class="wave"><div class="b"></div><div class="b"></div><div class="b"></div><div class="b"></div><div class="b"></div></div>
+
+<div id="pill" class="pill recording">
+    <!-- 波形 -->
+    <div id="wave" class="waveform">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+    <!-- 圆点（处理/完成时切换显示） -->
     <div id="dot" class="dot hidden"></div>
-    <div id="txt" class="txt hint">聆听中...</div>
+    <!-- 分隔 -->
+    <div id="sep" class="divider hidden"></div>
+    <!-- 文字 -->
+    <div id="txt" class="text hint">聆听中...</div>
 </div>
+
 <script>
-const pl=document.getElementById('pill'), wv=document.getElementById('wave'),
-      dt=document.getElementById('dot'), tx=document.getElementById('txt');
+const pill = document.getElementById('pill');
+const wave = document.getElementById('wave');
+const dot  = document.getElementById('dot');
+const sep  = document.getElementById('sep');
+const txt  = document.getElementById('txt');
 
 function reset() {
-    pl.classList.remove('wide'); wv.classList.remove('hidden');
-    dt.classList.add('hidden'); dt.className='dot';
-    tx.className='txt hint'; tx.textContent='聆听中...';
+    pill.className = 'pill recording';
+    wave.classList.remove('hidden');
+    dot.classList.add('hidden');
+    sep.classList.add('hidden');
+    dot.className = 'dot';
+    txt.className = 'text hint';
+    txt.textContent = '聆听中...';
 }
+
+// 录音中
 function showRecording() { reset(); }
+
+// 处理中 — 波形变金 + 辉光
 function showProcessing() {
-    wv.classList.add('hidden'); dt.classList.remove('hidden');
-    dt.className='dot proc'; tx.textContent='处理中...';
+    pill.className = 'pill processing';
+    txt.textContent = '处理中...';
 }
+
+// 完成 — 绿点 + 分隔线 + 结果文字
 function showResult(t) {
-    wv.classList.add('hidden'); dt.classList.remove('hidden');
-    dt.className='dot ok'; tx.className='txt'; tx.textContent=t||'完成';
-    pl.classList.add('wide');
+    pill.className = 'pill done wide';
+    wave.classList.add('hidden');
+    dot.classList.remove('hidden');
+    dot.className = 'dot ok';
+    sep.classList.remove('hidden');
+    txt.className = 'text result';
+    txt.textContent = t || '';
 }
+
+// 错误
 function showError(m) {
-    wv.classList.add('hidden'); dt.classList.remove('hidden');
-    dt.className='dot err'; tx.className='txt'; tx.textContent=m;
-    pl.classList.add('wide');
+    pill.className = 'pill recording wide';
+    wave.classList.add('hidden');
+    dot.classList.remove('hidden');
+    dot.className = 'dot rec';
+    sep.classList.remove('hidden');
+    txt.className = 'text';
+    txt.textContent = m;
 }
 </script>
 </body>
