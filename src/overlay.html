@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8"/>
+    <title>VoiceFlow</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, 'SF Pro Text', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: transparent;
+            overflow: hidden;
+            -webkit-app-region: drag;
+            user-select: none;
+        }
+
+        /* 主容器 — 输入法风格 */
+        .bar {
+            width: 420px;
+            height: 44px;
+            background: rgba(28, 28, 30, 0.88);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-radius: 22px;
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.35),
+                0 0 0 0.5px rgba(0, 0, 0, 0.2) inset;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            gap: 10px;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .bar.recording {
+            border-color: rgba(255, 59, 48, 0.25);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.35),
+                0 0 20px rgba(255, 59, 48, 0.08);
+        }
+
+        .bar.done {
+            border-color: rgba(52, 199, 89, 0.25);
+        }
+
+        /* 呼吸灯指示器 */
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: background 0.3s ease;
+        }
+
+        .dot.idle {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .dot.ready {
+            background: #34C759;
+        }
+
+        .dot.recording {
+            background: #FF3B30;
+            animation: breathe 1.4s ease-in-out infinite;
+        }
+
+        .dot.transcribing {
+            background: #FFCC00;
+            animation: breathe 0.8s ease-in-out infinite;
+        }
+
+        .dot.done {
+            background: #34C759;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.75); }
+        }
+
+        /* 文字区域 */
+        .text {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 400;
+            line-height: 44px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: rgba(255, 255, 255, 0.85);
+            letter-spacing: 0.2px;
+            transition: color 0.3s ease;
+        }
+
+        .text.hint {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 13px;
+        }
+
+        .text.streaming {
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .text.error {
+            color: #FF453A;
+        }
+
+        .text.done {
+            color: #30D158;
+        }
+
+        /* 光标闪烁（流式输出时） */
+        .cursor {
+            display: inline-block;
+            width: 1.5px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.6);
+            margin-left: 1px;
+            vertical-align: middle;
+            animation: blink 0.6s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 快捷键提示 */
+        .shortcut {
+            flex-shrink: 0;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.2);
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+
+        .shortcut kbd {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.06);
+            border: 0.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-family: -apple-system, monospace;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .hidden { display: none !important; }
+
+        /* 进度条（转写中） */
+        .progress {
+            position: absolute;
+            bottom: 0;
+            left: 14px;
+            right: 14px;
+            height: 1.5px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #FFCC00, #FF9F0A);
+            border-radius: 1px;
+            animation: slide 1.2s ease-in-out infinite;
+            width: 30%;
+        }
+
+        @keyframes slide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+        }
+    </style>
+</head>
+<body>
+    <div id="bar" class="bar">
+        <!-- 指示灯 -->
+        <div id="dot" class="dot idle"></div>
+
+        <!-- 文字 -->
+        <div id="text" class="text hint">就绪</div>
+
+        <!-- 光标（流式输出时显示） -->
+        <span id="cursor" class="cursor hidden"></span>
+
+        <!-- 快捷键提示 -->
+        <div id="shortcut" class="shortcut"><kbd>F2</kbd></div>
+    </div>
+
+    <!-- 转写进度条 -->
+    <div id="progress" class="progress hidden">
+        <div class="progress-bar"></div>
+    </div>
+
+    <script>
+        const bar = document.getElementById('bar');
+        const dot = document.getElementById('dot');
+        const text = document.getElementById('text');
+        const cursor = document.getElementById('cursor');
+        const shortcut = document.getElementById('shortcut');
+        const progress = document.getElementById('progress');
+
+        function reset() {
+            bar.className = 'bar';
+            dot.className = 'dot';
+            text.className = 'text';
+            cursor.classList.add('hidden');
+            progress.classList.add('hidden');
+        }
+
+        // 就绪状态 — 等待录音
+        function showReady() {
+            reset();
+            dot.classList.add('ready');
+            text.classList.add('hint');
+            text.textContent = '就绪';
+            shortcut.innerHTML = '<kbd>右Ctrl</kbd> 或 <kbd>Ctrl+Shift+Win</kbd>';
+        }
+
+        // 录音中 — 呼吸灯 + 等待流式文字
+        function showRecording() {
+            reset();
+            bar.classList.add('recording');
+            dot.classList.add('recording');
+            text.classList.add('hint');
+            text.textContent = '聆听中...';
+            cursor.classList.remove('hidden');
+            shortcut.innerHTML = '<kbd>松手</kbd> 或 <kbd>再按</kbd> 结束';
+        }
+
+        // 流式更新文字（录音期间实时调用）
+        function updateStreaming(partialText) {
+            dot.className = 'dot recording';
+            text.className = 'text streaming';
+            text.textContent = partialText || '...';
+            cursor.classList.remove('hidden');
+            // 自动滚动到末尾（如果文字超出）
+            text.scrollLeft = text.scrollWidth;
+        }
+
+        // 转写中（停止录音后，最终处理）
+        function showTranscribing() {
+            bar.className = 'bar';
+            dot.className = 'dot transcribing';
+            text.className = 'text hint';
+            text.textContent = '处理中...';
+            cursor.classList.add('hidden');
+            progress.classList.remove('hidden');
+            shortcut.innerHTML = '';
+        }
+
+        // 转写完成 — 短暂显示结果
+        function showResult(resultText) {
+            reset();
+            bar.classList.add('done');
+            dot.classList.add('done');
+            text.classList.add('done');
+            text.textContent = resultText || '...';
+            shortcut.innerHTML = '<kbd>已粘贴</kbd>';
+
+            // 2秒后回到就绪
+            setTimeout(() => {
+                if (text.classList.contains('done')) {
+                    showReady();
+                }
+            }, 2000);
+        }
+
+        // 错误
+        function showError(msg) {
+            reset();
+            dot.classList.add('ready');
+            text.classList.add('error');
+            text.textContent = msg;
+            shortcut.innerHTML = '';
+
+            setTimeout(() => {
+                if (text.classList.contains('error')) {
+                    showReady();
+                }
+            }, 2500);
+        }
+
+        // 取消
+        function showCancelled() {
+            reset();
+            text.classList.add('hint');
+            text.textContent = '已取消';
+            dot.classList.add('ready');
+            shortcut.innerHTML = '<kbd>右Ctrl</kbd> 或 <kbd>Ctrl+Shift+Win</kbd>';
+
+            setTimeout(() => {
+                showReady();
+            }, 1200);
+        }
+
+        // 初始状态
+        showReady();
+    </script>
+</body>
+</html>

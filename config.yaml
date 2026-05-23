@@ -1,0 +1,123 @@
+# Local STT Toolkit 配置文件
+# 位置: E:\Files\Projects\local-stt-toolkit\config.yaml
+
+# ============================================================
+# 引擎配置
+# ============================================================
+engine:
+  # 当前使用的 ASR 引擎
+  # 可选: sensevoice / qwen3-asr
+  active: "sensevoice"
+
+  # 引擎配置
+  sensevoice:
+    model_path: "models/sensevoice/model.int8.onnx"
+    tokens_path: "models/sensevoice/tokens.txt"
+    language: "zh"              # 主要语言: zh / en / auto
+    use_itn: true               # 逆文本正则化（数字、日期等标准化）
+
+  qwen3-asr:
+    model_path: "models/qwen3-asr/model.onnx"
+    tokens_path: "models/qwen3-asr/tokens.txt"
+    language: "zh"
+    prompt: ""                  # 可选的文本提示（引导识别方向）
+
+# ============================================================
+# 音频配置
+# ============================================================
+audio:
+  sample_rate: 16000            # 采样率（Hz），所有模型都要求 16kHz
+  channels: 1                   # 单声道
+  dtype: "int16"                # 采样格式
+  device_index: null            # 麦克风设备索引，null = 系统默认
+  # 如果有多个麦克风，用 scripts/test_mic.py 查看设备列表后填写索引
+
+# ============================================================
+# VAD 配置（语音活动检测，用于降噪辅助，不用于断句）
+# ============================================================
+vad:
+  enabled: true
+  # 静音多少秒后自动停止（仅 Push-to-Talk 模式生效）
+  silence_timeout: 1.5
+  # 最少录多久才允许自动停（防止误触立即停）
+  min_recording: 1.0
+  # 能量阈值：低于此值视为静音（0.0-1.0）
+  energy_threshold: 0.02
+
+# ============================================================
+# 快捷键配置
+hotkeys:
+  # 录音：按 F2 开始说话，安静 1.5 秒自动停止并粘贴文字
+  push_to_talk: "f2"
+
+  # 取消本次录音（不输出文字）
+  cancel: "escape"
+
+# ============================================================
+# 输出配置
+# ============================================================
+output:
+  # 输出方式: keyboard（模拟键盘输入）/ clipboard（剪贴板粘贴）
+  mode: "clipboard"
+
+  # keyboard 模式的输入速度（每个字符间隔，秒）
+  typing_interval: 0.01
+
+  # 是否在输出后自动加空格
+  auto_space: true
+
+  # 是否在输出后自动加句号（Toggle 模式下）
+  auto_period: false
+
+  # 兜底机制：粘贴失败时的处理
+  fallback:
+    # 粘贴失败时自动将文字存入剪贴板
+    to_clipboard: true
+    # 同时写入本地历史文件（防止剪贴板被覆盖）
+    to_history: true
+
+# ============================================================
+# 热词知识库配置
+# ============================================================
+hotwords:
+  enabled: true
+  # 词表文件目录
+  directory: "knowledge-base"
+  # 要加载的词表文件（按优先级排序）
+  files:
+    - "ai-terms.txt"
+    - "company-terms.txt"
+    - "user-custom.txt"
+  # 热词权重（默认 1.0，越大越优先匹配）
+  default_weight: 1.0
+
+# ============================================================
+# 系统配置
+# ============================================================
+system:
+  # 录音开始提示音（null = 不播放）
+  start_sound: null
+  # 录音结束提示音
+  end_sound: null
+  # 是否显示系统托盘图标
+  tray_icon: true
+  # 日志级别: DEBUG / INFO / WARNING / ERROR
+  log_level: "INFO"
+  # 日志文件路径（null = 只输出到控制台）
+  log_file: "logs/stt.log"
+
+# ============================================================
+# 文本清理器（后处理，零延迟）
+# ============================================================
+cleaner:
+  # 去除口头禅：嗯、啊、那个、就是说 等
+  remove_fillers: true
+
+  # 中英文之间自动加空格
+  auto_space_en: true
+
+  # 常见音近错字修正（从 knowledge-base/ 加载自定义词表）
+  fix_mistakes: true
+
+  # 基础标点补充
+  basic_punctuation: false

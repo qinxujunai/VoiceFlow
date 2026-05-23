@@ -1,0 +1,24 @@
+# 模型文件（太大，不入库）
+models/
+
+# 音频文件
+*.wav
+*.mp3
+*.flac
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# 环境变量
+.env
+
+# 日志
+logs/
+
+# IDE
+.vscode/
+.idea/
