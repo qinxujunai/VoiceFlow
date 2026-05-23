@@ -97,6 +97,11 @@ class OverlayWindow:
         if self._on_ready:
             self._on_ready()
 
+        # Exit cleanly when terminal closes (Ctrl+C or window closed)
+        import signal
+        signal.signal(signal.SIGINT, lambda s, f: app.quit())
+        signal.signal(signal.SIGTERM, lambda s, f: app.quit())
+
         app.exec()
 
     # ============================================================
@@ -189,6 +194,8 @@ class OverlayWindow:
             self._on_open_dictionary()
 
     def quit(self):
+        if self._tray:
+            self._tray.setVisible(False)
         QApplication.instance().quit()
 
     # ============================================================

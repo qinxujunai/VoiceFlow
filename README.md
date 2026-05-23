@@ -22,7 +22,7 @@ venv\Scripts\python.exe src\main.py
 
 | 按键 | 功能 |
 | --- | --- |
-| F2 | 开始录音 / 停止并粘贴 |
+| F2 / 鼠标上侧键 | 开始录音 / 停止并粘贴 |
 | Esc | 取消本次录音 |
 
 ## 当前能力
@@ -79,7 +79,7 @@ VoiceFlow/
 
 ```bash
 venv\Scripts\python.exe -m py_compile src\*.py
-venv\Scripts\python.exe -m unittest discover tests -v
+venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe test_integration.py
 ```
 
