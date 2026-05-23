@@ -50,14 +50,14 @@ class Transcriber:
                 tokens=tokens_path,
                 language=engine_cfg.get("language", "zh"),
                 use_itn=engine_cfg.get("use_itn", True),
-                num_threads=4,
+                num_threads=6,
                 provider="cpu",
             )
         elif engine_name == "qwen3-asr":
             self.recognizer = sherpa_onnx.OfflineRecognizer.from_qwen3_asr(
                 model=model_path,
                 tokens=tokens_path,
-                num_threads=4,
+                num_threads=6,
                 provider="cpu",
             )
         else:
