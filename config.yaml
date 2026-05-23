@@ -48,7 +48,7 @@ vad:
 # 快捷键配置
 hotkeys:
   # 录音：F2 或鼠标侧键开始；再次按下停止并粘贴文字
-  push_to_talk: ["f2", "xbutton1", "xbutton2", "ctrl+shift+space", "right_ctrl"]  # 跨平台多键（组合键 / 鼠标侧键 / macOS 右 Control）
+  push_to_talk: ["f2", "xbutton1", "xbutton2", "right_ctrl"]  # F2 / 鼠标侧键 / 右 Control
 
   # 取消本次录音（不输出文字）
   cancel: "escape"
