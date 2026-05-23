@@ -129,6 +129,10 @@ Think, then code. Every visual change must answer: would this belong in a native
 Match the existing code as if the same person wrote every line. Indentation, naming, control flow, comment style — follow the neighbors exactly. Before committing, re-read your diff and delete any line not traceable to the stated goal. Surgical, not sweeping.
 
 
+## Known Issues
+
+- **Pill flash on new recording.** After a recording ends and the pill hides, starting a new recording may briefly show the pill at the previous width before it snaps to the minimum listening width. Root cause involves the timing between Qt window visibility and WebEngine JavaScript execution. `_hide_and_idle` uses `runJavaScript` with a callback to set idle state before hiding, and `showState` now calls `removeProperty('--target-width')` to clear inline width. The issue persists in some fast-restart scenarios. Future investigation should focus on ensuring the pill CSS `--target-width` is reset synchronously before `window.show()`.
+
 ## Coding Rules
 
 - Keep changes narrow and tied to the product contract.
