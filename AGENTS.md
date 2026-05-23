@@ -121,6 +121,14 @@ Use `wrong=correct` only in correction files.
   ```
 - **`dist/VoiceFlow.exe` is a frozen snapshot.** If the desktop shortcut ever points to the exe instead of `start.bat`, the exe must be rebuilt with `venv\Scripts\pyinstaller.exe VoiceFlow.spec` to pick up config changes.
 
+
+## Craft Standard
+
+Think, then code. Every visual change must answer: would this belong in a native iOS or macOS app? Animations convey state, not decoration. Whitespace is intentional. Default to subtraction — remove before you add. The reference is not competing dictation tools; it is the restraint of Voice Memos, Notes, and Messages.
+
+Match the existing code as if the same person wrote every line. Indentation, naming, control flow, comment style — follow the neighbors exactly. Before committing, re-read your diff and delete any line not traceable to the stated goal. Surgical, not sweeping.
+
+
 ## Coding Rules
 
 - Keep changes narrow and tied to the product contract.
