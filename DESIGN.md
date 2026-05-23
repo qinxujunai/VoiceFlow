@@ -8,7 +8,7 @@ The project is not constrained by earlier prototype docs. Existing code is usefu
 
 ## Non-Negotiables
 
-- **F2 + mouse side button (xbutton1) are the recording keys.** Esc cancels.
+- **F2 + mouse side buttons (xbutton1/xbutton2) are the recording keys.** Esc cancels.
 - **Offline first.** No network calls in the default path.
 - **Low latency over heavy AI polish.** The main path uses ASR + deterministic cleanup.
 - **Never lose text.** Store output attempts in local history and keep clipboard fallback.
