@@ -175,6 +175,7 @@ class OverlayWindow:
     def _hide_and_idle(self):
         self._hide()
         self._set_tray_state(TRAY_ICON_IDLE)
+        self.show_idle()
 
     def _set_tray_state(self, state):
         if self._tray and state in self._tray_icons:

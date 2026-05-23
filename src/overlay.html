@@ -300,9 +300,7 @@ function showState(state, label) {
 }
 
 function showRecording() {
-    pill.style.opacity = '0';
     showState('listening', '');
-    requestAnimationFrame(() => { pill.style.opacity = ''; });
 }
 
 function updateStreaming(text) {
