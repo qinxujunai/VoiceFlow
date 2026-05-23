@@ -6,6 +6,8 @@
 import os
 import yaml
 
+from vocabulary import Vocabulary
+
 
 class HotwordLoader:
     """热词加载器"""
@@ -18,6 +20,7 @@ class HotwordLoader:
 
         self.base_dir = os.path.dirname(os.path.dirname(__file__))
         self._hotwords = set()
+        self._vocabulary = None
 
     def load_all(self):
         """
@@ -30,19 +33,10 @@ class HotwordLoader:
         if not hw_cfg.get("enabled", False):
             return []
 
-        hw_dir = os.path.join(self.base_dir, hw_cfg.get("directory", "knowledge-base"))
         files = hw_cfg.get("files", [])
-
-        self._hotwords = set()
-
-        for fname in files:
-            fpath = os.path.join(hw_dir, fname)
-            if os.path.exists(fpath):
-                with open(fpath, "r", encoding="utf-8") as f:
-                    for line in f:
-                        word = line.strip()
-                        if word and not word.startswith("#"):
-                            self._hotwords.add(word)
+        directory = hw_cfg.get("directory", "knowledge-base")
+        self._vocabulary = Vocabulary(self.base_dir, files=files, directory=directory)
+        self._hotwords = set(self._vocabulary.terms)
 
         return sorted(self._hotwords)
 
@@ -60,10 +54,10 @@ class HotwordLoader:
         word = word.strip()
         self._hotwords.add(word)
 
-        # 写入对应文件
         hw_cfg = self.config.get("hotwords", {})
         hw_dir = os.path.join(self.base_dir, hw_cfg.get("directory", "knowledge-base"))
         fpath = os.path.join(hw_dir, f"{category}.txt")
+        os.makedirs(hw_dir, exist_ok=True)
 
         with open(fpath, "a", encoding="utf-8") as f:
             f.write(f"{word}\n")

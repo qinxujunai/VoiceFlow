@@ -19,6 +19,8 @@ from hotkey_manager import HotkeyManager
 from output_handler import OutputHandler
 from overlay_webview import OverlayWindow
 from text_cleaner import TextCleaner
+from history_store import HistoryStore
+from recording_session import RecordingSession
 
 
 class _InitWorker(threading.Thread):
@@ -50,10 +52,12 @@ class VoiceInputSystem:
         self._streaming = False
         self._latest_text = ""  # 后台转写的最新结果
         self.overlay = OverlayWindow()
+        self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
         self.audio = AudioCapture(self.config_path)
+        self.session = RecordingSession(self.audio)
 
         print("[启动] ASR...", flush=True)
         self.overlay.show_processing()
@@ -65,6 +69,11 @@ class VoiceInputSystem:
         self.output_handler = OutputHandler(
             self.config_path, base_dir=self.base_dir, overlay=self.overlay
         )
+        self.overlay.set_actions(
+            on_copy_last=self._copy_last_text,
+            on_repaste_last=self._repaste_last_text,
+            on_open_dictionary=self._open_dictionary,
+        )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
 
@@ -74,7 +83,7 @@ class VoiceInputSystem:
         if self._is_processing:
             return
         try:
-            self.audio.start_recording()
+            self.session.start()
             self.overlay.show_window()
             self.overlay.show_recording()
             self._latest_text = ""
@@ -91,29 +100,31 @@ class VoiceInputSystem:
         self._stop_streaming()
 
         try:
-            data = self.audio.stop_recording()
+            result = self.session.stop()
+            data = result.audio_data
             if len(data) == 0:
                 self.overlay.show_error("无音频")
                 self.overlay.hide_after(2000)
                 self._is_processing = False
                 return
 
-            duration = len(data) / self.audio.sample_rate
-
-            # 优先用后台累积的转写结果（够新就直接用）
-            if self._latest_text and len(self._latest_text) > 2:
-                text = self._latest_text
-                print(f"[转写] (缓存) {text}", flush=True)
-            else:
+            duration = result.duration or (len(data) / self.audio.sample_rate)
+            raw_text, text, cached = self._final_text_from_cache()
+            if not cached:
                 self.overlay.show_processing()
-                text = self.transcriber.transcribe(data, self.audio.sample_rate)
+                raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
+                text = self.cleaner.clean(raw_text) if raw_text else ""
 
             if text:
-                text = self.cleaner.clean(text)
                 rtf = (time.time() - duration) / duration if duration > 0 else 0
-                print(f"[转写] {text} ({duration:.1f}s)", flush=True)
-                self.overlay.show_result(text)
-                self.output_handler.output(text)
+                source = "缓存" if cached else "最终"
+                print(f"[转写] ({source}) {text} ({duration:.1f}s)", flush=True)
+                output_status = self.output_handler.output(text)
+                self.history.append(
+                    raw_text=raw_text,
+                    clean_text=text,
+                    output_status=output_status,
+                )
                 self.overlay.hide_after(0)
             else:
                 self.overlay.show_error("无识别结果")
@@ -121,6 +132,7 @@ class VoiceInputSystem:
 
         except Exception as e:
             self.overlay.show_error(str(e))
+            self.history.append(output_status="error", error=str(e))
             import traceback
             traceback.print_exc()
         finally:
@@ -151,12 +163,37 @@ class VoiceInputSystem:
     def _stop_streaming(self):
         self._streaming = False
 
+    def _final_text_from_cache(self):
+        raw_text = (self._latest_text or "").strip()
+        if not raw_text:
+            return "", "", False
+        return raw_text, self.cleaner.clean(raw_text), True
+
     def _on_record_cancel(self):
         if self.audio.is_recording:
             self._stop_streaming()
-            self.audio.cancel_recording()
-            self.overlay.hide_after(0)
+            self.session.cancel()
+            self.overlay.show_canceled()
+            self.overlay.hide_after(800)
         print("[录音] 已取消", flush=True)
+
+    def _copy_last_text(self):
+        last = self.history.last()
+        text = last.get("clean_text", "") if last else ""
+        if text:
+            import pyperclip
+            pyperclip.copy(text)
+            self.overlay.show_result("已复制上一次结果")
+            self.overlay.hide_after(1200)
+
+    def _repaste_last_text(self):
+        last = self.history.last()
+        text = last.get("clean_text", "") if last else ""
+        if text and hasattr(self, "output_handler"):
+            self.output_handler.output(text)
+
+    def _open_dictionary(self):
+        os.startfile(os.path.join(self.base_dir, "knowledge-base"))
 
     # ---- 生命周期 ----
 
@@ -174,6 +211,7 @@ class VoiceInputSystem:
         def on_done():
             try:
                 self._start_hotkeys()
+                self.overlay.show_idle()
                 print("  按 F2 开始说话", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)

@@ -1,5 +1,5 @@
 # Local STT Toolkit 配置文件
-# 位置: E:\Files\Projects\local-stt-toolkit\config.yaml
+# 位置: E:\Files\Projects\VoiceFlow\config.yaml
 
 # ============================================================
 # 引擎配置
@@ -85,6 +85,11 @@ hotwords:
   directory: "knowledge-base"
   # 要加载的词表文件（按优先级排序）
   files:
+    - "builtin-ai.txt"
+    - "corrections.txt"
+    - "user-dictionary.txt"
+    - "phrases.txt"
+    # legacy lists kept for compatibility while the new layered dictionary grows
     - "ai-terms.txt"
     - "company-terms.txt"
     - "user-custom.txt"

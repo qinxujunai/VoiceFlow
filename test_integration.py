@@ -89,7 +89,7 @@ def main():
     print("  全部测试通过！")
     print("=" * 50)
     print("\n启动命令:")
-    print("  cd E:\\Files\\Projects\\local-stt-toolkit")
+    print("  cd E:\\Files\\Projects\\VoiceFlow")
     print("  .\\venv\\Scripts\\activate")
     print("  python src\\main.py")
 

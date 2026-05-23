@@ -38,6 +38,7 @@ class OutputHandler:
         self.base_dir = base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.history_file = os.path.join(self.base_dir, "logs", "history.txt")
         self.overlay = overlay  # 用于悬浮窗提示
+        self.last_text = ""
 
     def output(self, text):
         """
@@ -47,17 +48,23 @@ class OutputHandler:
             text: 要输出的文字
         """
         if not text:
-            return
+            return "empty"
 
         text = text.strip()
         if self.auto_period:
             if text and text[-1] not in "。！？.!?,，；;：:":
                 text += "。"
+        self.last_text = text
 
         if self.mode == "clipboard":
-            self._paste(text)
-        else:
-            self._type(text)
+            return "pasted" if self._paste(text) else "fallback"
+        return "typed" if self._type(text) else "fallback"
+
+    def repeat_last(self):
+        """重新输出最近一次成功进入输出模块的文本"""
+        if not self.last_text:
+            return "empty"
+        return self.output(self.last_text)
 
     def _paste(self, text):
         """通过剪贴板粘贴"""
@@ -101,6 +108,8 @@ class OutputHandler:
         if not result:
             self._fallback(text)
 
+        return result
+
     def _fallback(self, text):
         """兜底：粘贴失败时存入剪贴板 + 本地历史 + 悬浮窗提示"""
         try:
@@ -123,19 +132,25 @@ class OutputHandler:
         if self.overlay:
             try:
                 self.overlay.show_error("粘贴失败，已存入剪贴板")
+                self.overlay.hide_after(2000)
             except Exception:
                 pass
+
+        return False
 
     def _type(self, text):
         """模拟键盘输入"""
         try:
             pyautogui.write(text, interval=self.typing_interval)
+            return True
         except Exception:
             # pyautogui.write 不支持中文，用 press 逐字符 fallback
             try:
                 for char in text:
                     pyautogui.press(char)
                     time.sleep(self.typing_interval)
+                return True
             except Exception:
                 # 连键盘输入都失败了，走兜底
                 self._fallback(text)
+                return False

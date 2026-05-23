@@ -1,136 +1,94 @@
 # VoiceFlow
 
-> 免费、开源、完全本地的语音转文字工具。按一下快捷键，说话，安静后文字自动粘贴到光标位置。
+VoiceFlow 是一个 Windows 本地语音输入工具：按 **F2** 开始说话，再按 **F2** 停止，文字会粘贴到当前光标位置。目标不是做一个炫技 ASR demo，而是做一个日常可依赖的系统级输入基础设施。
 
----
+核心原则：
 
-## 🎯 为什么做这个
+- 本地优先：默认不上传语音，不依赖云服务。
+- 低摩擦：F2 是唯一主入口，Esc 取消。
+- 不丢字：粘贴失败时保留剪贴板兜底，并写入本地历史。
+- 懂你的词：AI/工程术语、公司词、个人修正词表持续积累。
+- 视觉克制：底部居中胶囊只表达当前状态，不抢注意力。
 
-在跟 AI 对话、写代码、聊天的场景里，打字是一个瓶颈——你想得快，手跟不上。而市面上的解决方案各有各的问题：
-
-| 痛点 | 具体场景 | VoiceFlow 的方案 |
-|------|---------|-----------------|
-| **输入法卡顿** | 打着打着切输入法崩了、卡死、丢字 | 语音直出，不经过输入法 |
-| **国外产品付费 + 中文差** | Wispr Flow $10/月，Speakly 订阅制 | 完全免费开源，SenseVoice 原生中文 |
-| **怕丢** | 讲了一大段话崩了，什么都没留下 | 粘贴失败自动存剪贴板 + 本地历史 |
-| **隐私** | 语音数据上传云端 | 100% 本地运行，数据不出本机 |
-| **通用模型不懂你的词** | 说"Cursor"识别成"科瑟" | 文本修正引擎，越用越懂你 |
-
----
-
-## ✨ 核心功能
-
-- **一键录音** — 按 F2 开始说话，安静 1.5 秒自动停止粘贴
-- **流式显示** — 说话时文字实时出现在悬浮条上
-- **VAD 静音检测** — Push-to-Talk 模式下自动识别说话结束，无需手动松键
-- **系统托盘** — 启动后最小化到托盘，只在录音时弹出悬浮窗
-- **文字清理** — 自动去口头禅（嗯、啊、那个）、中英文加空格、常见错字修正
-- **防丢兜底** — 粘贴失败时自动存剪贴板 + 写入历史文件
-- **全局可用** — 在任何应用（微信、Word、浏览器、IDE）中使用
-- **热词修正** — 按 Ctrl+Alt+H 弹出对话框，输入错误→正确映射
-
----
-
-## ⌨️ 快捷键
-
-| 功能 | 快捷键 | 说明 |
-|------|--------|------|
-| 录音 | **F2** | 按一下开始说话，安静 1.5 秒自动停止，文字粘贴 |
-| 取消 | **Esc** | 丢弃本次录音 |
-
----
-
-## 🏗️ 技术架构
-
-```
-VoiceFlow/
-├── src/
-│   ├── main.py              # 主入口、管道编排
-│   ├── audio_capture.py     # 麦克风采集 + VAD 静音检测
-│   ├── transcriber.py       # Sherpa-ONNX + SenseVoice 语音识别
-│   ├── text_cleaner.py      # 文字后处理（规则清理 + 错字修正）
-│   ├── output_handler.py    # 文字注入 + 兜底机制
-│   ├── hotkey_manager.py    # 全局快捷键监听
-│   ├── overlay_webview.py   # PyQt6 悬浮窗 + 系统托盘
-│   └── overlay.html         # 苹果风格毛玻璃 UI
-├── models/sensevoice/       # SenseVoice 模型文件 (229MB)
-├── knowledge-base/          # 修正词表（260+ AI 术语）
-├── config.yaml              # 配置文件
-├── start.bat                # 一键启动
-├── VoiceFlow.spec           # PyInstaller 打包配置
-└── README.md
-```
-
-**技术栈：**
-- 语音识别：Sherpa-ONNX + SenseVoice-Small（阿里开源，234M 参数）
-- VAD：能量检测，零额外依赖
-- 音频采集：sounddevice
-- 热键：pynput（吞键模式，不和输入法冲突）
-- 文字注入：pyperclip + pyautogui（含兜底）
-- UI：PyQt6 WebView + HTML/CSS 毛玻璃
-
----
-
-## 🚀 快速开始
-
-### 环境要求
-- Windows 10/11
-- Python 3.10+
-- 麦克风
-
-### 安装
+## 使用
 
 ```bash
-git clone https://github.com/yourname/VoiceFlow.git
-cd VoiceFlow
-
-# 创建虚拟环境 + 安装依赖
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-
-# 下载模型
-python scripts/download_models.py
-```
-
-### 使用
-
-双击 `start.bat`，或在终端：
-
-```bash
+双击 start.bat
+# 或
 venv\Scripts\python.exe src\main.py
 ```
 
-启动后托盘出现 VoiceFlow 图标。按 **F2** 开始说话，安静 1.5 秒后文字自动粘贴。
+快捷键：
 
----
+| 按键 | 功能 |
+| --- | --- |
+| F2 | 开始录音 / 停止并粘贴 |
+| Esc | 取消本次录音 |
 
-## 📊 性能
+## 当前能力
 
-| 指标 | 数值 |
-|------|------|
-| 识别延迟 | RTF 0.026（处理 1 秒音频仅需 0.026 秒） |
-| 文字清理延迟 | < 1ms（纯正则） |
-| 模型大小 | 229MB（int8） |
-| 内存占用 | ~200MB |
-| 支持语言 | 中文、英文、日文、韩文、粤语 |
+- SenseVoice-Small + sherpa-onnx 本地 ASR。
+- 录音期间预览转写，停止后用完整音频生成最终文本。
+- 规则清理：口头禅、中英文空格、常见音近词修正。
+- 分层词库：内置 AI 术语、用户词典、错词修正、常用短语。
+- 剪贴板粘贴 + 失败兜底。
+- `logs/history.jsonl` 记录原始文本、清理后文本和输出状态。
+- PyQt6 WebView 底部居中胶囊 + 系统托盘状态图标。
 
----
+## 项目结构
 
-## 🆚 对比
+```text
+VoiceFlow/
+├── src/
+│   ├── main.py              # 主流程编排
+│   ├── recording_session.py # 录音生命周期
+│   ├── audio_capture.py     # 麦克风采集
+│   ├── transcriber.py       # sherpa-onnx ASR
+│   ├── vocabulary.py        # 分层词库
+│   ├── text_cleaner.py      # 文本清理和修正
+│   ├── output_handler.py    # 粘贴与兜底
+│   ├── history_store.py     # JSONL 历史
+│   ├── ui_state.py          # UI 状态定义
+│   ├── overlay_webview.py   # 悬浮胶囊 + 托盘
+│   ├── overlay.html         # 胶囊 UI
+│   └── tray_icon.py         # 运行时托盘图标
+├── knowledge-base/
+│   ├── builtin-ai.txt
+│   ├── corrections.txt
+│   ├── user-dictionary.txt
+│   ├── phrases.txt
+│   └── legacy lists...
+├── scripts/
+├── config.yaml
+├── start.bat
+└── test_integration.py
+```
 
-| 特性 | VoiceFlow | Wispr Flow | Speakly |
-|------|-----------|------------|---------|
-| **价格** | 免费 | $10/月 | 订阅制 |
-| **离线** | ✅ | ❌ | 部分 |
-| **VAD 自动停** | ✅ | ✅ | ✅ |
-| **系统托盘** | ✅ | ✅ | ✅ |
-| **热词修正** | ✅ | ❌ | ❌ |
-| **防丢兜底** | ✅ | ❌ | ❌ |
-| **开源** | ✅ | ❌ | ❌ |
+## 词库
 
----
+优先编辑这些文件：
 
-## 📄 许可证
+- `knowledge-base/corrections.txt`：错词修正，格式 `错词=正确词`。
+- `knowledge-base/user-dictionary.txt`：人名、项目名、公司名。
+- `knowledge-base/phrases.txt`：希望完整保留的常用短语。
+- `knowledge-base/builtin-ai.txt`：通用 AI/工程术语。
 
-MIT License
+旧的 `ai-terms.txt`、`company-terms.txt`、`user-custom.txt` 仍会加载，用于兼容已有内容。
+
+## 验证
+
+```bash
+venv\Scripts\python.exe -m py_compile src\*.py
+venv\Scripts\python.exe -m unittest discover tests -v
+venv\Scripts\python.exe test_integration.py
+```
+
+## 路线图
+
+优先级从高到低：
+
+1. 胶囊 UI 细节继续打磨：缩放、多显示器、长文本。
+2. 词库学习闭环：从历史中把用户修正写回 `corrections.txt`。
+3. 真实安装包：PyInstaller build smoke、正式 exe 图标、模型缺失引导。
+4. 可选高级引擎：Qwen3-ASR 实验模式，不进入默认路径。
+5. 可选本地整理文字模式：默认关闭，不能破坏低延迟主链路。

@@ -1,0 +1,25 @@
+# Built-in AI and developer terms.
+# One term per line. Use corrections.txt for wrong=correct pairs.
+AI
+API
+ASR
+Claude
+Codex
+ComfyUI
+Cursor
+DeepSeek
+FastAPI
+GitHub
+HuggingFace
+LangChain
+LLaMA
+MCP
+OpenAI
+Qwen
+RAG
+SenseVoice
+Sherpa-ONNX
+STT
+TTS
+TypeScript
+vLLM
