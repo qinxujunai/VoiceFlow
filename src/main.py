@@ -250,7 +250,10 @@ class VoiceInputSystem:
 
     def start(self):
         ptt_raw = self.config.get("hotkeys", {}).get("push_to_talk", "f2")
-        ptt = ptt_raw if isinstance(ptt_raw, str) else "+".join(ptt_raw)
+        if isinstance(ptt_raw, list):
+            ptt = " / ".join(k.upper() for k in ptt_raw)
+        else:
+            ptt = ptt_raw.upper()
         engine = self.config.get("engine", {}).get("active", "sensevoice")
         print(f"\n  VoiceFlow | {engine} | {ptt.upper()}=录音/停止  Esc=取消\n", flush=True)
 
@@ -282,7 +285,7 @@ class VoiceInputSystem:
             try:
                 self._start_hotkeys()
                 self.overlay.show_idle()
-                print("  按 F2 开始说话", flush=True)
+                print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
 
