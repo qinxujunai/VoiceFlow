@@ -1,8 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-VoiceFlow PyInstaller 打包配置
-构建命令：pyinstaller VoiceFlow.spec
-输出：dist/VoiceFlow.exe（单文件，双击即用）
+VoiceFlow PyInstaller release build.
+Build: venv\\Scripts\\pyinstaller.exe VoiceFlow.spec
+Output: dist\\VoiceFlow.exe
 """
 
 import sys
@@ -15,13 +15,14 @@ a = Analysis(
     pathex=[str(PROJECT_ROOT / "src")],
     binaries=[],
     datas=[
-        # HTML 悬浮窗
+        # Overlay UI.
         (str(PROJECT_ROOT / "src" / "overlay.html"), "src"),
-        # 配置文件
+        # Runtime config.
         (str(PROJECT_ROOT / "config.yaml"), "."),
-        # 知识库
+        # Vocabulary files.
         (str(PROJECT_ROOT / "knowledge-base"), "knowledge-base"),
-        # 模型文件（太大，排除；用户自己下载）
+        (str(PROJECT_ROOT / "assets" / "voiceflow.ico"), "assets"),
+        # Models are intentionally not bundled because they are large.
         # (str(PROJECT_ROOT / "models"), "models"),
     ],
     hiddenimports=[
@@ -29,6 +30,7 @@ a = Analysis(
         "sounddevice",
         "numpy",
         "keyboard",
+        "pynput",
         "pyperclip",
         "pyautogui",
         "yaml",
@@ -69,11 +71,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # 显示控制台窗口（方便调试）
-    disable_windowed_traceback=False,
+    console=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # runtime tray icon is generated in src/tray_icon.py
+    icon=str(PROJECT_ROOT / "assets" / "voiceflow.ico"),
 )

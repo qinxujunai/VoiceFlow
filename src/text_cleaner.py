@@ -199,21 +199,6 @@ class TextCleaner:
         return stripped
 
 
-    def clean_streaming(self, text: str) -> str:
-        """Clean for streaming display: strip all punctuation for smooth flow."""
-        if not text or not text.strip():
-            return text
-        text = text.strip()
-        if self.remove_fillers:
-            text = self._strip_fillers(text)
-        if self.fix_mistakes:
-            text = self._fix_mistakes(text)
-        # Strip all punctuation for streaming
-        import unicodedata
-        text = ''.join(c for c in text if not unicodedata.category(c).startswith('P') and c != '\uff0c' and c != '\u3002' and c != '\uff01' and c != '\uff1f' and c != '\u3001' and c != '\uff1b' and c != '\uff1a' and c != '\u2026' and c != '\u2014' and c != '\u2018' and c != '\u2019' and c != '\u201c' and c != '\u201d')
-        text = re.sub(r" {2,}", " ", text)
-        return text.strip()
-
     def _strip_fillers(self, text: str) -> str:
         text = self.filler_pattern.sub("", text)
         text = self.then_dedup.sub("然后", text)

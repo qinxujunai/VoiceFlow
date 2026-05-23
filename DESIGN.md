@@ -1,24 +1,26 @@
 # VoiceFlow Design
 
-## Product Intent
+## Product Contract
 
-VoiceFlow is a local-first Windows dictation layer for people who think faster than they type. The product contract is simple: press F2, speak naturally, press F2 again, and the cleaned text appears at the current cursor without losing the original speech.
+VoiceFlow is a local-first Windows dictation layer. Press F2 or a mouse side button, speak, press again, and text appears where the cursor is. If paste cannot land in an input field, the text must remain in the clipboard and local history.
 
-The project is not constrained by earlier prototype docs. Existing code is useful only where it supports the current product direction.
+The product is intentionally small. Reliability, low latency, and "never lose text" matter more than decorative UI or AI rewriting.
 
 ## Non-Negotiables
 
-- **F2 + mouse side buttons (xbutton1/xbutton2) are the recording keys.** Esc cancels.
-- **Offline first.** No network calls in the default path.
-- **Low latency over heavy AI polish.** The main path uses ASR + deterministic cleanup.
-- **Never lose text.** Store output attempts in local history and keep clipboard fallback.
-- **Personal vocabulary is product core.** Corrections, names, product terms, and phrases must be easy to maintain.
-- **The overlay is a state indicator, not a full app window.** It must stay centered, quiet, and precise.
+- Default path is offline: no cloud ASR, no cloud LLM, no hidden network work.
+- Text output is first copied to the clipboard, then pasted.
+- The app must not restore the old clipboard after dictation.
+- Final output is generated from complete stopped audio, not only from streaming preview.
+- Streaming preview may be throttled for long recordings, but final transcription must remain complete.
+- Tray menu must expose a working Exit action.
+- Default triggers are F2 plus xbutton1/xbutton2. Do not add more default keys unless there is a strong reason.
 
-## Current Architecture
+## Current Flow
 
 ```text
 HotkeyManager
+  -> VoiceInputSystem
   -> RecordingSession
   -> AudioCapture
   -> Transcriber
@@ -28,74 +30,54 @@ HotkeyManager
   -> OverlayWindow / tray icon
 ```
 
-### Recording
+Recording starts on toggle. A background thread updates the overlay with preview text. The preview is throttled more aggressively as the audio gets longer so it cannot dominate CPU time during long dictation.
 
-`RecordingSession` owns the recording lifecycle. `AudioCapture` remains the hardware adapter around `sounddevice`. Background streaming is used only for preview; final output is generated from the complete stopped audio buffer.
+Stopping recording always stops capture first and then runs final recognition over the complete audio buffer. If final recognition returns empty while preview had text, the preview text is used as a safety fallback.
 
-### Recognition
+## Recognition
 
-SenseVoice-Small through sherpa-onnx is the default engine because it is fast, local, and light. Qwen3-ASR remains experimental until model download, runtime, and prompt/context behavior are verified in this repo.
+Default model is SenseVoice-Small int8 through sherpa-onnx. It is the current conservative default for local Chinese and mixed Chinese-English dictation on Windows CPU.
 
-SenseVoice does not use sherpa transducer hotwords in the current implementation. Vocabulary improvement happens through deterministic post-processing.
+Qwen3-ASR stays experimental until `scripts/benchmark_models.py` proves a better local tradeoff for load time, RTF, stability, and domain vocabulary.
 
-### Vocabulary
+Vocabulary and corrections are deterministic post-processing. SenseVoice hotwords are not wired through sherpa transducer hotwords in this project.
 
-`Vocabulary` loads layered files from `knowledge-base`:
+## Output And History
 
-- `builtin-ai.txt`: curated AI/developer terms.
-- `corrections.txt`: `wrong=correct` pairs.
-- `user-dictionary.txt`: personal nouns and project names.
-- `phrases.txt`: phrases that should survive cleanup.
-- legacy `ai-terms.txt`, `company-terms.txt`, `user-custom.txt`: still loaded for compatibility.
+`OutputHandler` copies text to clipboard before attempting `Ctrl+V`. This guarantees that a user can manually paste even when focus is not in a text field.
 
-`TextCleaner` applies corrections and formatting after ASR. It avoids broad lowercase rewrites that corrupt ordinary English words.
+`HistoryStore` writes JSONL entries to `logs/history.jsonl`. Each successful text output should have raw text, cleaned text, output status, and timestamp.
 
-### Output And History
+## UI
 
-`OutputHandler` uses clipboard + Ctrl+V as the default cross-app insertion path. It returns an output status and stores the last text for repeat-paste. `HistoryStore` writes append-only JSONL entries to `logs/history.jsonl` with raw text, cleaned text, output status, timestamp, and error.
+The overlay is a compact bottom-centered pill. It is a state indicator, not a full editor:
 
-### UI
+- listening / streaming: three-bar waveform and live text
+- success: short confirmation animation, then hide
+- error / canceled: brief state, then hide
 
-The overlay is a transparent bottom-centered band. The pill itself is centered inside the band, so short and long content expands visually from the center instead of drifting left. States:
+The pill should remain visually centered. Width grows with text up to a small maximum, and long text scrolls with a left fade.
 
-- idle
-- listening
-- streaming
-- success
-- error
-- canceled
+The tray icon is generated at runtime for status. The application/shortcut icon is `assets/voiceflow.ico`.
 
-The tray icon is generated at runtime and exposes useful background commands: show window, copy last result, repaste last result, open dictionary, quit.
+## Packaging
 
-## Implementation Priorities
+`start.bat` remains the development launcher. `scripts/create_shortcut.ps1` creates a desktop shortcut for daily use.
 
-1. **Reliability**: state transitions, final transcription, history, fallback.
-2. **Visual precision**: centered pill, responsive width, clear microphone/state indicator.
-3. **Vocabulary learning**: corrections and personal dictionary first; UI for editing later.
-4. **Packaging**: one-click install, model checks, formal app icon.
-5. **Optional intelligence**: local cleanup mode only after the base path is fast and stable.
+`VoiceFlow.spec` is the release build configuration. It uses a windowed exe, includes overlay/config/knowledge-base/icon, and intentionally does not bundle large model files.
 
 ## Verification
 
-Required checks before claiming the app is healthy:
-
-```bash
-venv\Scripts\python.exe -m py_compile src\*.py
+```bat
+venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py
 venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe test_integration.py
 ```
 
 Manual checks:
 
-- Start app, confirm no JavaScript errors during initialization.
-- Press F2: overlay appears bottom-centered.
-- Speak, press F2: text is pasted and written to `logs/history.jsonl`.
-- Press Esc while recording: overlay shows canceled and no text is output.
-- Tray menu can copy and repaste the last result.
-
-## Explicitly Out Of Default Path
-
-- Cloud ASR or cloud LLM cleanup.
-- Always-on microphone listening.
-- Multiple competing recording hotkeys.
-- Heavy AI rewriting that changes user intent.
+- Start app, verify tray icon appears.
+- Right-click tray icon and click Exit; no VoiceFlow Python process should remain.
+- Dictate into a text field; text should paste quickly and remain in clipboard.
+- Dictate with no text field focused; text should still remain in clipboard.
+- Dictate a long passage; final output should include the end of the speech.
