@@ -268,7 +268,11 @@ function smoothTicker() {
 function updateTickerOffset() {
     cancelAnimationFrame(_tickerRaf);
     requestAnimationFrame(() => {
-        const overflow = Math.max(0, txt.scrollWidth - ticker.clientWidth);
+        // Use --target-width to compute ticker width, not clientWidth
+        // (clientWidth lags behind CSS transition and causes false overflow)
+        var targetW = parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
+        var tickerW = Math.max(0, targetW - 50);
+        const overflow = Math.max(0, txt.scrollWidth - tickerW);
         _tickerTarget = -overflow;
         ticker.classList.toggle('overflowing', overflow > 0);
         if (overflow > 0) {
