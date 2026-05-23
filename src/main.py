@@ -140,6 +140,8 @@ class VoiceInputSystem:
                             text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
                             if text:
                                 self._latest_text = text
+                                clean = self.cleaner.clean(text)
+                                self.overlay.update_streaming(clean)
                 except Exception:
                     pass
                 time.sleep(0.3)

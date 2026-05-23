@@ -138,6 +138,9 @@ class OverlayWindow:
     def show_recording(self):
         self._js("showRecording()")
 
+    def update_streaming(self, text):
+        self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)})")
+
     def show_processing(self):
         self._js("showProcessing()")
 
