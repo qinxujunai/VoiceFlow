@@ -173,9 +173,15 @@ class OverlayWindow:
         QTimer.singleShot(ms, self._hide_and_idle)
 
     def _hide_and_idle(self):
-        self._hide()
         self._set_tray_state(TRAY_ICON_IDLE)
-        self.show_idle()
+        # JS must execute before hiding, or WebEngine suspends and state is stale on next show
+        if self._bridge and self._bridge._web_view and self._bridge._web_view.page():
+            self._bridge._web_view.page().runJavaScript(
+                "showState('idle', '准备就绪')",
+                lambda _: self._hide(),
+            )
+        else:
+            self._hide()
 
     def _set_tray_state(self, state):
         if self._tray and state in self._tray_icons:
