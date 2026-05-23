@@ -8,7 +8,7 @@ The project is not constrained by earlier prototype docs. Existing code is usefu
 
 ## Non-Negotiables
 
-- **F2 is the main recording key.** Esc cancels.
+- **F2 + mouse side button (xbutton1) are the recording keys.** Esc cancels.
 - **Offline first.** No network calls in the default path.
 - **Low latency over heavy AI polish.** The main path uses ASR + deterministic cleanup.
 - **Never lose text.** Store output attempts in local history and keep clipboard fallback.
@@ -61,7 +61,6 @@ The overlay is a transparent bottom-centered band. The pill itself is centered i
 - idle
 - listening
 - streaming
-- processing
 - success
 - error
 - canceled
@@ -82,7 +81,7 @@ Required checks before claiming the app is healthy:
 
 ```bash
 venv\Scripts\python.exe -m py_compile src\*.py
-venv\Scripts\python.exe -m unittest discover tests -v
+venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe test_integration.py
 ```
 

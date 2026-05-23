@@ -318,10 +318,8 @@ function showRecording() {
 
 function updateStreaming(text) {
     if (!text) return;
-    var display = text.replace(/[，。！？、；：""''…—~.,!?;:'"\-]/g, '').trim();
-    if (!display) return;
     pill.className = 'pill streaming';
-    setWidthForText(display);
+    setWidthForText(text);
     updateTickerOffset();
 }
 

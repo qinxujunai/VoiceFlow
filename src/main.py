@@ -164,7 +164,7 @@ class VoiceInputSystem:
                             last_len = len(chunk)
                             if text:
                                 self._latest_text = text
-                                clean = self.cleaner.clean_streaming(text)
+                                clean = self.cleaner.clean(text)
                                 if clean:
                                     self.overlay.update_streaming(clean)
                 except Exception:
