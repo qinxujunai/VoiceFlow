@@ -243,7 +243,10 @@ function measureTextWidth(text) {
 function setWidthForText(text) {
     txt.textContent = text || '';
     if (!text) {
+        pill.style.transition = 'none';
         pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
+        pill.offsetHeight;
+        pill.style.transition = '';
         return;
     }
     var est = measureTextWidth(text);
@@ -284,20 +287,16 @@ function updateTickerOffset() {
 
 function showState(state, label) {
         ticker.style.textAlign = '';
-    // Snap without transition to avoid visible width-shrink animation
-    pill.style.transition = 'none';
     pill.className = 'pill ' + state;
     pill.style.width = '';
     txt.textContent = label || '';
     pill.style.setProperty('--ticker-offset', '0px');
-    pill.offsetHeight; // force reflow
     if (state === 'listening' || state === 'idle') {
         setWidthForText('');
     } else {
         setWidthForText(label || '');
         updateTickerOffset();
     }
-    pill.style.transition = '';
 }
 
 function showRecording() {
