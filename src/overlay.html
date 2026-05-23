@@ -256,16 +256,22 @@ const txt = document.getElementById('txt');
 
 const MIN_WIDTH = 86;
 const MAX_WIDTH = 260;
-const TEXT_START = 100;
-const CHAR_WIDTH = 8.2;
 
 function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
 }
 
 function setWidthForText(text) {
-    const width = text ? clamp(TEXT_START + text.length * CHAR_WIDTH, MIN_WIDTH, MAX_WIDTH) : MIN_WIDTH;
-    pill.style.setProperty('--target-width', `${width}px`);
+    if (!text) {
+        pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
+        return;
+    }
+    // Measure actual rendered width instead of guessing
+    // pill layout: mark(18px) + gap(8px) + pad-left(12px) + text + pad-right(12px) = 50px + text
+    txt.textContent = text;
+    var textWidth = txt.scrollWidth;
+    var width = clamp(50 + textWidth, MIN_WIDTH, MAX_WIDTH);
+    pill.style.setProperty('--target-width', width + 'px');
 }
 
 let _tickerTarget = 0;
@@ -312,11 +318,9 @@ function showRecording() {
 
 function updateStreaming(text) {
     if (!text) return;
-    // Strip punctuation for clean streaming display
     var display = text.replace(/[，。！？、；：""''…—~.,!?;:'"\-]/g, '').trim();
     if (!display) return;
     pill.className = 'pill streaming';
-    txt.textContent = display;
     setWidthForText(display);
     updateTickerOffset();
 }
@@ -351,7 +355,6 @@ function showDone() {
 function showResult(msg) {
     pill.className = 'pill success';
     if (msg) {
-        txt.textContent = msg;
         setWidthForText(msg);
         updateTickerOffset();
     } else {

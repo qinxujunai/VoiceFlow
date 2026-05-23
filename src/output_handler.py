@@ -71,12 +71,6 @@ class OutputHandler:
         result = False
 
         try:
-            # 保存原有剪贴板内容
-            old_clipboard = ""
-            try:
-                old_clipboard = pyperclip.paste()
-            except Exception:
-                pass
 
             # 复制新内容到剪贴板
             pyperclip.copy(text)
@@ -91,15 +85,6 @@ class OutputHandler:
 
             result = True
 
-            # 延迟恢复剪贴板
-            def restore():
-                time.sleep(1.0)
-                try:
-                    pyperclip.copy(old_clipboard)
-                except Exception:
-                    pass
-
-            threading.Thread(target=restore, daemon=True).start()
 
         except Exception as e:
             print(f"[OutputHandler] 粘贴失败: {e}")
