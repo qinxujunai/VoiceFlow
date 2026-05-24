@@ -52,6 +52,7 @@ class VoiceInputSystem:
         self._actively_recording = False
         self._shutdown_started = False
         self._streaming = False
+        self._stream_generation = 0
         self._latest_text = ""  # 后台转写的最新结果
         self.overlay = OverlayWindow()
         self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
@@ -106,10 +107,11 @@ class VoiceInputSystem:
         self._actively_recording = True
         try:
             self.session.start()
-            self.overlay.show_window()
-            self.overlay.show_recording()
+            self._stream_generation += 1
+            generation = self._stream_generation
+            self.overlay.show_recording(generation)
             self._latest_text = ""
-            self._start_streaming()
+            self._start_streaming(generation)
             print("[录音] 开始", flush=True)
         except Exception as e:
             self._actively_recording = False
@@ -161,7 +163,7 @@ class VoiceInputSystem:
         finally:
             self._is_processing = False
 
-    def _start_streaming(self):
+    def _start_streaming(self, generation):
         """后台 ASR 线程：录音期间持续转写，停止时结果已就绪"""
         self._streaming = True
 
@@ -190,6 +192,8 @@ class VoiceInputSystem:
                             window = min(len(new_audio), self.audio.sample_rate // 2)
                             rms = float(np.sqrt(np.mean(new_audio[-window:].astype(np.float64)**2))) / 32768.0
                             if rms < 0.008 and last_len > 0:
+                                last_len = len(chunk)
+                                time.sleep(0.25)
                                 continue
                             text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
                             last_len = len(chunk)
@@ -203,7 +207,8 @@ class VoiceInputSystem:
                                     if ascii_chars == len(stripped) and len(stripped) <= 8:
                                         pass  # skip short English-only (likely hallucination)
                                     else:
-                                        self.overlay.update_streaming(clean)
+                                        if generation == self._stream_generation:
+                                            self.overlay.update_streaming(clean, generation)
                 except Exception:
                     pass
                 time.sleep(0.25)

@@ -109,11 +109,16 @@ class OverlayWindow:
 
     def _setup_tray(self):
         self._tray = QSystemTrayIcon()
+        icon_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "assets",
+            "voiceflow.ico",
+        )
         self._tray_icons = {
-            TRAY_ICON_IDLE: build_tray_icon(TRAY_ICON_IDLE),
-            TRAY_ICON_RECORDING: build_tray_icon(TRAY_ICON_RECORDING),
-            TRAY_ICON_PROCESSING: build_tray_icon(TRAY_ICON_PROCESSING),
-            TRAY_ICON_ERROR: build_tray_icon(TRAY_ICON_ERROR),
+            TRAY_ICON_IDLE: build_tray_icon(TRAY_ICON_IDLE, icon_path),
+            TRAY_ICON_RECORDING: build_tray_icon(TRAY_ICON_RECORDING, icon_path),
+            TRAY_ICON_PROCESSING: build_tray_icon(TRAY_ICON_PROCESSING, icon_path),
+            TRAY_ICON_ERROR: build_tray_icon(TRAY_ICON_ERROR, icon_path),
         }
 
         self._tray.setIcon(self._tray_icons[TRAY_ICON_IDLE])
@@ -174,14 +179,10 @@ class OverlayWindow:
 
     def _hide_and_idle(self):
         self._set_tray_state(TRAY_ICON_IDLE)
-        # JS must execute before hiding, or WebEngine suspends and state is stale on next show
-        if self._bridge and self._bridge._web_view and self._bridge._web_view.page():
-            self._bridge._web_view.page().runJavaScript(
-                "showState('idle', '准备就绪')",
-                lambda _: self._hide(),
-            )
-        else:
-            self._hide()
+        if self._bridge:
+            self._bridge.js_then_hide_requested.emit("resetHidden()")
+            return
+        self._hide()
 
     def _set_tray_state(self, state):
         if self._tray and state in self._tray_icons:
@@ -233,12 +234,13 @@ class OverlayWindow:
         if self._bridge:
             self._bridge.tray_state_requested.emit(state)
 
-    def show_recording(self):
+    def show_recording(self, session_id):
         self._tray_state(TRAY_ICON_RECORDING)
-        self._js("showRecording()")
+        if self._bridge:
+            self._bridge.js_then_show_requested.emit(f"prepareRecording({int(session_id)})")
 
-    def update_streaming(self, text):
-        self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)})")
+    def update_streaming(self, text, session_id):
+        self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
 
     def show_processing(self):
         self._tray_state(TRAY_ICON_PROCESSING)
@@ -281,6 +283,8 @@ class _Bridge(QObject):
     js_requested = pyqtSignal(str)
     show_requested = pyqtSignal()
     hide_requested = pyqtSignal()
+    js_then_show_requested = pyqtSignal(str)
+    js_then_hide_requested = pyqtSignal(str)
     hide_after_requested = pyqtSignal(int)
     tray_state_requested = pyqtSignal(str)
 
@@ -291,6 +295,8 @@ class _Bridge(QObject):
         self._pending_js = []
         self._web_view.loadFinished.connect(self._on_load_finished)
         self.js_requested.connect(self._run_js)
+        self.js_then_show_requested.connect(self._run_js_then_show)
+        self.js_then_hide_requested.connect(self._run_js_then_hide)
         # show/hide 信号连接到自身的方法只是为了统一管理，
         # 实际执行由 OverlayWindow._show/_hide 通过外部连接完成
         # 这里只做 JS 桥接
@@ -311,3 +317,16 @@ class _Bridge(QObject):
             return
         if self._web_view and self._web_view.page():
             self._web_view.page().runJavaScript(code)
+
+    @pyqtSlot(str)
+    def _run_js_then_show(self, code):
+        if not self._page_ready or not self._web_view or not self._web_view.page():
+            return
+        self._web_view.page().runJavaScript(code, lambda _: self.show_requested.emit())
+
+    @pyqtSlot(str)
+    def _run_js_then_hide(self, code):
+        if not self._page_ready or not self._web_view or not self._web_view.page():
+            self.hide_requested.emit()
+            return
+        self._web_view.page().runJavaScript(code, lambda _: self.hide_requested.emit())
