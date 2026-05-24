@@ -41,7 +41,7 @@ venv\Scripts\python.exe src\main.py
 - 输出兜底：先复制到剪贴板，再模拟 `Ctrl+V`；不会恢复旧剪贴板。
 - 历史记录：每次有文字输出都会写入 `logs/history.jsonl`。
 - 词库：内置 AI/开发术语、用户词典、短语和错词修正。
-- UI：底部居中小胶囊，三条声波符号，文本从中心扩展并在长文本时左侧渐隐。
+- UI：底部居中小胶囊，录音中实时预览；停止后进入“处理中”圆环，再以“已完成”收束并离屏归零，下一次从干净的窄胶囊开始。
 
 ## 项目结构
 
@@ -75,6 +75,10 @@ scripts/
 - `knowledge-base/builtin-ai.txt`：通用 AI/工程术语
 
 旧文件 `ai-terms.txt`、`company-terms.txt`、`user-custom.txt` 仍会加载，用于兼容已有内容。
+
+## 准确率
+
+默认不牺牲速度去盲目换模型。优先把高频错词写进 `knowledge-base/corrections.txt`，让最终输出稳定修正；再用本地真实音频评测 SenseVoice int8、SenseVoice fp32 和 Qwen3-ASR 0.6B。只有本机 benchmark 证明更准且速度可接受，才切换默认模型。
 
 ## 验证
 

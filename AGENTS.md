@@ -110,7 +110,7 @@ Use `wrong=correct` only in correction files.
 
 ## Packaging
 
-- `scripts\generate_icon.py` creates `assets\voiceflow.ico`.
+- `scripts\generate_icon.py` creates the multi-size `assets\voiceflow.ico`.
 - `scripts\create_shortcut.ps1` creates a desktop shortcut.
 - `VoiceFlow.spec` is the windowed release build. It includes overlay/config/knowledge-base/icon, but not large model files.
 
@@ -132,7 +132,7 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Regression Guards
 
-- **Pill flash on new recording.** The old failure mode was showing the Qt window before WebEngine had reset the DOM from the previous recording. Keep `prepareRecording()` and `resetHidden()` as the only JS entrypoints for recording show/hide, and keep `OverlayWindow.show_recording()` on the JS-then-show path.
+- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint, keep hide as hide-first then offscreen `resetHidden()`, and keep normal stop flow as `show_processing()` -> final transcribe/output/history -> `show_done()` -> hide/reset. Do not call `show_result(text)` for the normal recording stop path.
 
 - **Final text overwritten by streaming preview.** The old failure mode was one queued `updateStreaming` arriving after `show_result`. Keep `_stop_streaming()` joining `self._stream_thread`, and keep generation/session guards on `prepareRecording()` and `updateStreaming()`.
 

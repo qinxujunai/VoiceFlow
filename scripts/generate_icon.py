@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "voiceflow.ico"
-SIZE = 256
+SIZES = (16, 20, 24, 32, 48, 64, 128, 256)
 
 
 def _clamp(value: float) -> int:
@@ -64,73 +64,128 @@ def _bar_alpha(x, y, cx, cy, width, height, radius):
     return _rounded_rect_alpha(x, y, left, top, right, bottom, radius)
 
 
-def _make_pixels():
-    pixels = [(0, 0, 0, 0)] * (SIZE * SIZE)
-    for y in range(SIZE):
-        for x in range(SIZE):
+def _make_pixels(size):
+    pixels = [(0, 0, 0, 0)] * (size * size)
+    scale = size / 256
+    for y in range(size):
+        for x in range(size):
             # Soft shadow.
-            dx = max(abs(x - SIZE / 2) - 86, 0)
-            dy = max(abs(y - SIZE / 2) - 86, 0)
+            dx = max(abs(x - size / 2) - 86 * scale, 0)
+            dy = max(abs(y - size / 2) - 86 * scale, 0)
             shadow_dist = math.hypot(dx, dy)
-            shadow = max(0, 42 - shadow_dist * 5)
+            shadow = max(0, 42 - shadow_dist * 5 / scale)
             color = (0, 0, 0, _clamp(shadow))
 
             # Dark rounded square.
-            a = _rounded_rect_alpha(x, y, 34, 34, 222, 222, 44)
+            a = _rounded_rect_alpha(
+                x,
+                y,
+                34 * scale,
+                34 * scale,
+                222 * scale,
+                222 * scale,
+                44 * scale,
+            )
             if a:
                 color = _blend(color, (24, 24, 26, a))
 
             # Thin inner highlight.
-            border_a = _rounded_rect_alpha(x, y, 37, 37, 219, 219, 41)
-            inner_a = _rounded_rect_alpha(x, y, 39, 39, 217, 217, 39)
+            border_a = _rounded_rect_alpha(
+                x,
+                y,
+                37 * scale,
+                37 * scale,
+                219 * scale,
+                219 * scale,
+                41 * scale,
+            )
+            inner_a = _rounded_rect_alpha(
+                x,
+                y,
+                39 * scale,
+                39 * scale,
+                217 * scale,
+                217 * scale,
+                39 * scale,
+            )
             if border_a and not inner_a:
                 color = _blend(color, (255, 255, 255, 36))
 
             # Voice bars.
             bars = [(101, 128, 16, 68), (128, 128, 16, 108), (155, 128, 16, 82)]
             for cx, cy, w, h in bars:
-                ba = _bar_alpha(x, y, cx, cy, w, h, 8)
+                ba = _bar_alpha(
+                    x,
+                    y,
+                    cx * scale,
+                    cy * scale,
+                    w * scale,
+                    h * scale,
+                    8 * scale,
+                )
                 if ba:
                     color = _blend(color, (245, 245, 247, ba))
 
-            pixels[y * SIZE + x] = color
+            pixels[y * size + x] = color
     return pixels
 
 
-def _write_ico(path: Path, pixels):
-    path.parent.mkdir(parents=True, exist_ok=True)
-
+def _image_bytes(size, pixels):
     # ICO stores DIB rows bottom-up in BGRA order. Height is doubled to
     # include the unused 1-bit AND mask.
     header = struct.pack(
         "<IIIHHIIIIII",
         40,
-        SIZE,
-        SIZE * 2,
+        size,
+        size * 2,
         1,
         32,
         0,
-        SIZE * SIZE * 4,
+        size * size * 4,
         0,
         0,
         0,
         0,
     )
     xor = bytearray()
-    for y in range(SIZE - 1, -1, -1):
-        for x in range(SIZE):
-            r, g, b, a = pixels[y * SIZE + x]
+    for y in range(size - 1, -1, -1):
+        for x in range(size):
+            r, g, b, a = pixels[y * size + x]
             xor += bytes((b, g, r, a))
-    and_mask = bytes(((SIZE + 31) // 32) * 4 * SIZE)
-    image = header + xor + and_mask
+    and_mask = bytes(((size + 31) // 32) * 4 * size)
+    return header + xor + and_mask
 
-    icon_dir = struct.pack("<HHH", 0, 1, 1)
-    entry = struct.pack("<BBBBHHII", 0, 0, 0, 0, 1, 32, len(image), 6 + 16)
-    path.write_bytes(icon_dir + entry + image)
+
+def _write_ico(path: Path, images):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    icon_dir = struct.pack("<HHH", 0, 1, len(images))
+    offset = 6 + 16 * len(images)
+    entries = bytearray()
+    payload = bytearray()
+    for size, pixels in images:
+        image = _image_bytes(size, pixels)
+        size_byte = 0 if size >= 256 else size
+        entries += struct.pack(
+            "<BBBBHHII",
+            size_byte,
+            size_byte,
+            0,
+            0,
+            1,
+            32,
+            len(image),
+            offset,
+        )
+        payload += image
+        offset += len(image)
+
+    path.write_bytes(icon_dir + entries + payload)
 
 
 def main():
-    _write_ico(OUT, _make_pixels())
+    images = [(size, _make_pixels(size)) for size in SIZES]
+    _write_ico(OUT, images)
     print(f"Wrote {OUT}")
 
 

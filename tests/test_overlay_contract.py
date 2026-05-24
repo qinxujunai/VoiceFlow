@@ -34,6 +34,18 @@ def test_recording_window_shows_after_js_state_preparation():
     assert "runJavaScript(code, lambda _: self.show_requested.emit())" in overlay
 
 
+def test_hide_path_hides_window_before_resetting_dom():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    hide_idx = overlay.index("def _hide_and_idle")
+    state_idx = overlay.index("def _set_tray_state", hide_idx)
+    hide_block = overlay[hide_idx:state_idx]
+
+    assert "js_then_hide_requested.emit" not in hide_block
+    assert "self._hide()" in hide_block
+    assert "self._bridge.js_requested.emit(\"resetHidden()\")" in hide_block
+    assert hide_block.index("self._hide()") < hide_block.index("resetHidden()")
+
+
 def test_streaming_updates_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
@@ -42,3 +54,33 @@ def test_streaming_updates_are_session_guarded():
     assert "if (sessionId !== activeSession) return;" in html
     assert "activeSession += 1;" in html[html.index("function showState(state, label)"):]
     assert "updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
+
+
+def test_stop_flow_uses_processing_and_done_states():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    stop_idx = main.index("def _on_record_stop")
+    stream_idx = main.index("def _start_streaming", stop_idx)
+    stop_block = main[stop_idx:stream_idx]
+
+    assert "self.overlay.show_processing()" in stop_block
+    assert stop_block.index("self.overlay.show_processing()") < stop_block.index("self._stop_streaming()")
+    assert "self.overlay.show_done()" in stop_block
+    assert "self.overlay.show_result(text)" not in stop_block
+
+
+def test_overlay_has_processing_spinner_and_done_checkmark():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert ".pill.done" in html
+    assert ".processing .mark::before" in html
+    assert ".done .mark::before" in html
+    assert "@keyframes spin" in html
+    assert "function showDone()" in html
+    assert "showState('done', '已完成')" in html
+    assert "position: absolute;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
+    assert "inset: 2.5px;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
+    assert "border-right: 1.8px solid var(--green);" in html
+    assert "border-bottom: 1.8px solid var(--green);" in html
+    assert "def show_done(self):" in overlay
+    assert "showDone()" in overlay
