@@ -90,6 +90,14 @@ venv\Scripts\python.exe test_integration.py
 venv\Scripts\python.exe scripts\benchmark_models.py
 ```
 
+本地准确率评测：
+
+```bat
+venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\samples.example.jsonl
+```
+
+真实音频请放在 `eval\audio\` 或 `eval\private\`，这些目录不会进入 Git。
+
 创建桌面快捷方式：
 
 ```powershell

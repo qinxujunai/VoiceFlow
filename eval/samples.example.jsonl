@@ -1,0 +1,4 @@
+{"id":"ai_terms_001","audio":"audio/ai_terms_001.wav","reference":"我现在用 Cursor 和 Codex 调试这个本地语音输入工具"}
+{"id":"mixed_cn_en_001","audio":"audio/mixed_cn_en_001.wav","reference":"这个 API 返回 JSON 以后交给 FastAPI 服务处理"}
+{"id":"long_pause_001","audio":"audio/long_pause_001.wav","reference":"这是一段带停顿的长句，用来检查最终转写是否完整保留结尾"}
+{"id":"noisy_room_001","audio":"audio/noisy_room_001.wav","reference":"背景有一点噪音的时候，文字也应该尽量准确并且不要乱补"}

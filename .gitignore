@@ -5,6 +5,8 @@ models/
 *.wav
 *.mp3
 *.flac
+eval/audio/
+eval/private/
 
 # Python
 __pycache__/

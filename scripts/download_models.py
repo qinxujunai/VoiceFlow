@@ -40,7 +40,7 @@ def download_sensevoice(base_dir):
 
 
 def download_qwen3_asr(base_dir):
-    """下载 Qwen3-ASR 0.6B ONNX 模型"""
+    """下载 sherpa-onnx 可直接加载的 Qwen3-ASR 0.6B int8 模型"""
     target_dir = os.path.join(base_dir, "models", "qwen3-asr")
 
     if os.path.exists(os.path.join(target_dir, "model.onnx")):
@@ -54,10 +54,17 @@ def download_qwen3_asr(base_dir):
         from huggingface_hub import snapshot_download
 
         snapshot_download(
-            repo_id="Qwen/Qwen3-ASR-0.6B",
+            repo_id="pantinor/sherpa-onnx-qwen3-asr-0.6b-int8",
             local_dir=target_dir,
-            allow_patterns=["*.onnx", "*.txt", "*.yaml", "*.json", "*.bin"],
+            allow_patterns=["*.onnx", "*.txt", "*.yaml", "*.json", "*.bin", "*.data"],
         )
+        model_path = os.path.join(target_dir, "model.onnx")
+        tokens_path = os.path.join(target_dir, "tokens.txt")
+        if not (os.path.exists(model_path) and os.path.exists(tokens_path)):
+            raise FileNotFoundError(
+                "downloaded Qwen3-ASR files are not sherpa-onnx ready "
+                "(expected model.onnx and tokens.txt)"
+            )
         print("[Qwen3-ASR] 下载完成")
         return True
     except Exception as e:

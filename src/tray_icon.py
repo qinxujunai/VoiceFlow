@@ -1,8 +1,5 @@
 """
 Small, status-aware tray icons for VoiceFlow.
-
-The icon is generated at runtime to avoid packaged image assets while keeping
-the notification-area symbol crisp at common tray sizes.
 """
 
 from PyQt6.QtCore import QPointF, Qt
@@ -17,21 +14,19 @@ TRAY_ICON_ERROR = "error"
 _ICON_SIZES = (16, 20, 24, 32)
 
 
-def build_tray_icon(state=TRAY_ICON_IDLE):
+def build_tray_icon(state=TRAY_ICON_IDLE, icon_path=None):
     icon = QIcon()
     for size in _ICON_SIZES:
-        icon.addPixmap(_draw_pixmap(size, state))
+        icon.addPixmap(_draw_pixmap(size, state, icon_path))
     return icon
 
 
-def _draw_pixmap(size, state):
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
+def _draw_pixmap(size, state, icon_path=None):
+    pixmap = _base_pixmap(size, icon_path)
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-    _draw_waveform(painter, size)
     if state == TRAY_ICON_RECORDING:
         _draw_status_dot(painter, size, QColor(255, 69, 58))
     elif state == TRAY_ICON_PROCESSING:
@@ -39,6 +34,22 @@ def _draw_pixmap(size, state):
     elif state == TRAY_ICON_ERROR:
         _draw_status_dot(painter, size, QColor(255, 159, 10))
 
+    painter.end()
+    return pixmap
+
+
+def _base_pixmap(size, icon_path=None):
+    if icon_path:
+        app_icon = QIcon(icon_path)
+        pixmap = app_icon.pixmap(size, size)
+        if not pixmap.isNull():
+            return pixmap
+
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    _draw_waveform(painter, size)
     painter.end()
     return pixmap
 

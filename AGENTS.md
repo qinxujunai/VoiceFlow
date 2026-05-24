@@ -57,17 +57,18 @@ src/
 
 ```yaml
 hotkeys:
-  push_to_talk: ["f2", "xbutton1", "xbutton2"]
+  push_to_talk: ["f2", "xbutton1", "xbutton2", "right_ctrl"]
   cancel: "escape"
 ```
 
-All push-to-talk keys are single keys — no combo keys. Keyboard keys use the `keyboard` package and are suppressed. Mouse side buttons use `pynput` and are not suppressed.
+All push-to-talk keys are single keys — no combo keys. `f2` uses the `keyboard` package and is suppressed. `right_ctrl` uses `pynput` so left/right Ctrl stay distinct. Mouse side buttons use `pynput` and are not suppressed.
 
 ### Key Reference
 
 | Key | Type | Notes |
 |---|---|---|
 | `f2` | keyboard | Windows default |
+| `right_ctrl` | keyboard | detected via pynput virtual key code |
 | `xbutton1` | mouse | side button (back) |
 | `xbutton2` | mouse | side button (forward) |
 | `escape` | keyboard | cancel recording |
@@ -129,11 +130,11 @@ Think, then code. Every visual change must answer: would this belong in a native
 Match the existing code as if the same person wrote every line. Indentation, naming, control flow, comment style — follow the neighbors exactly. Before committing, re-read your diff and delete any line not traceable to the stated goal. Surgical, not sweeping.
 
 
-## Known Issues
+## Regression Guards
 
-- **Pill flash on new recording.** After a recording ends and the pill hides, starting a new recording may briefly show the pill at the previous width before it snaps to the minimum listening width. Root cause involves the timing between Qt window visibility and WebEngine JavaScript execution. Future investigation should focus on ensuring the pill CSS `--target-width` is reset synchronously before `window.show()`.
+- **Pill flash on new recording.** The old failure mode was showing the Qt window before WebEngine had reset the DOM from the previous recording. Keep `prepareRecording()` and `resetHidden()` as the only JS entrypoints for recording show/hide, and keep `OverlayWindow.show_recording()` on the JS-then-show path.
 
-- **Final text overwritten by streaming preview.** The streaming thread could send one last `updateStreaming` after `_stop_streaming()` returned, overwriting the final transcription shown by `show_result`. Fixed: `_start_streaming` saves the thread as `self._stream_thread`; `_stop_streaming` now calls `self._stream_thread.join(timeout=2.0)` to wait for the streaming loop to fully exit before proceeding to final transcription and result display.
+- **Final text overwritten by streaming preview.** The old failure mode was one queued `updateStreaming` arriving after `show_result`. Keep `_stop_streaming()` joining `self._stream_thread`, and keep generation/session guards on `prepareRecording()` and `updateStreaming()`.
 
 ## Coding Rules
 
