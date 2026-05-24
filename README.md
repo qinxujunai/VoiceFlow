@@ -80,6 +80,15 @@ scripts/
 
 默认不牺牲速度去盲目换模型。优先把高频错词写进 `knowledge-base/corrections.txt`，让最终输出稳定修正；再用本地真实音频评测 SenseVoice int8、SenseVoice fp32 和 Qwen3-ASR 0.6B。只有本机 benchmark 证明更准且速度可接受，才切换默认模型。
 
+实时 AI 校对是可选层，默认关闭：
+
+```yaml
+correction:
+  provider: "disabled"  # disabled / ollama
+```
+
+录音中仍会先显示 ASR 预览文本；如果启用校对器，停顿时后台校对当前稳定文本，结果回来后替换悬浮窗文本。停止录音后仍使用完整音频做最终转写，最终校对最多等待 `final_timeout`，超时就输出基础清理结果。不要把未通过本机延迟和质量烟测的 Ollama 模型设为默认。
+
 ## 验证
 
 ```bat

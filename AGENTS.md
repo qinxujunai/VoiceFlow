@@ -34,6 +34,8 @@ src/
   transcriber.py       # sherpa-onnx ASR
   vocabulary.py        # layered dictionary/corrections
   text_cleaner.py      # deterministic cleanup
+  correction_engine.py # optional AI correction provider
+  realtime_correction.py # async pause-time correction scheduler
   output_handler.py    # clipboard first, then Ctrl+V
   history_store.py     # logs/history.jsonl
   overlay_webview.py   # PyQt overlay + tray menu
@@ -48,6 +50,8 @@ src/
 - Do not restore the previous clipboard after dictation.
 - Final output must use the complete stopped audio buffer; streaming preview is only preview.
 - Streaming preview may be throttled for long recordings, but final transcription must remain complete.
+- AI correction is optional and must be timeout-bounded. Default provider is `disabled`; do not enable Ollama/cloud-like providers by default without local latency and quality smoke tests.
+- Streaming correction may replace preview text only for the active recording generation; stale correction results must never overwrite newer recording text.
 - Default triggers are `f2`, `right_ctrl`, `xbutton1`, and `xbutton2`. Do not add combo keys as defaults — suppress=True blocks the individual keys from normal use.
 - Tray right-click menu must keep a working `退出` action.
 - Keep the overlay small, centered, and quiet.
