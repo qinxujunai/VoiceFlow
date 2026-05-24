@@ -245,8 +245,7 @@ class OverlayWindow:
 
     def show_processing(self):
         self._tray_state(TRAY_ICON_PROCESSING)
-        display = display_for_state(UiState.PROCESSING)
-        self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
+        self._js("showProcessing()")
 
 
     def show_done(self):

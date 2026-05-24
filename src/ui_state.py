@@ -27,7 +27,7 @@ _DISPLAY = {
     UiState.IDLE: UiDisplay("准备就绪", "idle", "idle"),
     UiState.LISTENING: UiDisplay("聆听中...", "listening", "recording"),
     UiState.STREAMING: UiDisplay("", "streaming", "recording"),
-    UiState.PROCESSING: UiDisplay("处理中...", "processing", "processing"),
+    UiState.PROCESSING: UiDisplay("", "processing", "processing"),
     UiState.SUCCESS: UiDisplay("", "success", "idle"),
     UiState.ERROR: UiDisplay("出错了", "error", "error"),
     UiState.CANCELED: UiDisplay("已取消", "canceled", "idle"),
