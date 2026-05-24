@@ -180,7 +180,8 @@ class OverlayWindow:
     def _hide_and_idle(self):
         self._set_tray_state(TRAY_ICON_IDLE)
         if self._bridge:
-            self._bridge.js_then_hide_requested.emit("resetHidden()")
+            self._hide()
+            self._bridge.js_requested.emit("resetHidden()")
             return
         self._hide()
 
@@ -246,6 +247,11 @@ class OverlayWindow:
         self._tray_state(TRAY_ICON_PROCESSING)
         display = display_for_state(UiState.PROCESSING)
         self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
+
+
+    def show_done(self):
+        self._tray_state(TRAY_ICON_IDLE)
+        self._js(f"showDone()")
 
 
     def show_result(self, text):

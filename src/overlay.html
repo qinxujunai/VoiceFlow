@@ -79,6 +79,11 @@ body {
     border-color: rgba(100, 167, 255, 0.18);
 }
 
+.pill.done {
+    --target-width: 112px;
+    border-color: rgba(50, 215, 75, 0.22);
+}
+
 .pill.error {
     --target-width: 210px;
     border-color: rgba(255, 179, 64, 0.22);
@@ -94,6 +99,7 @@ body {
 }
 
 .mark {
+    position: relative;
     width: 18px;
     height: 18px;
     display: flex;
@@ -131,9 +137,33 @@ body {
     animation-delay: 260ms;
 }
 
-.processing .mark span {
-    background: var(--blue);
-    animation: breathe 760ms ease-in-out infinite;
+.processing .mark span,
+.done .mark span {
+    opacity: 0;
+    animation: none;
+}
+
+.processing .mark::before {
+    content: "";
+    position: absolute;
+    inset: 2.5px;
+    border: 1.6px solid rgba(245, 245, 247, 0.22);
+    border-top-color: rgba(245, 245, 247, 0.92);
+    border-radius: 50%;
+    animation: spin 780ms linear infinite;
+}
+
+.done .mark::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 6px;
+    height: 10px;
+    border-right: 1.8px solid var(--green);
+    border-bottom: 1.8px solid var(--green);
+    border-radius: 1px;
+    transform: rotate(42deg);
 }
 
 .error .mark span { background: var(--gold); }
@@ -165,6 +195,7 @@ body {
 }
 
 .processing .ticker,
+.done .ticker,
 .canceled .ticker {
     color: var(--muted);
 }
@@ -195,6 +226,10 @@ body {
 @keyframes breathe {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.38; }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 </style>
@@ -333,6 +368,10 @@ function updateStreaming(text, sessionId) {
 
 function showProcessing() {
     showState('processing', '处理中');
+}
+
+function showDone() {
+    showState('done', '已完成');
 }
 
 function showResult(msg) {

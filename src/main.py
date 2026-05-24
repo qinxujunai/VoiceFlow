@@ -123,6 +123,7 @@ class VoiceInputSystem:
             return
         self._actively_recording = False
         self._is_processing = True
+        self.overlay.show_processing()
         self._stop_streaming()
 
         try:
@@ -150,8 +151,8 @@ class VoiceInputSystem:
                     clean_text=text,
                     output_status=output_status,
                 )
-                self.overlay.show_result(text)
-                self.overlay.hide_after(280)
+                self.overlay.show_done()
+                self.overlay.hide_after(420)
             else:
                 self.overlay.hide_after(0)
 
