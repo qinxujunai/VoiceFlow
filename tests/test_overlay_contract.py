@@ -71,16 +71,25 @@ def test_stop_flow_uses_processing_and_done_states():
 def test_overlay_has_processing_spinner_and_done_checkmark():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    processing_idx = html.index("function showProcessing()")
+    done_idx = html.index("function showDone()", processing_idx)
+    processing_block = html[processing_idx:done_idx]
 
     assert ".pill.done" in html
     assert ".processing .mark::before" in html
     assert ".done .mark::before" in html
     assert "@keyframes spin" in html
     assert "function showDone()" in html
+    assert "showState('processing'" not in processing_block
+    assert "setWidthForText" not in processing_block
+    assert "txt.textContent" not in processing_block
+    assert "pill.className = 'pill processing';" in processing_block
     assert "showState('done', '已完成')" in html
+    assert "ticker.style.textAlign = 'center';" in html[html.index("function showState(state, label)"):html.index("function showRecording(sessionId)")]
     assert "position: absolute;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
     assert "inset: 2.5px;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
     assert "border-right: 1.8px solid var(--green);" in html
     assert "border-bottom: 1.8px solid var(--green);" in html
     assert "def show_done(self):" in overlay
+    assert 'self._js("showProcessing()")' in overlay
     assert "showDone()" in overlay

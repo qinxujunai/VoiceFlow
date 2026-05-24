@@ -349,6 +349,9 @@ function showState(state, label) {
         setWidthForText('');
     } else {
         setWidthForText(label || '');
+        if (state === 'processing' || state === 'done') {
+            ticker.style.textAlign = 'center';
+        }
         updateTickerOffset();
     }
 }
@@ -367,7 +370,8 @@ function updateStreaming(text, sessionId) {
 }
 
 function showProcessing() {
-    showState('processing', '处理中');
+    activeSession += 1;
+    pill.className = 'pill processing';
 }
 
 function showDone() {
