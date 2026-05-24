@@ -41,8 +41,24 @@ class Vocabulary:
         self.corrections[wrong] = correct
         path = self.directory / "corrections.txt"
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as f:
-            f.write(f"{wrong}={correct}\n")
+        lines = []
+        updated = False
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    lines.append(line)
+                    continue
+                existing_wrong, _ = stripped.split("=", 1)
+                if existing_wrong.strip() == wrong:
+                    if not updated:
+                        lines.append(f"{wrong}={correct}")
+                        updated = True
+                    continue
+                lines.append(line)
+        if not updated:
+            lines.append(f"{wrong}={correct}")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def apply_corrections(self, text):
         if not text:

@@ -17,6 +17,7 @@ class TextCleaner:
 
     def __init__(self, config=None, base_dir=None):
         cfg = config.get("cleaner", {}) if config else {}
+        self.base_dir = base_dir
 
         self.remove_fillers = cfg.get("remove_fillers", True)
         self.auto_space_en = cfg.get("auto_space_en", True)
@@ -44,6 +45,7 @@ class TextCleaner:
 
         # --- 修正词表：音近词 → 正确形式 ---
         self.corrections = self._build_corrections(base_dir)
+        self._corrections_signature = self._correction_files_signature()
 
         # --- 标点 ---
         self.punctuation_map = [
@@ -141,6 +143,29 @@ class TextCleaner:
 
         return corrections
 
+    def _correction_files_signature(self):
+        if not self.vocabulary:
+            return None
+        signature = []
+        for filename in self.vocabulary.files:
+            path = self.vocabulary.directory / filename
+            if path.exists():
+                stat = path.stat()
+                signature.append((str(path), stat.st_mtime_ns, stat.st_size))
+            else:
+                signature.append((str(path), None, None))
+        return tuple(signature)
+
+    def _reload_corrections_if_changed(self):
+        if not self.vocabulary:
+            return
+        signature = self._correction_files_signature()
+        if signature == self._corrections_signature:
+            return
+        self.vocabulary.reload()
+        self.corrections = self._build_corrections(self.base_dir)
+        self._corrections_signature = signature
+
     @staticmethod
     def _read_lines(path):
         """读取文件的非注释行"""
@@ -161,6 +186,7 @@ class TextCleaner:
             path = os.path.join(base_dir, "knowledge-base", "corrections.txt")
             with open(path, "a", encoding="utf-8") as f:
                 f.write(f"{wrong}={correct}\n")
+        self._corrections_signature = self._correction_files_signature()
 
     # ================================================================
     # 主清理流程
@@ -176,6 +202,7 @@ class TextCleaner:
         if self.remove_fillers:
             text = self._strip_fillers(text)
         if self.fix_mistakes:
+            self._reload_corrections_if_changed()
             text = self._fix_mistakes(text)
         if self.auto_space_en:
             text = self._add_cjk_en_space(text)
@@ -210,7 +237,7 @@ class TextCleaner:
         return self.cjk_en_boundary.sub(" ", text)
 
     def _fix_mistakes(self, text: str) -> str:
-        for wrong, correct in self.corrections.items():
+        for wrong, correct in sorted(self.corrections.items(), key=lambda item: len(item[0]), reverse=True):
             if wrong in text:
                 text = text.replace(wrong, correct)
         return text

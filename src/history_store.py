@@ -11,12 +11,13 @@ class HistoryStore:
     def __init__(self, path):
         self.path = Path(path)
 
-    def append(self, raw_text="", clean_text="", output_status="unknown", error=""):
+    def append(self, raw_text="", clean_text="", corrected_text="", output_status="unknown", error=""):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "raw_text": raw_text or "",
             "clean_text": clean_text or "",
+            "corrected_text": corrected_text or "",
             "output_status": output_status or "unknown",
             "error": error or "",
         }

@@ -126,3 +126,19 @@ cleaner:
 
   # 基础标点补充
   basic_punctuation: false
+
+# ============================================================
+# AI 校对配置（默认关闭；开启前必须先做本地延迟/质量烟测）
+# ============================================================
+correction:
+  # 可选: disabled / ollama
+  provider: "disabled"
+  # 停止录音后的最终校对最多等待多久，超时就输出基础清理结果
+  final_timeout: 2.0
+  # 流式停顿校对最小间隔，避免连续讲话时频繁调用模型
+  stream_min_interval: 1.2
+  ollama:
+    url: "http://localhost:11434"
+    model: "qwen3.5:4b"
+    timeout: 2.0
+    num_predict: 80
