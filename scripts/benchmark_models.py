@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import io
 import json
 import tempfile
 import time
@@ -26,7 +27,20 @@ import sys
 sys.path.insert(0, str(SRC))
 
 from transcriber import Transcriber  # noqa: E402
+from text_cleaner import TextCleaner  # noqa: E402
 from vocabulary import Vocabulary  # noqa: E402
+
+
+def _force_utf8_stdout():
+    encoding = (getattr(sys.stdout, "encoding", None) or "").lower()
+    if "utf" in encoding or not hasattr(sys.stdout, "buffer"):
+        return
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer,
+        encoding="utf-8",
+        errors="replace",
+        line_buffering=True,
+    )
 
 
 def _variant_configs(config):
@@ -95,6 +109,7 @@ def _eval_samples(manifest_path, limit=None):
                 "id": item.get("id") or audio.stem,
                 "audio": audio,
                 "reference": item.get("reference", ""),
+                "terms": item.get("terms", []),
             })
     return samples[:limit] if limit else samples
 
@@ -126,9 +141,15 @@ def _domain_terms(config):
 
 def _term_stats(text, terms):
     if not text:
-        return 0, []
+        return 0, [], [term for term in terms if term]
     hits = [term for term in terms if term and term in text]
-    return len(hits), hits[:8]
+    missed = [term for term in terms if term and term not in text]
+    return len(hits), hits[:8], missed[:8]
+
+
+def _sample_terms(sample, domain_terms):
+    terms = sample.get("terms") or domain_terms
+    return list(dict.fromkeys(term for term in terms if term))
 
 
 def _char_error_rate(reference, hypothesis):
@@ -154,6 +175,7 @@ def benchmark(limit=None, manifest=None):
     config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     samples = _eval_samples(manifest, limit) if manifest else _wav_files(limit)
     terms = _domain_terms(config)
+    cleaner = TextCleaner(config, base_dir=ROOT)
     if not samples:
         raise SystemExit("No benchmark samples found")
 
@@ -171,23 +193,34 @@ def benchmark(limit=None, manifest=None):
                 audio, sample_rate = _read_wav(sample["audio"])
                 duration = len(audio) / sample_rate
                 t1 = time.time()
-                text = transcriber.transcribe(audio, sample_rate)
+                raw_text = transcriber.transcribe(audio, sample_rate)
                 elapsed = time.time() - t1
                 rtf = elapsed / duration if duration else 0
-                term_count, term_hits = _term_stats(text, terms)
-                cer = _char_error_rate(sample["reference"], text)
-                cer_label = "-" if cer is None else f"{cer:.3f}"
+                clean_text = cleaner.clean(raw_text)
+                sample_terms = _sample_terms(sample, terms)
+                explicit_terms = bool(sample.get("terms"))
+                term_count, term_hits, missed_terms = _term_stats(clean_text, sample_terms)
+                raw_cer = _char_error_rate(sample["reference"], raw_text)
+                clean_cer = _char_error_rate(sample["reference"], clean_text)
+                raw_cer_label = "-" if raw_cer is None else f"{raw_cer:.3f}"
+                clean_cer_label = "-" if clean_cer is None else f"{clean_cer:.3f}"
                 print(
                     f"{sample['id']:>12} | {elapsed:.2f}s | RTF {rtf:.3f} | "
-                    f"CER {cer_label} | terms {term_count:02d} | {text}"
+                    f"raw CER {raw_cer_label} | clean CER {clean_cer_label} | "
+                    f"terms {term_count:02d}/{len(sample_terms):02d} | {clean_text}"
                 )
+                if raw_text != clean_text:
+                    print(f"{'':>12} | raw: {raw_text}")
                 if term_hits:
                     print(f"{'':>12} | term hits: {', '.join(term_hits)}")
+                if explicit_terms and missed_terms:
+                    print(f"{'':>12} | missed terms: {', '.join(missed_terms)}")
         finally:
             Path(cfg_path).unlink(missing_ok=True)
 
 
 def main():
+    _force_utf8_stdout()
     parser = argparse.ArgumentParser(description="Benchmark local VoiceFlow ASR models")
     parser.add_argument("--limit", type=int, default=None, help="limit number of wav files")
     parser.add_argument("--manifest", default=None, help="JSONL eval manifest with audio/reference fields")

@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -26,11 +27,12 @@ class HistoryStoreTests(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             store = HistoryStore(Path(tmp) / "history.jsonl")
-            store.append(raw_text="科瑟", clean_text="Cursor", output_status="pasted")
+            store.append(raw_text="科瑟", clean_text="Cursor", corrected_text="Cursor", output_status="pasted")
 
             last = store.last()
             self.assertEqual(last["raw_text"], "科瑟")
             self.assertEqual(last["clean_text"], "Cursor")
+            self.assertEqual(last["corrected_text"], "Cursor")
             self.assertEqual(last["output_status"], "pasted")
 
             rows = (Path(tmp) / "history.jsonl").read_text(encoding="utf-8").splitlines()
@@ -62,6 +64,87 @@ class VocabularyTests(unittest.TestCase):
             self.assertEqual(vocab.corrections["科瑟"], "Cursor")
             self.assertEqual(vocab.apply_corrections("我用科瑟和扣问"), "我用Cursor和Qwen")
             self.assertEqual(vocab.apply_corrections("cursor 应保持原样"), "cursor 应保持原样")
+
+
+class AccuracyLoopTests(unittest.TestCase):
+    def test_cleaner_applies_longer_corrections_first(self):
+        from text_cleaner import TextCleaner
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            kb = base / "knowledge-base"
+            kb.mkdir()
+            (kb / "corrections.txt").write_text(
+                "扣问=Qwen\n大扣问=BigQwen\n",
+                encoding="utf-8",
+            )
+            config = {
+                "hotwords": {"files": ["corrections.txt"]},
+                "cleaner": {
+                    "remove_fillers": False,
+                    "auto_space_en": False,
+                    "fix_mistakes": True,
+                    "basic_punctuation": False,
+                },
+            }
+
+            cleaner = TextCleaner(config, base_dir=base)
+
+            self.assertEqual(cleaner.clean("我在用大扣问"), "我在用BigQwen")
+
+    def test_cleaner_reloads_corrections_without_restart(self):
+        from text_cleaner import TextCleaner
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            kb = base / "knowledge-base"
+            kb.mkdir()
+            corrections = kb / "corrections.txt"
+            corrections.write_text("科瑟=Cursor\n", encoding="utf-8")
+            config = {
+                "hotwords": {"files": ["corrections.txt"]},
+                "cleaner": {
+                    "remove_fillers": False,
+                    "auto_space_en": False,
+                    "fix_mistakes": True,
+                    "basic_punctuation": False,
+                },
+            }
+
+            cleaner = TextCleaner(config, base_dir=base)
+            self.assertEqual(cleaner.clean("科瑟"), "Cursor")
+
+            corrections.write_text("科瑟=Cursor\n扣问=Qwen\n", encoding="utf-8")
+
+            self.assertEqual(cleaner.clean("扣问"), "Qwen")
+
+    def test_add_correction_cli_updates_existing_pair(self):
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            kb = base / "knowledge-base"
+            kb.mkdir()
+            corrections = kb / "corrections.txt"
+            corrections.write_text("科瑟=Cursor\n扣问=旧值\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "add_correction.py"),
+                    "扣问",
+                    "Qwen",
+                    "--base-dir",
+                    str(base),
+                ],
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                corrections.read_text(encoding="utf-8").splitlines(),
+                ["科瑟=Cursor", "扣问=Qwen"],
+            )
 
 
 class RecordingSessionTests(unittest.TestCase):
@@ -125,6 +208,32 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertEqual(raw, "")
         self.assertEqual(clean, "")
         self.assertFalse(cached)
+
+    def test_final_correction_falls_back_to_clean_text_on_timeout(self):
+        from main import VoiceInputSystem
+
+        class SlowCorrectionEngine:
+            def correct(self, request):
+                import time
+                time.sleep(0.2)
+                return "Cursor"
+
+        system = object.__new__(VoiceInputSystem)
+        system.correction_engine = SlowCorrectionEngine()
+        system.correction_terms = ["Cursor"]
+        system.final_correction_timeout = 0.01
+
+        corrected = VoiceInputSystem._correct_final_text(system, "科瑟")
+
+        self.assertEqual(corrected, "科瑟")
+
+    def test_main_wires_realtime_and_final_correction(self):
+        main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+        self.assertIn("build_correction_engine", main)
+        self.assertIn("RealtimeCorrectionScheduler", main)
+        self.assertIn("self.realtime_correction.request_correction", main)
+        self.assertIn("corrected_text=corrected_text", main)
 
 
 if __name__ == "__main__":
