@@ -209,31 +209,24 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertEqual(clean, "")
         self.assertFalse(cached)
 
-    def test_final_correction_falls_back_to_clean_text_on_timeout(self):
-        from main import VoiceInputSystem
+    def test_stop_streaming_invalidates_generation_before_short_join(self):
+        main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+        stop_idx = main.index("def _stop_streaming")
+        stop_block = main[stop_idx:main.index("def _final_text_from_cache", stop_idx)]
 
-        class SlowCorrectionEngine:
-            def correct(self, request):
-                import time
-                time.sleep(0.2)
-                return "Cursor"
+        self.assertIn("self._stream_generation += 1", stop_block)
+        self.assertIn("self._stream_thread.join(timeout=0.2)", stop_block)
+        self.assertLess(
+            stop_block.index("self._stream_generation += 1"),
+            stop_block.index("self._stream_thread.join(timeout=0.2)"),
+        )
 
-        system = object.__new__(VoiceInputSystem)
-        system.correction_engine = SlowCorrectionEngine()
-        system.correction_terms = ["Cursor"]
-        system.final_correction_timeout = 0.01
-
-        corrected = VoiceInputSystem._correct_final_text(system, "科瑟")
-
-        self.assertEqual(corrected, "科瑟")
-
-    def test_main_wires_realtime_and_final_correction(self):
+    def test_main_uses_clean_text_as_output_text(self):
         main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
-        self.assertIn("build_correction_engine", main)
-        self.assertIn("RealtimeCorrectionScheduler", main)
-        self.assertIn("self.realtime_correction.request_correction", main)
-        self.assertIn("corrected_text=corrected_text", main)
+        self.assertIn("output_status = self.output_handler.output(text)", main)
+        self.assertIn("corrected_text=text", main)
+        self.assertNotIn("_correct_final_text", main)
 
 
 if __name__ == "__main__":

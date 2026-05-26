@@ -4,7 +4,7 @@
 
 VoiceFlow is a local-first Windows dictation layer. Press F2 or a mouse side button, speak, press again, and text appears where the cursor is. If paste cannot land in an input field, the text must remain in the clipboard and local history.
 
-The product is intentionally small. Reliability, low latency, and "never lose text" matter more than decorative UI or AI rewriting.
+The product is intentionally small. Reliability, low latency, and "never lose text" matter more than decorative UI or automatic rewriting.
 
 ## Non-Negotiables
 

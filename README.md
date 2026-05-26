@@ -1,126 +1,158 @@
 # VoiceFlow
 
-> 声音落下，文字已在光标的尽头。
+> Local-first dictation for Windows. Press a key, speak, and your text lands at the cursor.
 
-VoiceFlow。离线，即刻，不丢一字。
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#)
+[![Local First](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
+[![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20%2B%20SenseVoice-6F42C1)](#)
+[![Tests](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
----
+![VoiceFlow demo](docs/voiceflow-demo.svg)
 
-VoiceFlow 是一个 Windows 本地优先语音输入工具：按 **F2**、**右 Ctrl** 或鼠标侧键开始说话，再按一次停止，识别文本会先进入剪贴板，再尝试粘贴到当前光标位置。
+VoiceFlow is a small Windows dictation layer built around one product promise:
+**if VoiceFlow recognizes text, the text must not be lost.** It copies the final text
+to the clipboard first, then attempts to paste it at the current cursor. If paste
+does not land anywhere, the text is still available in the clipboard and local
+history.
 
-它的产品底线很简单：**只要识别出了文字，文字就不能丢。** 即使当前没有可输入的聊天框，文本也必须留在剪贴板和本地历史里，用户可以直接 `Ctrl+V`。
+VoiceFlow is intentionally not a cloud assistant. There are no hidden cloud ASR
+calls and no default LLM correction layer. The default path is local, fast,
+inspectable, and boring in the best way.
 
-## 使用
+## Highlights
+
+- **Push-to-talk dictation**: press `F2`, `Right Ctrl`, or a mouse side button to
+  start and stop.
+- **Local ASR by default**: SenseVoice-Small int8 through `sherpa-onnx`.
+- **Streaming preview**: a compact bottom-centered pill shows live text while you
+  speak.
+- **Final full-buffer transcription**: stopping recording still transcribes the
+  complete audio buffer, so the preview never becomes the source of truth.
+- **Never-lost output**: final text goes to clipboard before `Ctrl+V`.
+- **Local history**: successful outputs are appended to `logs/history.jsonl`.
+- **Deterministic cleanup**: `TextCleaner` and `knowledge-base/corrections.txt`
+  handle stable, known ASR mistakes without calling a model.
+- **Native-feeling overlay**: the pill grows with text, preserves the last text
+  during processing, and resets invisibly before the next recording.
+
+## Quick Start
 
 ```bat
 start.bat
 ```
 
-也可以直接运行：
+Or run the app directly:
 
 ```bat
 venv\Scripts\python.exe src\main.py
 ```
 
-快捷键：
+### Shortcuts
 
-| 按键 | 功能 |
+| Key | Action |
 | --- | --- |
-| F2 | 开始 / 停止语音输入 |
-| 右 Ctrl | 开始 / 停止语音输入（pynput 虚拟键码区分左右，不干扰左 Ctrl） |
-| 鼠标侧键 xbutton1 / xbutton2 | 开始 / 停止语音输入 |
-| Esc | 取消本次录音，不输出文字 |
+| `F2` | Start / stop dictation |
+| `Right Ctrl` | Start / stop dictation |
+| `xbutton1` / `xbutton2` | Start / stop dictation with mouse side buttons |
+| `Esc` | Cancel the current recording without output |
 
-托盘图标右键菜单提供：显示窗口、复制上一次结果、重新粘贴上一次结果、打开词库、退出。
+The tray menu can show the window, copy the last result, paste the last result
+again, open the dictionary folder, and exit the app.
 
-## 当前能力
+## How It Works
 
-- 默认引擎：SenseVoice-Small int8 + sherpa-onnx，本地 CPU 离线运行。
-- 流式预览：录音时持续显示识别文本和标点，长录音时自动降低预览频率，避免卡顿。
-- 最终输出：停止后用完整音频做最终转写，确保完整性；如果最终转写为空，会用流式缓存兜底。
-- 输出兜底：先复制到剪贴板，再模拟 `Ctrl+V`；不会恢复旧剪贴板。
-- 历史记录：每次有文字输出都会写入 `logs/history.jsonl`。
-- 词库：内置 AI/开发术语、用户词典、短语和错词修正。
-- UI：底部居中小胶囊，录音中实时预览；停止后进入“处理中”圆环，再以“已完成”收束并离屏归零，下一次从干净的窄胶囊开始。
+```text
+Hotkey
+  -> RecordingSession
+  -> AudioCapture
+  -> Transcriber
+  -> TextCleaner + Vocabulary
+  -> Clipboard
+  -> Ctrl+V
+  -> logs/history.jsonl
+```
 
-## 项目结构
+The streaming text you see while speaking is only a preview. When you stop, the
+app transcribes the complete stopped audio buffer and uses that final result for
+output. If final transcription returns empty but a streaming preview exists,
+VoiceFlow uses the preview as a safety fallback.
+
+## Project Structure
 
 ```text
 src/
-  main.py              # 主流程和生命周期
-  hotkey_manager.py    # F2 + 鼠标侧键
-  recording_session.py # 录音会话
-  audio_capture.py     # 麦克风采集
+  main.py              # orchestration, lifecycle, streaming preview
+  hotkey_manager.py    # F2, Right Ctrl, mouse side buttons
+  recording_session.py # recording lifecycle
+  audio_capture.py     # microphone adapter
   transcriber.py       # sherpa-onnx ASR
-  text_cleaner.py      # 规则清理和词库修正
-  vocabulary.py        # 分层词库
-  output_handler.py    # 剪贴板 + Ctrl+V + 兜底
-  history_store.py     # JSONL 历史
-  overlay_webview.py   # PyQt 悬浮窗和托盘
-  overlay.html         # 胶囊 UI
-  tray_icon.py         # 运行时托盘图标
+  text_cleaner.py      # deterministic cleanup and corrections
+  vocabulary.py        # layered local vocabulary
+  output_handler.py    # clipboard first, then Ctrl+V
+  history_store.py     # JSONL history
+  overlay_webview.py   # PyQt overlay and tray bridge
+  overlay.html         # compact pill UI
+  tray_icon.py         # runtime tray icons
 scripts/
-  benchmark_models.py  # 本地模型基准测试
-  create_shortcut.ps1  # 创建桌面快捷方式
-  generate_icon.py     # 生成 assets/voiceflow.ico
+  benchmark_models.py  # local ASR benchmark
+  add_correction.py    # add wrong=correct pairs
+  create_shortcut.ps1  # desktop shortcut
+  generate_icon.py     # app icon
 ```
 
-## 词库
+## Accuracy Workflow
 
-优先维护这些文件：
+VoiceFlow does not pretend a plain word list is ASR hotword injection. Today,
+the output-changing path is deterministic:
 
-- `knowledge-base/corrections.txt`：错词修正，格式 `wrong=correct`
-- `knowledge-base/user-dictionary.txt`：人名、项目名、公司名
-- `knowledge-base/phrases.txt`：希望完整保留的常用短语
-- `knowledge-base/builtin-ai.txt`：通用 AI/工程术语
+1. Record real private samples.
+2. Write a JSONL manifest with `reference` and important `terms`.
+3. Run the benchmark.
+4. Add stable ASR mistakes to `knowledge-base/corrections.txt`.
+5. Re-run the benchmark and compare raw vs clean output.
 
-旧文件 `ai-terms.txt`、`company-terms.txt`、`user-custom.txt` 仍会加载，用于兼容已有内容。
+Example:
 
-## 准确率
-
-默认不牺牲速度去盲目换模型。优先把高频错词写进 `knowledge-base/corrections.txt`，让最终输出稳定修正；再用本地真实音频评测 SenseVoice int8、SenseVoice fp32 和 Qwen3-ASR 0.6B。只有本机 benchmark 证明更准且速度可接受，才切换默认模型。
-
-实时 AI 校对是可选层，默认关闭：
-
-```yaml
-correction:
-  provider: "disabled"  # disabled / ollama
+```bat
+venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\private\local.jsonl
+venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
 ```
 
-录音中仍会先显示 ASR 预览文本；如果启用校对器，停顿时后台校对当前稳定文本，结果回来后替换悬浮窗文本。停止录音后仍使用完整音频做最终转写，最终校对最多等待 `final_timeout`，超时就输出基础清理结果。不要把未通过本机延迟和质量烟测的 Ollama 模型设为默认。
-
-## 验证
+## Verification
 
 ```bat
 venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py
 venv\Scripts\python.exe -m pytest tests -q
+venv\Scripts\python.exe scripts\benchmark_models.py --limit 3
 venv\Scripts\python.exe test_integration.py
 ```
 
-模型基准：
-
-```bat
-venv\Scripts\python.exe scripts\benchmark_models.py
-```
-
-本地准确率评测：
-
-```bat
-venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\samples.example.jsonl
-```
-
-真实音频请放在 `eval\audio\` 或 `eval\private\`，这些目录不会进入 Git。
-
-创建桌面快捷方式：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\create_shortcut.ps1
-```
-
-## 打包
+## Packaging
 
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec
 ```
 
-`VoiceFlow.spec` 会打包 overlay、配置、词库和应用图标；模型文件默认不打进 exe，仍放在 `models/` 下。
+`VoiceFlow.spec` includes the overlay, config, knowledge base, and app icon.
+Large model files are intentionally kept outside the executable under `models/`.
+
+## 中文说明
+
+VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先进入剪贴板，再尝试粘贴到当前光标位置。
+
+它的底线很简单：**只要识别出了文字，文字就不能丢。** 即使当前没有可输入的文本框，结果也会留在剪贴板和本地 `logs/history.jsonl` 里。
+
+当前设计重点：
+
+- 默认离线运行，不做隐藏云调用。
+- 不默认接入大模型校对，避免慢、跑偏和交互不稳定。
+- 录音中显示实时预览，但最终输出仍来自完整音频转写。
+- 悬浮胶囊保持克制：文字自然生长，满宽后平滑追随，处理时保留最后文本。
+- 准确率优先走本地可控闭环：真实样本评测，加确定性的 `wrong=correct` 修正。
+
+## Roadmap
+
+- Better visual regression coverage for the overlay.
+- More benchmark manifests for Chinese and mixed Chinese-English dictation.
+- A release build flow that keeps models external but setup simple.
+- Optional model comparison only when local benchmarks prove a better tradeoff.

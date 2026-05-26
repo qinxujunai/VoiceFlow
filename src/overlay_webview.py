@@ -42,6 +42,7 @@ class OverlayWindow:
         self._window_height = 48
         self._tray_menu = None
         self._tray_actions = []
+        self._hide_timer = None
 
     def set_actions(self, on_copy_last=None, on_repaste_last=None, on_open_dictionary=None, on_quit=None):
         self._on_copy_last = on_copy_last
@@ -175,13 +176,23 @@ class OverlayWindow:
             self.window.hide()
 
     def _hide_after(self, ms=2000):
-        QTimer.singleShot(ms, self._hide_and_idle)
+        self._cancel_pending_hide()
+        self._hide_timer = QTimer(self.window)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self._hide_and_idle)
+        self._hide_timer.start(ms)
+
+    def _cancel_pending_hide(self):
+        if self._hide_timer:
+            self._hide_timer.stop()
+            self._hide_timer.deleteLater()
+            self._hide_timer = None
 
     def _hide_and_idle(self):
+        self._hide_timer = None
         self._set_tray_state(TRAY_ICON_IDLE)
         if self._bridge:
-            self._hide()
-            self._bridge.js_requested.emit("resetHidden()")
+            self._bridge.js_then_hide_requested.emit("resetHiddenInstant()")
             return
         self._hide()
 
@@ -236,6 +247,7 @@ class OverlayWindow:
             self._bridge.tray_state_requested.emit(state)
 
     def show_recording(self, session_id):
+        self._cancel_pending_hide()
         self._tray_state(TRAY_ICON_RECORDING)
         if self._bridge:
             self._bridge.js_then_show_requested.emit(f"prepareRecording({int(session_id)})")
@@ -334,4 +346,4 @@ class _Bridge(QObject):
         if not self._page_ready or not self._web_view or not self._web_view.page():
             self.hide_requested.emit()
             return
-        self._web_view.page().runJavaScript(code, lambda _: self.hide_requested.emit())
+        self._web_view.page().runJavaScript(code, lambda _: QTimer.singleShot(50, self.hide_requested.emit))
