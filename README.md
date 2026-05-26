@@ -25,9 +25,10 @@ inspectable, and boring in the best way.
   start and stop.
 - **Local ASR by default**: SenseVoice-Small int8 through `sherpa-onnx`.
 - **Streaming preview**: a compact bottom-centered pill shows live text while you
-  speak.
-- **Final full-buffer transcription**: stopping recording still transcribes the
-  complete audio buffer, so the preview never becomes the source of truth.
+  speak; long recordings use a recent audio window to stay responsive.
+- **Progressive final transcription**: short recordings use one complete final
+  pass; long recordings cache stable audio segments while you speak and finish
+  only the tail on stop.
 - **Never-lost output**: final text goes to clipboard before `Ctrl+V`.
 - **Local history**: successful outputs are appended to `logs/history.jsonl`.
 - **Deterministic cleanup**: `TextCleaner` and `knowledge-base/corrections.txt`
@@ -72,10 +73,13 @@ Hotkey
   -> logs/history.jsonl
 ```
 
-The streaming text you see while speaking is only a preview. When you stop, the
-app transcribes the complete stopped audio buffer and uses that final result for
-output. If final transcription returns empty but a streaming preview exists,
-VoiceFlow uses the preview as a safety fallback.
+The streaming text you see while speaking is only a preview. For short
+recordings, stopping still runs one complete final pass. For long recordings,
+VoiceFlow progressively transcribes stable audio segments during recording, then
+only finishes the remaining tail when you stop. The final output still covers
+the complete stopped audio; the UI preview never becomes the source of truth. If
+final transcription returns empty but a streaming preview exists, VoiceFlow uses
+the preview as a safety fallback.
 
 ## Project Structure
 
@@ -146,7 +150,7 @@ VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctr
 
 - 默认离线运行，不做隐藏云调用。
 - 不默认接入大模型校对，避免慢、跑偏和交互不稳定。
-- 录音中显示实时预览，但最终输出仍来自完整音频转写。
+- 录音中显示实时预览；长语音会边录边缓存稳定音频段，停止时只补最后尾巴，最终输出仍覆盖完整音频。
 - 悬浮胶囊保持克制：文字自然生长，满宽后平滑追随，处理时保留最后文本。
 - 准确率优先走本地可控闭环：真实样本评测，加确定性的 `wrong=correct` 修正。
 

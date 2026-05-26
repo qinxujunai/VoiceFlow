@@ -86,7 +86,6 @@ body {
 }
 
 .pill.processing {
-    --target-width: 112px;
     border-color: rgba(100, 167, 255, 0.18);
 }
 
@@ -329,13 +328,18 @@ function updateTickerOffset(targetWidth) {
         var targetW = targetWidth || parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
         var tickerW = Math.max(0, targetW - 50);
         const overflow = Math.max(0, txt.scrollWidth - tickerW);
-        _tickerTarget = overflow > 0 ? -overflow : 0;
+        var nextTarget = overflow > 0 ? -overflow : 0;
         ticker.classList.toggle('overflowing', overflow > 0);
         if (overflow > 0) {
             ticker.style.textAlign = 'left';
         } else {
             ticker.style.textAlign = 'center';
         }
+        if (nextTarget > _tickerCurrent) {
+            _tickerCurrent = nextTarget;
+            pill.style.setProperty('--ticker-offset', `${nextTarget}px`);
+        }
+        _tickerTarget = nextTarget;
         _tickerRaf = requestAnimationFrame(smoothTicker);
     });
 }

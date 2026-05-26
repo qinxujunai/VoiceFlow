@@ -11,7 +11,7 @@ The product is intentionally small. Reliability, low latency, and "never lose te
 - Default path is offline: no cloud ASR, no cloud LLM, no hidden network work.
 - Text output is first copied to the clipboard, then pasted.
 - The app must not restore the old clipboard after dictation.
-- Final output is generated from complete stopped audio, not only from streaming preview.
+- Final output must cover the complete stopped audio, not only the streaming preview.
 - Streaming preview may be throttled for long recordings, but final transcription must remain complete.
 - Tray menu must expose a working Exit action.
 - Default triggers are F2 plus xbutton1/xbutton2. Do not add more default keys unless there is a strong reason.
@@ -30,9 +30,9 @@ HotkeyManager
   -> OverlayWindow / tray icon
 ```
 
-Recording starts on toggle. A background thread updates the overlay with preview text. The preview is throttled more aggressively as the audio gets longer so it cannot dominate CPU time during long dictation.
+Recording starts on toggle. A background thread updates the overlay with preview text. For long dictation, preview transcription uses only the most recent audio window and refreshes at a bounded interval so it cannot dominate CPU time. Preview remains UI feedback, not the source of truth.
 
-Stopping recording always stops capture first and then runs final recognition over the complete audio buffer. If final recognition returns empty while preview had text, the preview text is used as a safety fallback.
+Short recordings run final recognition over the complete stopped audio buffer. Long recordings progressively transcribe stable audio segments during recording and only transcribe the remaining tail on stop. The assembled final output still covers the complete audio. If final recognition returns empty while preview had text, the preview text is used as a safety fallback.
 
 ## Recognition
 
@@ -50,10 +50,11 @@ Vocabulary and corrections are deterministic post-processing. SenseVoice hotword
 
 ## UI
 
-The overlay is a compact bottom-centered pill. It is a state indicator, not a full editor:
+The overlay is a compact bottom-centered pill. It is a state indicator, not a full editor. The left mark region and right text region stay stable so waveform, spinner, checkmark, and text never stack on top of each other:
 
 - listening / streaming: three-bar waveform and live text
-- success: short confirmation animation, then hide
+- processing: spinner in the left mark while preserving the last visible text and width
+- done: checkmark plus short completion text, then hide/reset
 - error / canceled: brief state, then hide
 
 The pill should remain visually centered. Width grows with text up to a small maximum, and long text scrolls with a left fade.
