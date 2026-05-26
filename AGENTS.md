@@ -46,8 +46,9 @@ src/
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
-- Final output must use the complete stopped audio buffer; streaming preview is only preview.
-- Streaming preview may be throttled for long recordings, but final transcription must remain complete.
+- Final output must cover the complete stopped audio; streaming preview is only preview.
+- Streaming preview may use a recent audio window and be throttled for long recordings.
+- Long recordings may progressively cache stable final segments during recording, but stop-time output must still include the remaining tail and cover the complete audio.
 - Default triggers are `f2`, `right_ctrl`, `xbutton1`, and `xbutton2`. Do not add combo keys as defaults — suppress=True blocks the individual keys from normal use.
 - Tray right-click menu must keep a working `退出` action.
 - Keep the overlay small, centered, and quiet.
@@ -135,6 +136,8 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 - **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint, keep hide as hide-first then offscreen `resetHidden()`, and keep normal stop flow as `show_processing()` -> final transcribe/output/history -> `show_done()` -> hide/reset. Do not call `show_result(text)` for the normal recording stop path.
 
 - **Final text overwritten by streaming preview.** The old failure mode was one queued `updateStreaming` arriving after `show_result`. Keep `_stop_streaming()` joining `self._stream_thread`, and keep generation/session guards on `prepareRecording()` and `updateStreaming()`.
+
+- **Long dictation preview cost.** Streaming preview is UI feedback and may use only a recent audio window. Long recordings may use progressive final segments plus a stop-time tail pass, but do not output preview text as final unless final transcription is empty and the existing safety fallback is the only available text.
 
 ## Coding Rules
 

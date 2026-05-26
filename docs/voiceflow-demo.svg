@@ -1,71 +1,121 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
   <title id="title">VoiceFlow compact dictation overlay demo</title>
-  <desc id="desc">Animated preview of VoiceFlow growing pill, live text, processing spinner, and completion state.</desc>
+  <desc id="desc">A faithful animated preview of the real VoiceFlow pill: waveform, clipped live text, processing spinner, and done checkmark.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-80%" width="140%" height="260%">
-      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000" flood-opacity="0.18"/>
-      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.16"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#000" flood-opacity="0.10"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.12"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#000" flood-opacity="0.07"/>
     </filter>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f7f8fb"/>
       <stop offset="1" stop-color="#eceff5"/>
     </linearGradient>
-    <linearGradient id="pill" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="pillFill" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#27272b" stop-opacity="0.94"/>
       <stop offset="1" stop-color="#161719" stop-opacity="0.92"/>
     </linearGradient>
-    <clipPath id="textClip">
-      <rect x="410" y="146" width="190" height="28" rx="8"/>
-    </clipPath>
+    <style>
+      .ui-font { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
+      #demo-pill { animation: pillState 6.8s cubic-bezier(0.2, 0, 0, 1) infinite; }
+      #demo-waveform { animation: waveformState 6.8s ease infinite; }
+      #demo-spinner { animation: spinnerState 6.8s ease infinite; }
+      #demo-check { animation: checkState 6.8s ease infinite; }
+      #demo-text { animation: textState 6.8s ease infinite; }
+      .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
+      .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
+      .spin-ring { animation: spin 780ms linear infinite; transform-box: fill-box; transform-origin: center; }
+      .live-text { animation: liveTextState 6.8s ease infinite; }
+      .done-text { animation: doneTextState 6.8s ease infinite; }
+      @keyframes pillState {
+        0%, 9%, 100% { opacity: 0; }
+        12%, 88% { opacity: 1; }
+      }
+      @keyframes waveformState {
+        0%, 10%, 66%, 100% { opacity: 0; }
+        14%, 62% { opacity: 1; }
+      }
+      @keyframes spinnerState {
+        0%, 62%, 77%, 100% { opacity: 0; }
+        66%, 73% { opacity: 1; }
+      }
+      @keyframes checkState {
+        0%, 74%, 100% { opacity: 0; }
+        79%, 88% { opacity: 1; }
+      }
+      @keyframes textState {
+        0%, 16%, 100% { opacity: 0; }
+        23%, 88% { opacity: 1; }
+      }
+      @keyframes liveTextState {
+        0%, 18%, 74%, 100% { opacity: 0; }
+        24%, 68% { opacity: 1; }
+      }
+      @keyframes doneTextState {
+        0%, 75%, 100% { opacity: 0; }
+        80%, 88% { opacity: 1; }
+      }
+      @keyframes barA {
+        0%, 100% { transform: scaleY(0.55); opacity: 0.55; }
+        50% { transform: scaleY(1.22); opacity: 1; }
+      }
+      @keyframes barB {
+        0%, 100% { transform: scaleY(0.60); opacity: 0.50; }
+        55% { transform: scaleY(1.15); opacity: 1; }
+      }
+      @keyframes barC {
+        0%, 100% { transform: scaleY(0.50); opacity: 0.60; }
+        45% { transform: scaleY(1.28); opacity: 1; }
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </defs>
 
   <rect width="960" height="320" fill="url(#bg)"/>
-  <rect x="72" y="62" width="816" height="196" rx="28" fill="#fff" opacity="0.72"/>
-  <text x="96" y="108" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" fill="#202124">VoiceFlow</text>
-  <text x="96" y="134" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" fill="#69707d">Press F2. Speak. Paste. Never lose text.</text>
+  <rect x="72" y="62" width="816" height="196" rx="28" fill="#fff" opacity="0.74"/>
+  <text x="96" y="108" class="ui-font" font-size="18" font-weight="650" fill="#202124">VoiceFlow</text>
+  <text x="96" y="134" class="ui-font" font-size="13" fill="#69707d">Local-first, clipboard-first, never lose text.</text>
 
   <g filter="url(#shadow)">
-    <rect id="p" x="410" y="136" width="140" height="48" rx="24" fill="url(#pill)" stroke="#ffffff" stroke-opacity="0.10">
-      <animate attributeName="x" values="410;370;320;320;374;410" dur="6s" repeatCount="indefinite"/>
-      <animate attributeName="width" values="140;220;320;320;212;140" dur="6s" repeatCount="indefinite"/>
+    <rect id="demo-pill" x="437" y="143" width="86" height="34" rx="17" fill="url(#pillFill)" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5">
+      <animate attributeName="x" values="437;437;401;350;350;424;437" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="width" values="86;86;158;260;260;112;86" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
     </rect>
   </g>
 
-  <g transform="translate(430 152)">
-    <rect x="0" y="8" width="3" height="13" rx="1.5" fill="#ff453a">
-      <animate attributeName="height" values="9;20;9" dur="0.9s" repeatCount="indefinite"/>
-      <animate attributeName="y" values="10;4;10" dur="0.9s" repeatCount="indefinite"/>
-    </rect>
-    <rect x="8" y="4" width="3" height="21" rx="1.5" fill="#ff453a">
-      <animate attributeName="height" values="20;10;20" dur="0.8s" repeatCount="indefinite"/>
-      <animate attributeName="y" values="4;9;4" dur="0.8s" repeatCount="indefinite"/>
-    </rect>
-    <rect x="16" y="9" width="3" height="12" rx="1.5" fill="#ff453a">
-      <animate attributeName="height" values="10;18;10" dur="1.0s" repeatCount="indefinite"/>
-      <animate attributeName="y" values="10;5;10" dur="1.0s" repeatCount="indefinite"/>
-    </rect>
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;362 160;362 160;436 160;449 160" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+
+    <g id="demo-waveform" transform="translate(0 -9)">
+      <rect class="bar-a" x="2" y="5.5" width="2" height="7" rx="1" fill="#ff453a"/>
+      <rect class="bar-b" x="8" y="3" width="2" height="12" rx="1" fill="#ff453a"/>
+      <rect class="bar-c" x="14" y="5" width="2" height="8" rx="1" fill="#ff453a"/>
+    </g>
+
+    <g id="demo-spinner" transform="translate(9 0)">
+      <circle cx="0" cy="0" r="6.5" fill="none" stroke="#f5f5f7" stroke-opacity="0.22" stroke-width="1.6"/>
+      <circle class="spin-ring" cx="0" cy="0" r="6.5" fill="none" stroke="#f5f5f7" stroke-opacity="0.92" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="20 21"/>
+    </g>
+
+    <path id="demo-check" d="M5 -1 l4 5.5 l8 -10" fill="none" stroke="#32d74b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
-  <g clip-path="url(#textClip)">
-    <text x="464" y="166" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="500" fill="#f5f5f7">
-      Cursor and Codex at the cursor
-      <animate attributeName="x" values="464;456;446;446;456;464" dur="6s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0;1;1;1;1;0" dur="6s" repeatCount="indefinite"/>
-    </text>
-  </g>
+  <svg id="demo-text-viewport" x="475" y="151" width="36" height="18" overflow="hidden">
+    <animate attributeName="x" values="475;475;439;388;388;462;475" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animate attributeName="width" values="36;36;108;210;210;62;36" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <g id="demo-text">
+      <text class="ui-font live-text" x="105" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#f5f5f7">
+        我现在用 Cursor 和 Codex 写代码
+        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-34 0;-74 0;-74 0;0 0" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+      </text>
+      <text class="ui-font done-text" x="31" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#c7c7cc">已完成</text>
+    </g>
+  </svg>
 
-  <g transform="translate(526 160)" opacity="0">
-    <circle cx="0" cy="0" r="10" fill="none" stroke="#f5f5f7" stroke-width="2" stroke-linecap="round" stroke-dasharray="42 20">
-      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="0.9s" repeatCount="indefinite"/>
-    </circle>
-    <animate attributeName="opacity" values="0;0;0;1;0;0" dur="6s" repeatCount="indefinite"/>
-  </g>
-
-  <path d="M515 160 l8 8 l16 -18" fill="none" stroke="#32d74b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0">
-    <animate attributeName="opacity" values="0;0;0;0;1;0" dur="6s" repeatCount="indefinite"/>
-  </path>
-
-  <text x="480" y="236" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13" fill="#69707d">
-    Local preview -> full final transcription -> clipboard first
+  <text x="480" y="236" text-anchor="middle" class="ui-font" font-size="13" fill="#69707d">
+    Recent-window preview -> full final transcription -> clipboard first
   </text>
 </svg>

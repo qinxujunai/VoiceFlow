@@ -36,9 +36,19 @@ def test_streaming_ticker_only_overflows_after_reaching_max_width():
 
     assert "text-align: center;" in html[html.index(".ticker {"):html.index(".ticker.overflowing")]
     assert "const overflow = Math.max(0, txt.scrollWidth - tickerW);" in ticker_block
-    assert "_tickerTarget = overflow > 0 ? -overflow : 0;" in ticker_block
+    assert "var nextTarget = overflow > 0 ? -overflow : 0;" in ticker_block
     assert "ticker.classList.toggle('overflowing', overflow > 0);" in ticker_block
     assert "ticker.style.textAlign = 'center';" in ticker_block
+
+
+def test_streaming_ticker_never_animates_backwards_to_the_right():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    ticker_idx = html.index("function updateTickerOffset")
+    ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
+
+    assert "if (nextTarget > _tickerCurrent)" in ticker_block
+    assert "pill.style.setProperty('--ticker-offset', `${nextTarget}px`);" in ticker_block
+    assert ticker_block.index("if (nextTarget > _tickerCurrent)") < ticker_block.index("_tickerTarget = nextTarget;")
 
 
 def test_recording_state_has_explicit_reset_entrypoints():
@@ -161,3 +171,65 @@ def test_overlay_has_processing_spinner_and_done_checkmark():
     assert "def show_done(self):" in overlay
     assert 'self._js("showProcessing()")' in overlay
     assert "showDone()" in overlay
+
+
+def test_overlay_processing_only_changes_mark_state():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    processing_css = html[html.index(".pill.processing"):html.index(".pill.done")]
+    processing_idx = html.index("function showProcessing()")
+    processing_block = html[processing_idx:html.index("function showDone()", processing_idx)]
+
+    assert "--target-width" not in processing_css
+    assert "pill.className = 'pill processing';" in processing_block
+    assert "txt.textContent" not in processing_block
+    assert "setWidthForText" not in processing_block
+    assert "pill.style.setProperty('--target-width'" not in processing_block
+
+
+def test_overlay_keeps_single_stable_mark_and_text_regions():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    pill_css = html[html.index(".pill {"):html.index(".pill.no-width-transition")]
+    mark_css = html[html.index(".mark {"):html.index(".mark span")]
+    body = html[html.index('<div id="pill"'):html.index("<script>")]
+
+    assert "grid-template-columns: 18px minmax(0, 1fr);" in pill_css
+    assert "width: 18px;" in mark_css
+    assert body.count('class="mark"') == 1
+    assert body.count('id="ticker"') == 1
+    assert body.count('id="txt"') == 1
+
+
+def test_readme_demo_uses_single_product_pill_state_machine():
+    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
+
+    assert svg.count('id="demo-pill"') == 1
+    assert 'id="demo-text-viewport"' in svg
+    assert 'id="demo-waveform"' in svg
+    assert 'id="demo-spinner"' in svg
+    assert 'id="demo-check"' in svg
+    assert 'id="demo-text"' in svg
+    assert "@keyframes pillState" in svg
+    assert "@keyframes waveformState" in svg
+    assert "@keyframes spinnerState" in svg
+    assert "@keyframes checkState" in svg
+    assert "@keyframes textState" in svg
+    assert "Cursor and Codex at the cursor" not in svg
+
+
+def test_readme_demo_copies_real_overlay_geometry_and_clips_text():
+    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
+
+    assert 'height="34"' in svg
+    assert 'rx="17"' in svg
+    assert 'values="86;86;158;260;260;112;86"' in svg
+    assert 'values="36;36;108;210;210;62;36"' in svg
+    assert 'overflow="hidden"' in svg[svg.index('id="demo-text-viewport"'):svg.index('id="demo-text"', svg.index('id="demo-text-viewport"'))]
+    assert 'width="2"' in svg
+    assert 'height="7"' in svg
+    assert 'height="12"' in svg
+    assert 'height="8"' in svg
+    assert 'stdDeviation="3"' in svg
+    assert 'stdDeviation="8"' in svg
+    done_idx = svg.index('class="ui-font done-text"')
+    done_block = svg[done_idx:svg.index("</text>", done_idx)]
+    assert "<animate" not in done_block

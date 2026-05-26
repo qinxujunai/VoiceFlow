@@ -39,6 +39,10 @@ class _InitWorker(threading.Thread):
 
 
 class VoiceInputSystem:
+    STREAM_PREVIEW_WINDOW_SECONDS = 18.0
+    FINAL_SEGMENT_SECONDS = 18.0
+    FINAL_SEGMENT_HOLD_SECONDS = 2.0
+    SEGMENTED_FINAL_MIN_SECONDS = 45.0
 
     def __init__(self, config_path=None):
         self.base_dir = self._resolve_base_dir(config_path)
@@ -54,6 +58,9 @@ class VoiceInputSystem:
         self._streaming = False
         self._stream_generation = 0
         self._latest_text = ""  # 后台转写的最新结果
+        self._final_segments = []
+        self._finalized_audio_len = 0
+        self._final_cache_lock = threading.Lock()
         self.overlay = OverlayWindow()
         self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
 
@@ -111,6 +118,7 @@ class VoiceInputSystem:
             generation = self._stream_generation
             self.overlay.show_recording(generation)
             self._latest_text = ""
+            self._reset_final_cache()
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
         except Exception as e:
@@ -135,7 +143,7 @@ class VoiceInputSystem:
                 self._is_processing = False
                 return
 
-            raw_text = self.transcriber.transcribe(data, self.audio.sample_rate)
+            raw_text = self._transcribe_final_text(data)
             text = self.cleaner.clean(raw_text) if raw_text else ""
 
             # Safety: if final transcription empty but streaming had text, use streaming text
@@ -165,8 +173,68 @@ class VoiceInputSystem:
         finally:
             self._is_processing = False
 
+    def _stream_preview_interval(self, elapsed_seconds):
+        if elapsed_seconds < 30:
+            return 0.6
+        if elapsed_seconds < 120:
+            return 2.0
+        return 4.0
+
+    def _stream_preview_audio(self, chunk):
+        max_samples = int(self.audio.sample_rate * self.STREAM_PREVIEW_WINDOW_SECONDS)
+        if max_samples <= 0 or len(chunk) <= max_samples:
+            return chunk
+        return chunk[-max_samples:]
+
+    def _reset_final_cache(self):
+        with self._final_cache_lock:
+            self._final_segments = []
+            self._finalized_audio_len = 0
+
+    def _next_final_segment(self, chunk, finalized_audio_len):
+        segment_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_SECONDS)
+        hold_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_HOLD_SECONDS)
+        stable_len = max(0, len(chunk) - hold_samples)
+        if segment_samples <= 0 or stable_len - finalized_audio_len < segment_samples:
+            return None, finalized_audio_len
+        end = finalized_audio_len + segment_samples
+        return chunk[finalized_audio_len:end], end
+
+    def _append_final_segment(self, text, finalized_audio_len):
+        if not text:
+            return
+        with self._final_cache_lock:
+            self._final_segments.append(text.strip())
+            self._finalized_audio_len = finalized_audio_len
+
+    def _snapshot_final_cache(self):
+        lock = getattr(self, "_final_cache_lock", None)
+        if lock is None:
+            return list(getattr(self, "_final_segments", [])), getattr(self, "_finalized_audio_len", 0)
+        with lock:
+            return list(self._final_segments), self._finalized_audio_len
+
+    def _join_transcript_parts(self, parts):
+        return " ".join(part.strip() for part in parts if part and part.strip()).strip()
+
+    def _should_use_segmented_final(self, data, parts, finalized_audio_len):
+        duration = len(data) / self.audio.sample_rate
+        return (
+            duration >= self.SEGMENTED_FINAL_MIN_SECONDS
+            and bool(parts)
+            and 0 < finalized_audio_len < len(data)
+        )
+
+    def _transcribe_final_text(self, data):
+        parts, finalized_audio_len = self._snapshot_final_cache()
+        if self._should_use_segmented_final(data, parts, finalized_audio_len):
+            tail = data[finalized_audio_len:]
+            tail_text = self.transcriber.transcribe(tail, self.audio.sample_rate) if len(tail) else ""
+            return self._join_transcript_parts(parts + [tail_text])
+        return self.transcriber.transcribe(data, self.audio.sample_rate)
+
     def _start_streaming(self, generation):
-        """后台 ASR 线程：录音期间持续转写，停止时结果已就绪"""
+        """后台 ASR 线程：录音期间用最近窗口做预览，停止后仍完整转写"""
         self._streaming = True
 
         last_len = 0
@@ -177,16 +245,17 @@ class VoiceInputSystem:
                     buf = self.audio._audio_buffer
                     if buf:
                         chunk = np.concatenate(buf, axis=0).flatten()
+                        _, finalized_len = self._snapshot_final_cache()
+                        segment, segment_end = self._next_final_segment(chunk, finalized_len)
+                        if segment is not None:
+                            segment_text = self.transcriber.transcribe(segment, self.audio.sample_rate)
+                            self._append_final_segment(segment_text, segment_end)
+                            time.sleep(0.05)
+                            continue
+
                         new_samples = len(chunk) - last_len
                         elapsed = len(chunk) / self.audio.sample_rate
-                        if elapsed < 30:
-                            min_new_seconds = 0.6
-                        elif elapsed < 120:
-                            min_new_seconds = 2.0
-                        elif elapsed < 300:
-                            min_new_seconds = 8.0
-                        else:
-                            min_new_seconds = 20.0
+                        min_new_seconds = self._stream_preview_interval(elapsed)
 
                         if new_samples > self.audio.sample_rate * min_new_seconds or last_len == 0:
                             # Energy gate: skip transcription on silence
@@ -197,7 +266,8 @@ class VoiceInputSystem:
                                 last_len = len(chunk)
                                 time.sleep(0.25)
                                 continue
-                            text = self.transcriber.transcribe(chunk, self.audio.sample_rate)
+                            preview_audio = self._stream_preview_audio(chunk)
+                            text = self.transcriber.transcribe(preview_audio, self.audio.sample_rate)
                             last_len = len(chunk)
                             if text:
                                 self._latest_text = text
