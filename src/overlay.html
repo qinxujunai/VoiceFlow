@@ -56,8 +56,19 @@ body {
     -webkit-backdrop-filter: blur(24px) saturate(160%);
     transform-origin: center center;
     transition:
+        width 180ms cubic-bezier(0.2, 0, 0, 1),
         border-color 140ms ease,
         opacity 120ms ease;
+}
+
+.pill.no-width-transition {
+    transition:
+        border-color 140ms ease,
+        opacity 120ms ease;
+}
+
+.pill.no-transition {
+    transition: none !important;
 }
 
 .pill.idle {
@@ -177,6 +188,7 @@ body {
     font-weight: 470;
     line-height: 1;
     white-space: nowrap;
+    text-align: center;
 }
 
 .ticker.overflowing {
@@ -194,10 +206,13 @@ body {
     color: transparent;
 }
 
-.processing .ticker,
 .done .ticker,
 .canceled .ticker {
     color: var(--muted);
+}
+
+.processing .ticker {
+    color: var(--text);
 }
 
 .error .ticker {
@@ -252,6 +267,8 @@ const txt = document.getElementById('txt');
 const MIN_WIDTH = 86;
 const MAX_WIDTH = 260;
 let activeSession = 0;
+let maxStreamingWidth = MIN_WIDTH;
+let lastStreamingText = '';
 
 function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -276,15 +293,20 @@ function measureTextWidth(text) {
     return w;
 }
 
-function setWidthForText(text) {
+function setWidthForText(text, lockGrowth) {
     txt.textContent = text || '';
     if (!text) {
         pill.style.removeProperty('--target-width');
-        return;
+        return MIN_WIDTH;
     }
     var est = measureTextWidth(text);
     var width = clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH);
+    if (lockGrowth) {
+        width = Math.max(maxStreamingWidth, width);
+        maxStreamingWidth = width;
+    }
     pill.style.setProperty('--target-width', width + 'px');
+    return width;
 }
 
 let _tickerTarget = 0;
@@ -301,16 +323,18 @@ function smoothTicker() {
     }
 }
 
-function updateTickerOffset() {
+function updateTickerOffset(targetWidth) {
     cancelAnimationFrame(_tickerRaf);
     requestAnimationFrame(() => {
-        var targetW = parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
+        var targetW = targetWidth || parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
         var tickerW = Math.max(0, targetW - 50);
         const overflow = Math.max(0, txt.scrollWidth - tickerW);
-        _tickerTarget = -overflow;
+        _tickerTarget = overflow > 0 ? -overflow : 0;
         ticker.classList.toggle('overflowing', overflow > 0);
         if (overflow > 0) {
             ticker.style.textAlign = 'left';
+        } else {
+            ticker.style.textAlign = 'center';
         }
         _tickerRaf = requestAnimationFrame(smoothTicker);
     });
@@ -323,20 +347,36 @@ function resetTextMotion() {
     pill.style.setProperty('--ticker-offset', '0px');
     ticker.classList.remove('overflowing');
     ticker.style.textAlign = '';
+    maxStreamingWidth = MIN_WIDTH;
+    lastStreamingText = '';
 }
 
 function resetHidden() {
+    var keepNoTransition = pill.classList.contains('no-transition');
+    var keepNoWidthTransition = pill.classList.contains('no-width-transition');
     resetTextMotion();
     txt.textContent = '';
-    pill.style.removeProperty('--target-width');
+    pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
     pill.style.width = '';
-    pill.className = 'pill idle';
+    var classes = ['pill', 'idle'];
+    if (keepNoTransition) classes.push('no-transition');
+    if (keepNoWidthTransition) classes.push('no-width-transition');
+    pill.className = classes.join(' ');
+}
+
+function resetHiddenInstant() {
+    pill.classList.add('no-transition');
+    resetHidden();
+    void pill.offsetWidth;
 }
 
 function prepareRecording(sessionId) {
     activeSession = sessionId;
+    pill.classList.add('no-width-transition');
     resetHidden();
-    pill.className = 'pill listening';
+    pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
+    pill.className = 'pill listening no-width-transition';
+    requestAnimationFrame(() => pill.classList.remove('no-width-transition'));
 }
 
 function showState(state, label) {
@@ -346,13 +386,13 @@ function showState(state, label) {
     pill.style.width = '';
     txt.textContent = label || '';
     if (state === 'listening' || state === 'idle') {
-        setWidthForText('');
+        setWidthForText('', false);
     } else {
-        setWidthForText(label || '');
+        var width = setWidthForText(label || '', false);
         if (state === 'processing' || state === 'done') {
             ticker.style.textAlign = 'center';
         }
-        updateTickerOffset();
+        updateTickerOffset(width);
     }
 }
 
@@ -363,10 +403,10 @@ function showRecording(sessionId) {
 function updateStreaming(text, sessionId) {
     if (!text) return;
     if (sessionId !== activeSession) return;
-    ticker.style.textAlign = 'center';
     pill.className = 'pill streaming';
-    setWidthForText(text);
-    updateTickerOffset();
+    lastStreamingText = text;
+    var width = setWidthForText(text, true);
+    updateTickerOffset(width);
 }
 
 function showProcessing() {
@@ -383,12 +423,12 @@ function showResult(msg) {
     ticker.style.textAlign = '';
     pill.className = 'pill success';
     if (msg) {
-        setWidthForText(msg);
-        updateTickerOffset();
+        var width = setWidthForText(msg, false);
+        updateTickerOffset(width);
     } else {
         txt.textContent = '';
         pill.style.setProperty('--ticker-offset', '0px');
-        setWidthForText('');
+        setWidthForText('', false);
     }
 }
 

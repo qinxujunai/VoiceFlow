@@ -21,8 +21,6 @@ from overlay_webview import OverlayWindow
 from text_cleaner import TextCleaner
 from history_store import HistoryStore
 from recording_session import RecordingSession
-from correction_engine import CorrectionRequest, build_correction_engine, correct_with_timeout
-from realtime_correction import RealtimeCorrectionScheduler
 
 
 class _InitWorker(threading.Thread):
@@ -56,7 +54,6 @@ class VoiceInputSystem:
         self._streaming = False
         self._stream_generation = 0
         self._latest_text = ""  # 后台转写的最新结果
-        self._latest_clean_text = ""
         self.overlay = OverlayWindow()
         self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
 
@@ -100,22 +97,7 @@ class VoiceInputSystem:
             on_quit=self.shutdown,
         )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
-        self.correction_engine = build_correction_engine(self.config)
-        self.correction_terms = self._correction_terms()
-        correction_cfg = self.config.get("correction", {})
-        self.final_correction_timeout = correction_cfg.get("final_timeout", 2.0)
-        self.realtime_correction = RealtimeCorrectionScheduler(
-            self.correction_engine,
-            terms=self.correction_terms,
-            min_interval_seconds=correction_cfg.get("stream_min_interval", 1.2),
-        )
         print("[启动] 就绪", flush=True)
-
-    def _correction_terms(self):
-        vocabulary = getattr(self.cleaner, "vocabulary", None)
-        if not vocabulary:
-            return []
-        return sorted(vocabulary.terms, key=len, reverse=True)[:120]
 
     # ---- 录音 ----
 
@@ -129,9 +111,6 @@ class VoiceInputSystem:
             generation = self._stream_generation
             self.overlay.show_recording(generation)
             self._latest_text = ""
-            self._latest_clean_text = ""
-            if hasattr(self, "realtime_correction"):
-                self.realtime_correction.invalidate(generation)
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
         except Exception as e:
@@ -164,14 +143,13 @@ class VoiceInputSystem:
                 text = self.cleaner.clean(self._latest_text)
 
             if text:
-                corrected_text = self._correct_final_text(text)
                 duration = result.duration or (len(data) / self.audio.sample_rate)
-                print(f"[杞啓] {corrected_text} ({duration:.1f}s)", flush=True)
-                output_status = self.output_handler.output(corrected_text)
+                print(f"[杞啓] {text} ({duration:.1f}s)", flush=True)
+                output_status = self.output_handler.output(text)
                 self.history.append(
                     raw_text=raw_text,
                     clean_text=text,
-                    corrected_text=corrected_text,
+                    corrected_text=text,
                     output_status=output_status,
                 )
                 self.overlay.show_done()
@@ -216,7 +194,6 @@ class VoiceInputSystem:
                             window = min(len(new_audio), self.audio.sample_rate // 2)
                             rms = float(np.sqrt(np.mean(new_audio[-window:].astype(np.float64)**2))) / 32768.0
                             if rms < 0.008 and last_len > 0:
-                                self._request_stream_correction(generation)
                                 last_len = len(chunk)
                                 time.sleep(0.25)
                                 continue
@@ -233,7 +210,6 @@ class VoiceInputSystem:
                                         pass  # skip short English-only (likely hallucination)
                                     else:
                                         if generation == self._stream_generation:
-                                            self._latest_clean_text = clean
                                             self.overlay.update_streaming(clean, generation)
                 except Exception:
                     pass
@@ -244,48 +220,16 @@ class VoiceInputSystem:
 
     def _stop_streaming(self):
         self._streaming = False
+        self._stream_generation += 1
         if hasattr(self, "_stream_thread") and self._stream_thread:
-            self._stream_thread.join(timeout=2.0)
+            self._stream_thread.join(timeout=0.2)
             self._stream_thread = None
-        if hasattr(self, "realtime_correction"):
-            self.realtime_correction.invalidate(self._stream_generation + 1)
 
     def _final_text_from_cache(self):
         raw_text = (self._latest_text or "").strip()
         if not raw_text:
             return "", "", False
         return raw_text, self.cleaner.clean(raw_text), True
-
-    def _request_stream_correction(self, generation):
-        if not hasattr(self, "realtime_correction"):
-            return
-        clean = (self._latest_clean_text or "").strip()
-        if not clean:
-            return
-        self.realtime_correction.request_correction(
-            clean,
-            generation=generation,
-            on_result=self._on_stream_correction,
-            stable_text=clean,
-        )
-
-    def _on_stream_correction(self, corrected_text, generation):
-        if generation != self._stream_generation:
-            return
-        self._latest_clean_text = corrected_text
-        self.overlay.update_streaming(corrected_text, generation)
-
-    def _correct_final_text(self, text):
-        request = CorrectionRequest(
-            text=text,
-            stable_text=getattr(self, "_latest_clean_text", ""),
-            terms=self.correction_terms,
-        )
-        return correct_with_timeout(
-            self.correction_engine,
-            request,
-            timeout=self.final_correction_timeout,
-        )
 
     def _on_record_cancel(self):
         if self._actively_recording:
