@@ -6,17 +6,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_verify_uses_explicit_py_compile_file_list():
+def test_verify_compiles_all_project_python_files():
     from scripts import verify
 
     assert verify.PYTHON_FILES
     assert all("*" not in item for item in verify.PYTHON_FILES)
-    assert "src/main.py" in verify.PYTHON_FILES
-    assert "src/transcriber.py" in verify.PYTHON_FILES
-    assert "scripts/verify.py" in verify.PYTHON_FILES
-    assert "scripts/download_models.py" in verify.PYTHON_FILES
-    assert "tests/test_model_runtime_contract.py" in verify.PYTHON_FILES
-    assert "test_integration.py" in verify.PYTHON_FILES
+    expected = {
+        path.relative_to(ROOT).as_posix()
+        for root in ("src", "scripts", "tests")
+        for path in (ROOT / root).rglob("*.py")
+    }
+    expected.add("test_integration.py")
+    assert set(verify.PYTHON_FILES) == expected
 
 
 def test_verify_runs_the_project_quality_gate():

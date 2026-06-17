@@ -8,24 +8,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON_FILES = (
-    "src/main.py",
-    "src/overlay_webview.py",
-    "src/hotkey_manager.py",
-    "src/output_handler.py",
-    "src/text_cleaner.py",
-    "src/transcriber.py",
-    "src/audio_capture.py",
-    "src/recording_session.py",
-    "src/vocabulary.py",
-    "scripts/doctor.py",
-    "scripts/verify.py",
-    "scripts/benchmark_models.py",
-    "scripts/download_models.py",
-    "scripts/add_correction.py",
-    "tests/test_model_runtime_contract.py",
-    "test_integration.py",
-)
+
+
+def _python_files() -> tuple[str, ...]:
+    roots = ("src", "scripts", "tests")
+    files: list[str] = []
+    for root in roots:
+        for path in sorted((ROOT / root).rglob("*.py")):
+            files.append(path.relative_to(ROOT).as_posix())
+    files.append("test_integration.py")
+    return tuple(files)
+
+
+PYTHON_FILES = _python_files()
 
 
 def _run(label: str, command: list[str]) -> int:
