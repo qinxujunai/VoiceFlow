@@ -13,11 +13,19 @@ import sys
 import argparse
 
 
+SENSEVOICE_REQUIRED_FILES = ("model.int8.onnx", "tokens.txt")
+QWEN3_ASR_REQUIRED_FILES = ("model.onnx", "tokens.txt")
+
+
+def _has_required_files(target_dir, filenames):
+    return all(os.path.exists(os.path.join(target_dir, filename)) for filename in filenames)
+
+
 def download_sensevoice(base_dir):
     """下载 SenseVoice-Small ONNX 模型（sherpa-onnx 预导出版）"""
     target_dir = os.path.join(base_dir, "models", "sensevoice")
 
-    if os.path.exists(os.path.join(target_dir, "model.onnx")):
+    if _has_required_files(target_dir, SENSEVOICE_REQUIRED_FILES):
         print("[SenseVoice] 模型已存在，跳过下载")
         return True
 
@@ -32,6 +40,11 @@ def download_sensevoice(base_dir):
             repo_id="csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
             local_dir=target_dir,
         )
+        if not _has_required_files(target_dir, SENSEVOICE_REQUIRED_FILES):
+            raise FileNotFoundError(
+                "downloaded SenseVoice files are not sherpa-onnx ready "
+                f"(expected {', '.join(SENSEVOICE_REQUIRED_FILES)})"
+            )
         print("[SenseVoice] 下载完成")
         return True
     except Exception as e:
@@ -43,7 +56,7 @@ def download_qwen3_asr(base_dir):
     """下载 sherpa-onnx 可直接加载的 Qwen3-ASR 0.6B int8 模型"""
     target_dir = os.path.join(base_dir, "models", "qwen3-asr")
 
-    if os.path.exists(os.path.join(target_dir, "model.onnx")):
+    if _has_required_files(target_dir, QWEN3_ASR_REQUIRED_FILES):
         print("[Qwen3-ASR] 模型已存在，跳过下载")
         return True
 
@@ -58,12 +71,10 @@ def download_qwen3_asr(base_dir):
             local_dir=target_dir,
             allow_patterns=["*.onnx", "*.txt", "*.yaml", "*.json", "*.bin", "*.data"],
         )
-        model_path = os.path.join(target_dir, "model.onnx")
-        tokens_path = os.path.join(target_dir, "tokens.txt")
-        if not (os.path.exists(model_path) and os.path.exists(tokens_path)):
+        if not _has_required_files(target_dir, QWEN3_ASR_REQUIRED_FILES):
             raise FileNotFoundError(
                 "downloaded Qwen3-ASR files are not sherpa-onnx ready "
-                "(expected model.onnx and tokens.txt)"
+                f"(expected {', '.join(QWEN3_ASR_REQUIRED_FILES)})"
             )
         print("[Qwen3-ASR] 下载完成")
         return True

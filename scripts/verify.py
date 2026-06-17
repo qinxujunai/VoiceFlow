@@ -21,7 +21,9 @@ PYTHON_FILES = (
     "scripts/doctor.py",
     "scripts/verify.py",
     "scripts/benchmark_models.py",
+    "scripts/download_models.py",
     "scripts/add_correction.py",
+    "tests/test_model_runtime_contract.py",
     "test_integration.py",
 )
 
