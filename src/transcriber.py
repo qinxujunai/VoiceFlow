@@ -40,6 +40,11 @@ class Transcriber:
                 f"模型文件不存在: {model_path}\n"
                 f"请先运行: python scripts/download_models.py"
             )
+        if not os.path.exists(tokens_path):
+            raise FileNotFoundError(
+                f"tokens 文件不存在: {tokens_path}\n"
+                f"请先运行: python scripts/download_models.py"
+            )
 
         import sherpa_onnx
 

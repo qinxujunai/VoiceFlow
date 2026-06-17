@@ -14,6 +14,8 @@ def test_verify_uses_explicit_py_compile_file_list():
     assert "src/main.py" in verify.PYTHON_FILES
     assert "src/transcriber.py" in verify.PYTHON_FILES
     assert "scripts/verify.py" in verify.PYTHON_FILES
+    assert "scripts/download_models.py" in verify.PYTHON_FILES
+    assert "tests/test_model_runtime_contract.py" in verify.PYTHON_FILES
     assert "test_integration.py" in verify.PYTHON_FILES
 
 
