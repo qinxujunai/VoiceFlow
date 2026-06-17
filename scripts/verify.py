@@ -18,8 +18,10 @@ PYTHON_FILES = (
     "src/recording_session.py",
     "src/vocabulary.py",
     "scripts/doctor.py",
+    "scripts/verify.py",
     "scripts/benchmark_models.py",
     "scripts/add_correction.py",
+    "test_integration.py",
 )
 
 
