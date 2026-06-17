@@ -10,6 +10,7 @@ soundfile>=0.12.1
 
 # 全局快捷键（真正拦截输入法）
 keyboard>=0.13.0
+pynput>=1.7.7
 
 # 文字输出
 pyautogui>=0.9.54
