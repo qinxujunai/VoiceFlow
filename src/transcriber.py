@@ -32,6 +32,8 @@ class Transcriber:
 
         model_path = os.path.join(self.base_dir, engine_cfg.get("model_path", ""))
         tokens_path = os.path.join(self.base_dir, engine_cfg.get("tokens_path", ""))
+        num_threads = int(engine_cfg.get("num_threads", 6))
+        provider = engine_cfg.get("provider", "cpu")
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(
@@ -50,15 +52,15 @@ class Transcriber:
                 tokens=tokens_path,
                 language=engine_cfg.get("language", "zh"),
                 use_itn=engine_cfg.get("use_itn", True),
-                num_threads=6,
-                provider="cpu",
+                num_threads=num_threads,
+                provider=provider,
             )
         elif engine_name == "qwen3-asr":
             self.recognizer = sherpa_onnx.OfflineRecognizer.from_qwen3_asr(
                 model=model_path,
                 tokens=tokens_path,
-                num_threads=6,
-                provider="cpu",
+                num_threads=num_threads,
+                provider=provider,
             )
         else:
             raise ValueError(f"不支持的引擎: {engine_name}")
