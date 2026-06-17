@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -27,13 +28,38 @@ PYTHON_FILES = (
 
 def _run(label: str, command: list[str]) -> int:
     print(f"\n== {label} ==", flush=True)
-    completed = subprocess.run(command, cwd=ROOT)
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        env=_quality_gate_env(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.stdout:
+        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n", flush=True)
     if completed.returncode != 0:
         print(f"\nFAILED: {label} ({completed.returncode})", flush=True)
     return completed.returncode
 
 
+def _quality_gate_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    return env
+
+
+def _force_utf8_stdout() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main() -> int:
+    _force_utf8_stdout()
     parser = argparse.ArgumentParser(description="Run the non-interactive VoiceFlow quality gate.")
     parser.add_argument(
         "--quick",
