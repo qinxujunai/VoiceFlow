@@ -18,6 +18,7 @@ venv\Scripts\python.exe src\main.py
 Do not use `src\*.py` with `py_compile` on Windows; Python does not expand that glob.
 
 ```bat
+venv\Scripts\python.exe scripts\doctor.py
 venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py
 venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe test_integration.py
