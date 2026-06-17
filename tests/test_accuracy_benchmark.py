@@ -51,3 +51,13 @@ def test_clean_cer_can_improve_over_raw_cer():
 
     assert raw > 0
     assert clean == 0
+
+
+def test_transcriber_reads_provider_and_thread_settings_from_config():
+    transcriber = (ROOT / "src" / "transcriber.py").read_text(encoding="utf-8")
+    config = (ROOT / "config.yaml").read_text(encoding="utf-8")
+
+    assert 'engine_cfg.get("provider", "cpu")' in transcriber
+    assert 'engine_cfg.get("num_threads", 6)' in transcriber
+    assert 'provider: "cpu"' in config
+    assert "num_threads: 6" in config

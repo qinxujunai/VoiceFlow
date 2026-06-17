@@ -15,12 +15,16 @@ engine:
     tokens_path: "models/sensevoice/tokens.txt"
     language: "zh"              # 主要语言: zh / en / auto
     use_itn: true               # 逆文本正则化（数字、日期等标准化）
+    provider: "cpu"             # sherpa-onnx provider；默认 CPU 最稳
+    num_threads: 6              # Ryzen 7 5800H 上的低延迟默认值
 
   qwen3-asr:
     model_path: "models/qwen3-asr/model.onnx"
     tokens_path: "models/qwen3-asr/tokens.txt"
     language: "zh"
     prompt: ""                  # 可选的文本提示（引导识别方向）
+    provider: "cpu"
+    num_threads: 6
 
 # ============================================================
 # 音频配置

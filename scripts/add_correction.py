@@ -5,10 +5,16 @@ Add or update one VoiceFlow correction pair.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _force_utf8_stdout():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def update_correction(base_dir, wrong, correct):
@@ -44,6 +50,7 @@ def update_correction(base_dir, wrong, correct):
 
 
 def main():
+    _force_utf8_stdout()
     parser = argparse.ArgumentParser(description="Add or update a VoiceFlow correction")
     parser.add_argument("wrong", help="ASR text to replace")
     parser.add_argument("correct", help="preferred output text")
