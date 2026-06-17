@@ -125,6 +125,7 @@ venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
 ## Verification
 
 ```bat
+venv\Scripts\python.exe scripts\doctor.py
 venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py
 venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe scripts\benchmark_models.py --limit 3
