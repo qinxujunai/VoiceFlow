@@ -15,6 +15,9 @@ import wave
 import numpy as np
 import time
 
+MAX_RTF = 1.0
+MIN_TEXT_CHARS = 2
+
 
 def main():
     print("=" * 50)
@@ -61,8 +64,7 @@ def main():
     for wav_name, lang in test_files.items():
         wav_path = os.path.join(base_dir, "models", "sensevoice", "test_wavs", wav_name)
         if not os.path.exists(wav_path):
-            print(f"  [{lang}] {wav_name}: 文件不存在，跳过")
-            continue
+            raise FileNotFoundError(f"测试音频不存在: {wav_path}")
 
         with wave.open(wav_path) as f:
             sr = f.getframerate()
@@ -77,6 +79,10 @@ def main():
 
         print(f"  [{lang}] {text}")
         print(f"        耗时: {elapsed:.2f}s, RTF: {rtf:.3f}")
+        if len(text.strip()) < MIN_TEXT_CHARS:
+            raise RuntimeError(f"{wav_name} 转写结果为空或过短: {text!r}")
+        if rtf > MAX_RTF:
+            raise RuntimeError(f"{wav_name} 转写速度异常: RTF {rtf:.3f} > {MAX_RTF:.3f}")
 
     # 5. 输出模块测试
     print("\n[5/5] 输出模块加载...")
