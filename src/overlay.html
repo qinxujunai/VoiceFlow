@@ -38,7 +38,7 @@ body {
 .pill {
     width: var(--target-width);
     height: 34px;
-    max-width: 260px;
+    max-width: 340px;
     display: grid;
     grid-template-columns: 18px minmax(0, 1fr);
     align-items: center;
@@ -85,11 +85,13 @@ body {
     border-color: rgba(255, 69, 58, 0.16);
 }
 
-.pill.processing {
+.pill.processing,
+.pill.finalizing {
     border-color: rgba(100, 167, 255, 0.18);
 }
 
-.pill.done {
+.pill.done,
+.pill.final_ready {
     --target-width: 112px;
     border-color: rgba(50, 215, 75, 0.22);
 }
@@ -148,12 +150,15 @@ body {
 }
 
 .processing .mark span,
-.done .mark span {
+.finalizing .mark span,
+.done .mark span,
+.final_ready .mark span {
     opacity: 0;
     animation: none;
 }
 
-.processing .mark::before {
+.processing .mark::before,
+.finalizing .mark::before {
     content: "";
     position: absolute;
     inset: 2.5px;
@@ -163,7 +168,8 @@ body {
     animation: spin 780ms linear infinite;
 }
 
-.done .mark::before {
+.done .mark::before,
+.final_ready .mark::before {
     content: "";
     position: absolute;
     left: 5px;
@@ -206,11 +212,13 @@ body {
 }
 
 .done .ticker,
+.final_ready .ticker,
 .canceled .ticker {
     color: var(--muted);
 }
 
-.processing .ticker {
+.processing .ticker,
+.finalizing .ticker {
     color: var(--text);
 }
 
@@ -264,7 +272,7 @@ const ticker = document.getElementById('ticker');
 const txt = document.getElementById('txt');
 
 const MIN_WIDTH = 86;
-const MAX_WIDTH = 260;
+const MAX_WIDTH = 340;
 let activeSession = 0;
 let maxStreamingWidth = MIN_WIDTH;
 let lastStreamingText = '';
@@ -312,32 +320,41 @@ let _tickerTarget = 0;
 let _tickerCurrent = 0;
 let _tickerRaf = 0;
 
+function setTickerOffset(offset) {
+    _tickerCurrent = offset;
+    _tickerTarget = offset;
+    pill.style.setProperty('--ticker-offset', `${offset}px`);
+}
+
 function smoothTicker() {
     _tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;
     pill.style.setProperty('--ticker-offset', `${_tickerCurrent}px`);
     if (Math.abs(_tickerTarget - _tickerCurrent) > 0.4) {
         _tickerRaf = requestAnimationFrame(smoothTicker);
     } else {
-        pill.style.setProperty('--ticker-offset', `${_tickerTarget}px`);
+        setTickerOffset(_tickerTarget);
     }
 }
 
-function updateTickerOffset(targetWidth) {
+function updateTickerOffset(targetWidth, mode) {
     cancelAnimationFrame(_tickerRaf);
     requestAnimationFrame(() => {
         var targetW = targetWidth || parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
         var tickerW = Math.max(0, targetW - 50);
         const overflow = Math.max(0, txt.scrollWidth - tickerW);
-        var nextTarget = overflow > 0 ? -overflow : 0;
         ticker.classList.toggle('overflowing', overflow > 0);
+        var nextTarget = overflow > 0 ? -overflow : 0;
         if (overflow > 0) {
             ticker.style.textAlign = 'left';
         } else {
             ticker.style.textAlign = 'center';
         }
+        if (mode === 'final' || mode === 'settled') {
+            setTickerOffset(nextTarget);
+            return;
+        }
         if (nextTarget > _tickerCurrent) {
-            _tickerCurrent = nextTarget;
-            pill.style.setProperty('--ticker-offset', `${nextTarget}px`);
+            setTickerOffset(nextTarget);
         }
         _tickerTarget = nextTarget;
         _tickerRaf = requestAnimationFrame(smoothTicker);
@@ -346,9 +363,7 @@ function updateTickerOffset(targetWidth) {
 
 function resetTextMotion() {
     cancelAnimationFrame(_tickerRaf);
-    _tickerTarget = 0;
-    _tickerCurrent = 0;
-    pill.style.setProperty('--ticker-offset', '0px');
+    setTickerOffset(0);
     ticker.classList.remove('overflowing');
     ticker.style.textAlign = '';
     maxStreamingWidth = MIN_WIDTH;
@@ -393,7 +408,7 @@ function showState(state, label) {
         setWidthForText('', false);
     } else {
         var width = setWidthForText(label || '', false);
-        if (state === 'processing' || state === 'done') {
+        if (state === 'processing' || state === 'finalizing' || state === 'done' || state === 'final_ready') {
             ticker.style.textAlign = 'center';
         }
         updateTickerOffset(width);
@@ -418,8 +433,27 @@ function showProcessing() {
     pill.className = 'pill processing';
 }
 
+function showFinalizing(sessionId) {
+    if (sessionId < activeSession) return;
+    activeSession = sessionId;
+    pill.className = 'pill finalizing';
+    if (!txt.textContent) {
+        setWidthForText('整理中', false);
+    }
+    updateTickerOffset(parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH);
+}
+
 function showDone() {
     showState('done', '已完成');
+}
+
+function showFinalText(text, sessionId) {
+    if (sessionId < activeSession) return;
+    activeSession = sessionId;
+    resetTextMotion();
+    pill.className = 'pill final_ready success';
+    var width = setWidthForText(text || '已完成', false);
+    updateTickerOffset(width, 'final');
 }
 
 function showResult(msg) {
@@ -431,7 +465,7 @@ function showResult(msg) {
         updateTickerOffset(width);
     } else {
         txt.textContent = '';
-        pill.style.setProperty('--ticker-offset', '0px');
+        setTickerOffset(0);
         setWidthForText('', false);
     }
 }

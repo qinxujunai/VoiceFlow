@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +26,38 @@ REQUIRED_IMPORTS = (
     "soundfile",
     "pyperclip",
     "PyQt6",
+    "PyQt6.QtWebEngineWidgets",
     "pynput",
     "yaml",
 )
 REQUIRED_SAMPLE_WAVS = ("zh.wav", "en.wav")
+WARNING_STATUSES = {"warning"}
+
+
+def _is_required_ok(item: dict[str, str]) -> bool:
+    return item["status"] == "ok" or item["status"] in WARNING_STATUSES
+
+
+def _check_python_runtime(root: Path) -> list[dict[str, str]]:
+    rows = [
+        {
+            "name": "python_version",
+            "status": "ok" if sys.version_info >= (3, 10) else "missing",
+            "detail": sys.version.split()[0],
+        },
+        {
+            "name": "python_executable",
+            "status": "ok",
+            "detail": sys.executable,
+        },
+    ]
+    venv_python = root / "venv" / "Scripts" / "python.exe"
+    rows.append({
+        "name": "venv_python",
+        "status": "ok" if venv_python.exists() else "warning",
+        "detail": str(venv_python),
+    })
+    return rows
 
 
 def _check_imports() -> list[dict[str, str]]:
@@ -88,14 +118,40 @@ def _check_samples(root: Path) -> list[dict[str, str]]:
     return rows
 
 
+def _check_delivery_files(root: Path) -> list[dict[str, str]]:
+    logs_dir = root / "logs"
+    desktop = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+    shortcut = desktop / "VoiceFlow.lnk"
+    icon = root / "assets" / "voiceflow.ico"
+    return [
+        {
+            "name": "logs_dir",
+            "status": "ok",
+            "detail": str(logs_dir if logs_dir.exists() else f"{logs_dir} (created on demand)"),
+        },
+        {
+            "name": "app_icon",
+            "status": "ok" if icon.exists() else "missing",
+            "detail": str(icon),
+        },
+        {
+            "name": "desktop_shortcut",
+            "status": "ok" if shortcut.exists() else "warning",
+            "detail": str(shortcut if shortcut.exists() else f"{shortcut} (run scripts/create_shortcut.ps1)"),
+        },
+    ]
+
+
 def run_doctor(root: Path = ROOT) -> dict[str, Any]:
     config = _load_config(root)
     checks = []
+    checks.extend(_check_python_runtime(root))
     checks.extend(_check_imports())
     checks.extend(_check_active_engine(root, config))
     checks.extend(_check_knowledge_base(root, config))
     checks.extend(_check_samples(root))
-    ok = all(item["status"] == "ok" for item in checks)
+    checks.extend(_check_delivery_files(root))
+    ok = all(_is_required_ok(item) for item in checks)
     return {"ok": ok, "checks": checks}
 
 

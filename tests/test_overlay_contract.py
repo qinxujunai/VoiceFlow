@@ -17,7 +17,7 @@ def test_streaming_update_writes_text_before_measuring_width():
 def test_streaming_pill_width_animates_and_keeps_content_driven_growth():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     set_width_idx = html.index("function setWidthForText(text")
-    set_width_block = html[set_width_idx:html.index("let _tickerTarget", set_width_idx)]
+    set_width_block = html[set_width_idx:html.index("let _tickerRaf", set_width_idx)]
     streaming_block = html[html.index("function updateStreaming(text, sessionId)"):html.index("function showProcessing()")]
 
     assert "width 180ms cubic-bezier(0.2, 0, 0, 1)" in html
@@ -36,19 +36,55 @@ def test_streaming_ticker_only_overflows_after_reaching_max_width():
 
     assert "text-align: center;" in html[html.index(".ticker {"):html.index(".ticker.overflowing")]
     assert "const overflow = Math.max(0, txt.scrollWidth - tickerW);" in ticker_block
-    assert "var nextTarget = overflow > 0 ? -overflow : 0;" in ticker_block
     assert "ticker.classList.toggle('overflowing', overflow > 0);" in ticker_block
     assert "ticker.style.textAlign = 'center';" in ticker_block
+    assert "var nextTarget = overflow > 0 ? -overflow : 0;" in ticker_block
 
 
-def test_streaming_ticker_never_animates_backwards_to_the_right():
+def test_streaming_ticker_uses_original_smooth_tail_follow():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     ticker_idx = html.index("function updateTickerOffset")
     ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
+    smooth_block = html[html.index("function smoothTicker()"):ticker_idx]
 
+    assert "marquee" not in html
+    assert "text-replace" not in html
+    assert "tickerTrack" not in html
+    assert "_tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;" in smooth_block
+    assert "_tickerTarget = nextTarget;" in ticker_block
+    assert "_tickerRaf = requestAnimationFrame(smoothTicker);" in ticker_block
+
+
+def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    ticker_idx = html.index("function updateTickerOffset")
+    ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
+    streaming_block = html[html.index("function updateStreaming(text, sessionId)"):html.index("function showProcessing()")]
+
+    assert "STREAMING_MOTION_NUDGE" not in html
+    assert "function updateTickerOffset(targetWidth, mode)" in html
+    assert "restartTextRefresh" not in html
+    assert "updateTickerOffset(width);" in streaming_block
     assert "if (nextTarget > _tickerCurrent)" in ticker_block
-    assert "pill.style.setProperty('--ticker-offset', `${nextTarget}px`);" in ticker_block
-    assert ticker_block.index("if (nextTarget > _tickerCurrent)") < ticker_block.index("_tickerTarget = nextTarget;")
+
+
+def test_finalizing_and_final_text_are_session_guarded():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "function showFinalizing(sessionId)" in html
+    assert "activeSession = sessionId;" in html[html.index("function showFinalizing(sessionId)"):html.index("function showDone()")]
+    assert "pill.className = 'pill finalizing';" in html
+    assert "function showFinalText(text, sessionId)" in html
+    final_text_block = html[html.index("function showFinalText(text, sessionId)"):html.index("function showResult(msg)")]
+    assert "if (sessionId < activeSession) return;" in final_text_block
+    assert "pill.className = 'pill final_ready success';" in final_text_block
+    assert "resetTextMotion();" in final_text_block
+    assert "updateTickerOffset(width, 'final')" in final_text_block
+    assert "def show_finalizing(self, session_id):" in overlay
+    assert "showFinalizing({int(session_id)})" in overlay
+    assert "def show_final_text(self, text, session_id):" in overlay
+    assert "showFinalText({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
 
 
 def test_recording_state_has_explicit_reset_entrypoints():
@@ -103,6 +139,75 @@ def test_recording_start_cancels_pending_hide_timer():
     assert "self._cancel_pending_hide()" in recording_block
 
 
+def test_app_launch_opens_settings_window_after_runtime_ready():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    ready_idx = main.index("def _on_overlay_ready")
+    start_hotkeys_idx = main.index("def _start_hotkeys", ready_idx)
+    ready_block = main[ready_idx:start_hotkeys_idx]
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "self.overlay.show_settings_window()" in ready_block
+    assert "def show_settings_window(self):" in overlay
+    assert "settings_requested = pyqtSignal()" in overlay
+    assert "self._bridge.settings_requested.connect(self._show_settings)" in overlay
+
+
+def test_settings_window_has_recent_history_copy_controls():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert "self.history_list = QListWidget()" in settings_block
+    assert "setItemWidget(item, self._history_card" in settings_block
+    assert "self.search_box.setPlaceholderText(\"搜索最近转录\")" in settings_block
+    assert "QPushButton(\"复制\")" in settings_block
+    assert "QPushButton(\"重新粘贴\")" in settings_block
+    assert "QPushButton(\"复制全部\")" in settings_block
+    assert "copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))" in settings_block
+    assert "meta_parts.append(f\"尾部 {tail}\")" in settings_block
+    assert "pyperclip.copy(text)" in settings_block
+    assert "pyperclip.copy(\"\\n\\n\".join(texts))" in settings_block
+    assert "self._on_repaste_text(text)" in settings_block
+    assert "self.status_badge.setText(\"无可复制\")" in settings_block
+
+
+def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert "QStackedWidget" in overlay
+    assert "self.sidebar = QListWidget()" in settings_block
+    assert "self.stack = QStackedWidget()" in settings_block
+    assert "self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)" in settings_block
+    assert "QTabWidget" not in overlay
+    assert "QLabel#sectionTitle" in settings_block
+
+
+def test_tray_primary_click_opens_settings_not_raw_overlay():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    activated_idx = overlay.index("def _on_tray_activated")
+    show_idx = overlay.index("def _show", activated_idx)
+    activated_block = overlay[activated_idx:show_idx]
+
+    assert "self._show_settings()" in activated_block
+    assert "self._hide()" not in activated_block
+
+
+def test_overlay_enforces_single_instance_and_focuses_existing_window():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "SINGLE_INSTANCE_NAME" in overlay
+    assert "QLocalServer" in overlay
+    assert "QLocalSocket" in overlay
+    assert "if self._notify_existing_instance():" in overlay
+    assert "socket.write(b\"show\\n\")" in overlay
+    assert "server.newConnection.connect(self._on_instance_message)" in overlay
+    assert "self._show_settings()" in overlay[overlay.index("def _handle_instance_message"):overlay.index("def _setup_tray")]
+
+
 def test_hide_path_hides_window_before_resetting_dom():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     hide_idx = overlay.index("def _hide_and_idle")
@@ -131,29 +236,35 @@ def test_streaming_updates_are_session_guarded():
     assert "updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
 
 
-def test_stop_flow_uses_processing_and_done_states():
+def test_stop_flow_outputs_before_final_text_feedback():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     stop_idx = main.index("def _on_record_stop")
     stream_idx = main.index("def _start_streaming", stop_idx)
     stop_block = main[stop_idx:stream_idx]
 
-    assert "self.overlay.show_processing()" in stop_block
-    assert stop_block.index("self.overlay.show_processing()") < stop_block.index("self._stop_streaming()")
-    assert "self.overlay.show_done()" in stop_block
+    assert "final_generation = self._stop_streaming()" in stop_block
+    assert "self.overlay.show_finalizing(final_generation)" in stop_block
+    assert "self.overlay.show_final_text(text, final_generation)" in stop_block
+    assert stop_block.index("output_status = self.output_handler.output(text)") < stop_block.index("self.overlay.show_final_text(text, final_generation)")
+    assert "self.overlay.show_done()" not in stop_block
     assert "self.overlay.show_result(text)" not in stop_block
 
 
-def test_overlay_has_processing_spinner_and_done_checkmark():
+def test_overlay_has_processing_finalizing_spinner_and_final_checkmark():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     processing_idx = html.index("function showProcessing()")
-    done_idx = html.index("function showDone()", processing_idx)
+    done_idx = html.index("function showFinalizing(sessionId)", processing_idx)
     processing_block = html[processing_idx:done_idx]
     processing_ticker_block = html[html.index(".processing .ticker"):html.index(".error .ticker")]
 
     assert ".pill.done" in html
+    assert ".pill.finalizing" in html
+    assert ".pill.final_ready" in html
     assert ".processing .mark::before" in html
+    assert ".finalizing .mark::before" in html
     assert ".done .mark::before" in html
+    assert ".final_ready .mark::before" in html
     assert "@keyframes spin" in html
     assert "function showDone()" in html
     assert "showState('processing'" not in processing_block
@@ -177,7 +288,7 @@ def test_overlay_processing_only_changes_mark_state():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     processing_css = html[html.index(".pill.processing"):html.index(".pill.done")]
     processing_idx = html.index("function showProcessing()")
-    processing_block = html[processing_idx:html.index("function showDone()", processing_idx)]
+    processing_block = html[processing_idx:html.index("function showFinalizing(sessionId)", processing_idx)]
 
     assert "--target-width" not in processing_css
     assert "pill.className = 'pill processing';" in processing_block

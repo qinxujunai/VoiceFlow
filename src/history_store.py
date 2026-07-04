@@ -11,7 +11,19 @@ class HistoryStore:
     def __init__(self, path):
         self.path = Path(path)
 
-    def append(self, raw_text="", clean_text="", corrected_text="", output_status="unknown", error=""):
+    def append(
+        self,
+        raw_text="",
+        clean_text="",
+        corrected_text="",
+        output_status="unknown",
+        error="",
+        duration=None,
+        model="",
+        segment_count=None,
+        final_length=None,
+        final_tail="",
+    ):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -21,6 +33,16 @@ class HistoryStore:
             "output_status": output_status or "unknown",
             "error": error or "",
         }
+        if duration is not None:
+            entry["duration"] = round(float(duration), 3)
+        if model:
+            entry["model"] = model
+        if segment_count is not None:
+            entry["segment_count"] = int(segment_count)
+        if final_length is not None:
+            entry["final_length"] = int(final_length)
+        if final_tail:
+            entry["final_tail"] = final_tail
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry

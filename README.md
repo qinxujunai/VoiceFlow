@@ -25,7 +25,7 @@ inspectable, and boring in the best way.
   start and stop.
 - **Local ASR by default**: SenseVoice-Small int8 through `sherpa-onnx`.
 - **Streaming preview**: a compact bottom-centered pill shows live text while you
-  speak; long recordings use a recent audio window to stay responsive.
+  speak; pauses refresh the pill with a more complete in-progress transcription.
 - **Progressive final transcription**: short recordings use one complete final
   pass; long recordings cache stable audio segments while you speak and finish
   only the tail on stop.
@@ -33,13 +33,38 @@ inspectable, and boring in the best way.
 - **Local history**: successful outputs are appended to `logs/history.jsonl`.
 - **Deterministic cleanup**: `TextCleaner` and `knowledge-base/corrections.txt`
   handle stable, known ASR mistakes without calling a model.
-- **Native-feeling overlay**: the pill grows with text, preserves the last text
-  during processing, and resets invisibly before the next recording.
+- **Native-feeling overlay**: short text stays centered; long text sweeps once
+  through the pill and settles, so motion communicates change without becoming a
+  marquee.
 
 ## Quick Start
 
 ```bat
 start.bat
+```
+
+`start.bat` is the development and repair entrypoint for source checkouts. It
+checks that `venv\Scripts\python.exe` is actually runnable, rebuilds a broken
+venv, installs missing dependencies from `requirements.txt`, creates `logs\`,
+and restores the desktop shortcut. Healthy launches use a cached fast path;
+the full runtime doctor runs only after first setup, dependency/config changes,
+or a broken environment.
+
+The desktop shortcut points to `venv\Scripts\pythonw.exe` plus
+`scripts\launch_voiceflow.pyw`, so normal launches do not show a console. If the
+launcher detects that setup is needed, it opens `start.bat` so repair feedback is
+visible.
+
+On launch, VoiceFlow opens a small app window with recent transcriptions, search,
+per-row copy actions, status, and diagnostics. Clicking the desktop shortcut
+again focuses the existing app instead of opening another VoiceFlow process. The
+recording overlay remains the compact bottom pill.
+
+VoiceFlow stays offline by default. If local ASR model files are missing, setup
+stops with an explicit instruction instead of downloading in the background:
+
+```bat
+venv\Scripts\python.exe scripts\download_models.py
 ```
 
 Or run the app directly:
@@ -57,8 +82,8 @@ venv\Scripts\python.exe src\main.py
 | `xbutton1` / `xbutton2` | Start / stop dictation with mouse side buttons |
 | `Esc` | Cancel the current recording without output |
 
-The tray menu can show the window, copy the last result, paste the last result
-again, open the dictionary folder, and exit the app.
+The tray menu can open the app window, copy the last result, paste the last
+result again, open the dictionary folder, and exit the app.
 
 ## How It Works
 
@@ -73,13 +98,18 @@ Hotkey
   -> logs/history.jsonl
 ```
 
-The streaming text you see while speaking is only a preview. For short
-recordings, stopping still runs one complete final pass. For long recordings,
-VoiceFlow progressively transcribes stable audio segments during recording, then
-only finishes the remaining tail when you stop. The final output still covers
-the complete stopped audio; the UI preview never becomes the source of truth. If
-final transcription returns empty but a streaming preview exists, VoiceFlow uses
-the preview as a safety fallback.
+The streaming text you see while speaking is responsive feedback, not the final
+output contract. While you are still recording, a pause acts as a correction
+point: VoiceFlow refreshes the pill with a more complete in-progress
+transcription. When you stop, final text is copied and pasted before UI feedback
+is allowed to linger.
+
+For short recordings, stopping runs one complete final pass. For long recordings,
+VoiceFlow progressively transcribes stable audio segments with overlap, then
+finishes the remaining tail when you stop and de-duplicates transcript joins. The
+final output still covers the complete stopped audio. If final transcription
+returns empty but a streaming preview exists, VoiceFlow uses the preview as a
+safety fallback.
 
 ## Project Structure
 
@@ -98,6 +128,8 @@ src/
   overlay.html         # compact pill UI
   tray_icon.py         # runtime tray icons
 scripts/
+  bootstrap.py        # verifies and repairs local startup environment
+  launch_voiceflow.pyw # no-console desktop launcher
   benchmark_models.py  # local ASR benchmark
   add_correction.py    # add wrong=correct pairs
   create_shortcut.ps1  # desktop shortcut
@@ -158,8 +190,10 @@ VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctr
 
 - 默认离线运行，不做隐藏云调用。
 - 不默认接入大模型校对，避免慢、跑偏和交互不稳定。
-- 录音中显示实时预览；长语音会边录边缓存稳定音频段，停止时只补最后尾巴，最终输出仍覆盖完整音频。
-- 悬浮胶囊保持克制：文字自然生长，满宽后平滑追随，处理时保留最后文本。
+- 录音中显示实时预览；停顿时会把胶囊刷新为更完整的阶段性转写。
+- 长语音会边录边缓存带重叠的稳定音频段，停止时补最后尾巴并去重拼接，最终输出仍覆盖完整音频。
+- 悬浮胶囊保持克制：短文本居中，长文本单次扫过后停住，停止时优先粘贴再反馈。
+- 桌面图标启动后打开主窗口，可搜索最近转录、逐条复制、重新粘贴；重复点击图标会唤起已有窗口，不会堆出多个进程。
 - 准确率优先走本地可控闭环：真实样本评测，加确定性的 `wrong=correct` 修正。
 
 ## Roadmap

@@ -18,24 +18,40 @@ echo  ========================================
 echo.
 
 rem --- check venv ---
-if not exist "venv\Scripts\python.exe" (
-    echo [Setup] Creating virtual environment...
-    python -m venv venv
-    if errorlevel 1 (
-        echo [Error] Failed to create venv. Is Python installed and in PATH?
-        pause
-        exit /b 1
-    )
-    call venv\Scripts\activate.bat
-    echo [Setup] Installing dependencies...
-    pip install -r requirements.txt
-    if errorlevel 1 (
-        echo [Error] pip install failed.
-        pause
-        exit /b 1
-    )
-    echo [Setup] Done.
+set "BOOTSTRAP_PY="
+
+if exist "venv\Scripts\python.exe" (
+    venv\Scripts\python.exe -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "BOOTSTRAP_PY=venv\Scripts\python.exe"
+)
+
+if not defined BOOTSTRAP_PY (
+    py -3.12 -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "BOOTSTRAP_PY=py -3.12"
+)
+
+if not defined BOOTSTRAP_PY (
+    py -3 -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "BOOTSTRAP_PY=py -3"
+)
+
+if not defined BOOTSTRAP_PY (
+    python -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "BOOTSTRAP_PY=python"
+)
+
+if not defined BOOTSTRAP_PY (
+    echo [Error] No usable Python found. Install Python 3.10+ and try again.
+    pause
+    exit /b 1
+)
+
+%BOOTSTRAP_PY% scripts\bootstrap.py --ensure-shortcut
+if errorlevel 1 (
     echo.
+    echo [Error] VoiceFlow setup check failed.
+    pause
+    exit /b 1
 )
 
 echo [Launch] Starting VoiceFlow...
