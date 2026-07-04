@@ -375,6 +375,7 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
     assert svg.count('id="demo-pill"') == 1
+    assert svg.count('id="capsule"') == 1
     assert 'id="wave"' in svg
     assert 'id="check"' in svg
     assert 'id="liveText"' in svg
@@ -388,20 +389,23 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     assert "Cursor and Codex at the cursor" not in svg
 
 
-def test_readme_demo_copies_real_overlay_geometry_and_clips_text():
+def test_readme_demo_copies_real_overlay_geometry_and_expands_capsule():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
-    assert 'width="312" height="34" rx="17"' in svg
-    assert "说完，即刻落字。最终文本已复制。" in svg
-    assert "按下快捷键，说话。最终文本先进入剪贴板，再落到当前光标。" in svg
+    assert 'width="86" height="34" rx="17"' in svg
+    assert 'values="86;86;172;312;312;312;86"' in svg
+    assert 'values="557 190;557 190;514 190;444 190;444 190;444 190;557 190"' in svg
+    assert "说完，即刻落字。" in svg
+    assert "按下，说话。松开，文字已经在光标处。" in svg
     assert "overflow=\"hidden\"" not in svg
     assert 'width="2"' in svg
     assert 'height="7"' in svg
     assert 'height="12"' in svg
     assert 'height="8"' in svg
-    assert 'stdDeviation="16"' in svg
+    assert 'rotate(42 7 7)' in svg
+    assert 'stdDeviation="18"' in svg
 
 
 def test_readme_defaults_to_chinese_with_english_switch():
