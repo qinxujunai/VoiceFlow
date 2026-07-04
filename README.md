@@ -1,111 +1,45 @@
 # VoiceFlow
 
-> Local-first dictation for Windows. Press a key, speak, and your text lands at the cursor.
+> 本地优先的 Windows 语音输入层。按下快捷键，说话，最终文本落到当前光标；即使粘贴失败，文字也不会丢。
 
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#)
-[![Local First](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
+[![中文](https://img.shields.io/badge/中文-当前-111827)](README.md)
+[![English](https://img.shields.io/badge/English-Switch-6B7280)](README.en.md)
+
+[![平台](https://img.shields.io/badge/platform-Windows-0078D4)](#)
+[![本地优先](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
 [![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20%2B%20SenseVoice-6F42C1)](#)
-[![Tests](https://img.shields.io/badge/tests-pytest-0A7)](#)
+[![测试](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
-![VoiceFlow demo](docs/voiceflow-demo.svg)
+![VoiceFlow 演示](docs/voiceflow-demo.svg)
 
-VoiceFlow is a small Windows dictation layer built around one product promise:
-**if VoiceFlow recognizes text, the text must not be lost.** It copies the final text
-to the clipboard first, then attempts to paste it at the current cursor. If paste
-does not land anywhere, the text is still available in the clipboard and local
-history.
+VoiceFlow 的目标不是做一个录音玩具，而是做一个真正可用的系统级输入工具：
+按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先复制到剪贴板，再尝试粘贴到当前光标位置。
 
-VoiceFlow is intentionally not a cloud assistant. There are no hidden cloud ASR
-calls and no default LLM correction layer. The default path is local, fast,
-inspectable, and boring in the best way.
+它的底线很简单：**只要识别出了文字，文字就不能丢。** 如果当前应用没有可编辑输入框，或者 `Ctrl+V` 没有落到目标位置，结果仍然保留在剪贴板和本地历史里。
 
-Built and maintained with Codex-assisted engineering workflows; Codex is used
-for development and review, not as a runtime dependency.
+VoiceFlow 默认离线运行。没有隐藏云 ASR 调用，也没有默认大模型润色链路。Codex 只用于开发和维护流程，不是运行时依赖。
 
-## Highlights
+## 为什么这个项目值得看
 
-- **Push-to-talk dictation**: press `F2`, `Right Ctrl`, or a mouse side button to
-  start and stop.
-- **Local ASR by default**: SenseVoice-Small int8 through `sherpa-onnx`.
-- **Streaming preview**: a compact bottom-centered pill shows live text while you
-  speak; pauses refresh the pill with a more complete in-progress transcription.
-- **Progressive final transcription**: short recordings use one complete final
-  pass; long recordings cache stable audio segments while you speak and finish
-  only the tail on stop.
-- **Never-lost output**: final text goes to clipboard before `Ctrl+V`.
-- **Local history**: successful outputs are appended to `logs/history.jsonl`.
-- **Deterministic cleanup**: `TextCleaner` and `knowledge-base/corrections.txt`
-  handle stable, known ASR mistakes without calling a model.
-- **Native-feeling overlay**: short text stays centered; long dictation stays
-  smooth by rendering a bounded head/tail preview with tail-follow motion.
+- **系统级输入层**：不是文件转写器，而是面向任意应用的即时语音输入。
+- **最终结果可信**：流式预览只负责反馈，真正输出永远来自最终转写路径。
+- **剪贴板优先**：先复制，再粘贴；即使光标不在输入框，文字也可恢复。
+- **长语音完整性**：录音中缓存稳定音频段，停止时补最后尾巴并去重拼接。
+- **本地可交付**：启动器能修复 venv、安装依赖、恢复快捷方式；模型下载是显式确认，不偷偷联网。
+- **质量门明确**：doctor、py_compile、pytest、benchmark、integration 统一由 `scripts\verify.py` 执行。
 
-## Why This Project Is Worth Looking At
+## 技术栈
 
-VoiceFlow is not a toy recorder. It is a Windows system input layer with a clear
-reliability contract: speech becomes text at the active cursor, and recognized
-text must never disappear. That forces product and engineering decisions that a
-simple demo can avoid:
+- **运行时**：Python 3.12，Windows 本地运行。
+- **桌面 UI**：PyQt6 + PyQt6 WebEngine，负责主窗口、托盘和悬浮胶囊。
+- **语音识别**：`sherpa-onnx` + 本地 SenseVoice ONNX 模型。
+- **音频与输入**：`sounddevice` 采集麦克风，`keyboard` / `pynput` 处理 F2、右 Ctrl 和鼠标侧键。
+- **输出链路**：`pyperclip.copy(text)` -> `Ctrl+V` -> `logs/history.jsonl`。
+- **交付**：`start.bat` + bootstrap 自检修复，PyInstaller 用于窗口化打包。
 
-- **Preview is not truth**: streaming text is only feedback; final output always
-  comes from the final transcription path.
-- **Clipboard-first output**: even if the cursor is not in a text field or
-  `Ctrl+V` lands nowhere, the text remains recoverable.
-- **Long dictation is explicit**: stable segments are cached while recording,
-  then the remaining tail is finalized on stop.
-- **Local-first delivery**: setup can repair Python dependencies and shortcuts,
-  while model download is visible and user-confirmed.
-- **Maintained like a product**: doctor, verify, benchmark, integration tests,
-  and docs all describe the same runtime behavior.
+GitHub 右侧的语言统计是代码语言组成。语音识别语言由 `config.yaml` 控制，当前默认 `zh`，并按模型能力支持 `zh / en / auto` 等配置。
 
-## Tech Stack
-
-- **Runtime**: Python 3.12 on Windows.
-- **Desktop UI**: PyQt6 + PyQt6 WebEngine for the app window, tray integration,
-  and the compact HTML overlay.
-- **Speech recognition**: `sherpa-onnx` with local SenseVoice ONNX models.
-- **Audio and input**: `sounddevice`, `keyboard`, and `pynput` for microphone,
-  keyboard triggers, right-Ctrl detection, and mouse side buttons.
-- **Output**: `pyperclip` plus simulated `Ctrl+V`, with local JSONL history as
-  a recovery path.
-- **Packaging**: PyInstaller spec with external model files.
-
-GitHub's language bar reports source-code composition. VoiceFlow's speech
-language is configured separately in `config.yaml`; the default is `zh`, and the
-current engine config supports `zh`, `en`, and `auto` style language settings
-where the underlying model supports them.
-
-## Quick Start
-
-```bat
-start.bat
-```
-
-`start.bat` is the development and repair entrypoint for source checkouts. It
-checks that `venv\Scripts\python.exe` is actually runnable, rebuilds a broken
-venv, installs missing dependencies from `requirements.txt`, creates `logs\`,
-and restores the desktop shortcut. Healthy launches use a cached fast path;
-the full runtime doctor runs only after first setup, dependency/config changes,
-or a broken environment.
-
-The desktop shortcut points to `venv\Scripts\pythonw.exe` plus
-`scripts\launch_voiceflow.pyw`, so normal launches do not show a console. If the
-launcher detects that setup is needed, it opens `start.bat` so repair feedback is
-visible.
-
-On launch, VoiceFlow opens a small app window with recent transcriptions, search,
-per-row copy actions, model/language status, explicit model setup, and diagnostics.
-Clicking the desktop shortcut again focuses the existing app instead of opening
-another VoiceFlow process. The recording overlay remains the compact bottom pill.
-
-VoiceFlow stays offline by default. If local ASR model files are missing, setup
-opens a visible setup path and asks before downloading the default model. It
-does not download models silently. You can also run the model setup directly:
-
-```bat
-venv\Scripts\python.exe scripts\download_models.py
-```
-
-For a fresh clone, the intended path is:
+## 快速开始
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -113,29 +47,26 @@ cd VoiceFlow
 start.bat
 ```
 
-`start.bat` repairs Python dependencies and the desktop shortcut automatically.
-If the model is missing, confirm the visible prompt or run `download_models.py`
-yourself. After setup, future launches use the no-console desktop shortcut.
+`start.bat` 会检查 `venv\Scripts\python.exe` 是否真的可运行；如果 venv 损坏，会重建环境并安装 `requirements.txt`。它也会创建 `logs\`，恢复桌面快捷方式。
 
-Or run the app directly:
+模型文件较大，不放进 Git。如果模型缺失，启动器会打开可见 setup 流程并询问是否下载默认 SenseVoice 模型；也可以手动运行：
 
 ```bat
-venv\Scripts\python.exe src\main.py
+venv\Scripts\python.exe scripts\download_models.py
 ```
 
-### Shortcuts
+环境健康后，桌面快捷方式会通过 `venv\Scripts\pythonw.exe + scripts\launch_voiceflow.pyw` 无控制台启动。重复点击桌面图标会唤起已有窗口，不会堆出多个主进程。
 
-| Key | Action |
+## 快捷键
+
+| 按键 | 行为 |
 | --- | --- |
-| `F2` | Start / stop dictation |
-| `Right Ctrl` | Start / stop dictation |
-| `xbutton1` / `xbutton2` | Start / stop dictation with mouse side buttons |
-| `Esc` | Cancel the current recording without output |
+| `F2` | 开始 / 停止语音输入 |
+| `Right Ctrl` | 开始 / 停止语音输入 |
+| `xbutton1` / `xbutton2` | 鼠标侧键开始 / 停止 |
+| `Esc` | 取消当前录音，不输出文字 |
 
-The tray menu can open the app window, copy the last result, paste the last
-result again, open the dictionary folder, and exit the app.
-
-## How It Works
+## 工作流
 
 ```text
 Hotkey
@@ -148,153 +79,96 @@ Hotkey
   -> logs/history.jsonl
 ```
 
-The streaming text you see while speaking is responsive feedback, not the final
-output contract. While you are still recording, a pause acts as a correction
-point: VoiceFlow refreshes the pill with a more complete in-progress
-transcription. When you stop, final text is copied and pasted before UI feedback
-is allowed to linger.
+录音时看到的胶囊文字是即时反馈，不是最终真相。用户停顿时，VoiceFlow 会尝试用更完整的阶段性结果刷新胶囊；用户停止后，最终文本先复制和粘贴，再显示完成反馈。
 
-For short recordings, stopping runs one complete final pass. For long recordings,
-VoiceFlow progressively transcribes stable audio segments with overlap, then
-finishes the remaining tail when you stop and de-duplicates transcript joins. The
-final output still covers the complete stopped audio. If final transcription
-returns empty but a streaming preview exists, VoiceFlow uses the preview as a
-safety fallback.
+短语音走一次完整 final pass。长语音会在录音中缓存稳定段，停止时只补剩余尾巴并做拼接去重，确保最终输出覆盖完整音频。
 
-## Reliability and Performance
+## 可靠性与性能
 
-- **Startup self-healing**: `start.bat` validates that the virtual environment's
-  Python executable actually runs, rebuilds a broken venv, installs missing
-  dependencies, creates logs, and restores the desktop shortcut.
-- **Fast normal launches**: once the runtime signature is healthy, bootstrap uses
-  a cached fast path instead of running the full doctor on every start.
-- **Long overlay performance**: the pill renders a bounded head/tail preview
-  instead of placing an unbounded transcript into the DOM.
-- **Recognizer safety**: transcription access is serialized so preview and final
-  work do not compete for the same recognizer instance.
-- **Quality gate**: `scripts/verify.py` runs doctor, compile checks, tests,
-  benchmark, and integration before a change is considered ready.
+- **启动自愈**：检测 venv 是否可执行，必要时重建并安装依赖。
+- **快速正常启动**：环境健康后走缓存 fast path，不每次完整 doctor。
+- **长文本不卡胶囊**：悬浮层只渲染有头有尾的轻量预览，不把十几分钟全文塞进 DOM。
+- **转写串行保护**：preview 和 final 不同时抢同一个 recognizer。
+- **质量门**：`scripts\verify.py` 覆盖 doctor、编译、测试、benchmark 和 integration。
 
-## Known Product Constraints
+## 已知产品边界
 
-- VoiceFlow cannot force another app to accept paste when the cursor is not in
-  an editable field. The final text still remains in the clipboard and
-  `logs/history.jsonl`.
-- Model files are large and stay outside Git. The setup path asks before
-  downloading them instead of making a hidden network call.
-- Streaming preview can be partial or temporarily wrong; final output is the
-  source of truth.
-- Cloud ASR and cloud LLM correction are intentionally out of the default path
-  to keep latency, privacy, and failure modes predictable.
+- 如果光标不在可编辑输入框，任何工具都不能保证 `Ctrl+V` 落到目标位置；VoiceFlow 的兜底是剪贴板和本地历史。
+- 模型文件不入库，下载必须显式触发。
+- 流式预览可能临时不完整；最终输出才是可信结果。
+- 默认不接云 ASR 或云 LLM，避免隐私、延迟和不可控失败模式。
 
-## Interview Notes / Engineering Highlights
+## 面试可讲的工程亮点
 
-- Designed a small system-level product around a simple invariant: never lose
-  recognized text.
-- Built a three-layer UX: tray app for control/history, compact overlay for
-  real-time feedback, and clipboard/history as recovery.
-- Handled long-running dictation with progressive final segments, overlap, and a
-  stop-time tail pass.
-- Added startup bootstrap, doctor, shortcut recovery, and no-console launcher so
-  a fresh clone has a practical Windows setup path.
-- Kept model quality work measurable through ASR benchmarks and deterministic
-  correction files instead of opaque post-processing.
+- 用一个明确 invariant 驱动设计：识别出的文字不能丢。
+- 把体验拆成三层：主窗口管理历史与诊断，悬浮胶囊提供状态反馈，剪贴板/历史负责恢复。
+- 长语音不是简单堆全文，而是稳定段缓存 + overlap + stop-time tail pass。
+- Windows 交付路径完整：bootstrap、doctor、快捷方式恢复、无控制台 launcher、单实例保护。
+- 准确率优化走本地 benchmark 和确定性修正，不用不可解释的黑盒后处理掩盖问题。
 
-## Project Structure
+## 项目结构
 
 ```text
 src/
-  main.py              # orchestration, lifecycle, streaming preview
-  hotkey_manager.py    # F2, Right Ctrl, mouse side buttons
-  recording_session.py # recording lifecycle
-  audio_capture.py     # microphone adapter
+  main.py              # 编排录音、流式预览、最终输出
+  hotkey_manager.py    # F2、右 Ctrl、鼠标侧键
+  recording_session.py # 录音生命周期
+  audio_capture.py     # 麦克风适配
   transcriber.py       # sherpa-onnx ASR
-  text_cleaner.py      # deterministic cleanup and corrections
-  vocabulary.py        # layered local vocabulary
-  output_handler.py    # clipboard first, then Ctrl+V
-  history_store.py     # JSONL history
-  overlay_webview.py   # PyQt overlay and tray bridge
-  overlay.html         # compact pill UI
-  tray_icon.py         # runtime tray icons
+  text_cleaner.py      # 确定性清理和修正
+  vocabulary.py        # 本地词表
+  output_handler.py    # 剪贴板优先，再 Ctrl+V
+  history_store.py     # JSONL 历史
+  overlay_webview.py   # PyQt 主窗口、悬浮窗、托盘桥接
+  overlay.html         # 小胶囊 UI
 scripts/
-  bootstrap.py        # verifies and repairs local startup environment
-  launch_voiceflow.pyw # no-console desktop launcher
-  benchmark_models.py  # local ASR benchmark
-  add_correction.py    # add wrong=correct pairs
-  create_shortcut.ps1  # desktop shortcut
-  generate_icon.py     # app icon
+  bootstrap.py         # 启动前自检与修复
+  launch_voiceflow.pyw # 无控制台桌面启动器
+  benchmark_models.py  # 本地 ASR benchmark
+  download_models.py   # 显式模型下载
+  create_shortcut.ps1  # 桌面快捷方式
 ```
 
-## Accuracy Workflow
+## 准确率工作流
 
-VoiceFlow does not pretend a plain word list is ASR hotword injection. Today,
-the output-changing path is deterministic:
+VoiceFlow 不假装普通词表等于 ASR 热词注入。当前可控链路是确定性的：
 
-1. Record real private samples.
-2. Write a JSONL manifest with `reference` and important `terms`.
-3. Run the benchmark.
-4. Add stable ASR mistakes to `knowledge-base/corrections.txt`.
-5. Re-run the benchmark and compare raw vs clean output.
-
-Example:
+1. 录制真实私有样本。
+2. 写 manifest，包含 reference 和重要 terms。
+3. 跑 benchmark。
+4. 把稳定错字写入 `knowledge-base/corrections.txt`。
+5. 复测 raw / clean 结果。
 
 ```bat
 venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\private\local.jsonl
 venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
 ```
 
-## Verification
+## 验证
 
 ```bat
 venv\Scripts\python.exe scripts\verify.py
 ```
 
-The full gate runs the doctor, syntax compilation, tests, a small ASR benchmark,
-and the bundled integration test. Individual checks remain available:
+完整质量门会运行 doctor、py_compile、pytest、快速 ASR benchmark 和 integration。
 
-```bat
-venv\Scripts\python.exe scripts\doctor.py
-venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py src\transcriber.py src\audio_capture.py src\recording_session.py src\vocabulary.py
-venv\Scripts\python.exe -m pytest tests -q
-venv\Scripts\python.exe scripts\benchmark_models.py --limit 3
-venv\Scripts\python.exe test_integration.py
-```
-
-## Packaging
+## 打包
 
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec
 ```
 
-`VoiceFlow.spec` includes the overlay, config, knowledge base, and app icon.
-Large model files are intentionally kept outside the executable under `models/`.
+`VoiceFlow.spec` 会包含 overlay、config、knowledge-base 和图标。大型模型文件继续外置在 `models/`。
 
-## Maintenance Docs
+## 维护文档
 
-- [Quality gate](docs/quality-gate.md)
-- [ASR evaluation plan](docs/asr-evaluation-plan.md)
-- [Release checklist](docs/release-checklist.md)
-
-## 中文说明
-
-VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先进入剪贴板，再尝试粘贴到当前光标位置。
-
-它的底线很简单：**只要识别出了文字，文字就不能丢。** 即使当前没有可输入的文本框，结果也会留在剪贴板和本地 `logs/history.jsonl` 里。
-
-当前设计重点：
-
-- 默认离线运行，不做隐藏云调用。
-- 不默认接入大模型校对，避免慢、跑偏和交互不稳定。
-- 录音中显示实时预览；停顿时会把胶囊刷新为更完整的阶段性转写。
-- 长语音会边录边缓存带重叠的稳定音频段，停止时补最后尾巴并去重拼接，最终输出仍覆盖完整音频。
-- 悬浮胶囊保持克制：短文本居中，长文本只渲染有头有尾的轻量预览并跟随尾部，停止时优先粘贴再反馈。
-- 桌面图标启动后打开主窗口，可搜索最近转录、逐条复制、重新粘贴；重复点击图标会唤起已有窗口，不会堆出多个进程。
-- 准确率优先走本地可控闭环：真实样本评测，加确定性的 `wrong=correct` 修正。
+- [质量门](docs/quality-gate.md)
+- [ASR 评测计划](docs/asr-evaluation-plan.md)
+- [发布检查清单](docs/release-checklist.md)
 
 ## Roadmap
 
-- Better visual regression coverage for the overlay.
-- More benchmark manifests for Chinese and mixed Chinese-English dictation.
-- A release build flow that keeps models external but setup simple.
-- Local ASR evaluation manifests for long Chinese and mixed Chinese-English dictation.
-- Optional model comparison only when local benchmarks prove a better tradeoff.
+- 更完整的中文/中英混合长语音评测集。
+- 更强的 overlay 视觉回归测试。
+- 保持模型外置的发布构建流程。
+- 只有本地 benchmark 证明收益时，才增加可选模型对比。
