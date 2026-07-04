@@ -58,19 +58,19 @@
 
   <g class="ui">
     <text x="600" y="120" text-anchor="middle" font-size="38" font-weight="760" letter-spacing="0" fill="#111827">VoiceFlow</text>
-    <text x="600" y="154" text-anchor="middle" font-size="16" font-weight="450" letter-spacing="0" fill="#6b7280">按下，说话。松开，文字已经在光标处。</text>
+    <text x="600" y="154" text-anchor="middle" font-size="16" font-weight="450" letter-spacing="0" fill="#6b7280">把声音收束成文字，把文字送回光标。</text>
   </g>
 
   <g id="capsule" transform="translate(557 190)" filter="url(#pillShadow)">
     <animateTransform attributeName="transform" type="translate" dur="6s" repeatCount="indefinite"
-      values="557 190;557 190;534 190;514 190;514 190;514 190;557 190"
+      values="557 190;557 190;515 190;482 190;482 190;482 190;557 190"
       keyTimes="0;0.12;0.22;0.34;0.72;0.88;1"
       calcMode="spline"
       keySplines=".22 1 .36 1;.22 1 .36 1;.22 1 .36 1;.16 1 .3 1;.16 1 .3 1;.4 0 .2 1"/>
 
     <rect id="demo-pill" x="0" y="0" width="86" height="34" rx="17" fill="#1c1c1e" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5">
       <animate attributeName="width" dur="6s" repeatCount="indefinite"
-        values="86;86;132;172;172;172;86"
+        values="86;86;170;236;236;236;86"
         keyTimes="0;0.12;0.22;0.34;0.72;0.88;1"
         calcMode="spline"
         keySplines=".22 1 .36 1;.22 1 .36 1;.22 1 .36 1;.16 1 .3 1;.16 1 .3 1;.4 0 .2 1"/>
@@ -85,20 +85,19 @@
       <rect class="bar-c" x="12" y="5" width="2" height="8" rx="1" fill="#ff453a"/>
     </g>
 
-    <g id="check" transform="translate(15 7) rotate(42 7 7)" opacity="0">
+    <g id="check" transform="translate(12 8)" opacity="0">
       <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
         values="0;0;1;1;0"
         keyTimes="0;0.66;0.72;0.88;1"/>
-      <rect x="8" y="0" width="1.8" height="11" rx="0.9" fill="#32d74b"/>
-      <rect x="2" y="9.2" width="8" height="1.8" rx="0.9" fill="#32d74b"/>
+      <path d="M4.5 9.2 L7.5 12.2 L13.5 5.8" fill="none" stroke="#32d74b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
 
-    <text id="liveText" class="ui" x="44" y="22" font-size="13" font-weight="470" letter-spacing="0" fill="#f5f5f7" opacity="0">说完，即刻落字。
+    <text id="liveText" class="ui" x="44" y="22" font-size="13" font-weight="470" letter-spacing="0" fill="#f5f5f7" opacity="0">明早十点，把方案同步给团队。
       <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
         values="0;0;1;1;0;0"
         keyTimes="0;0.25;0.30;0.62;0.70;1"/>
     </text>
-    <text id="finalText" class="ui" x="44" y="22" font-size="13" font-weight="470" letter-spacing="0" fill="#c7c7cc" opacity="0">说完，即刻落字。
+    <text id="finalText" class="ui" x="44" y="22" font-size="13" font-weight="470" letter-spacing="0" fill="#c7c7cc" opacity="0">明早十点，把方案同步给团队。
       <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
         values="0;0;1;1;0"
         keyTimes="0;0.66;0.72;0.88;1"/>

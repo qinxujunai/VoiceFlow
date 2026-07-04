@@ -1,6 +1,6 @@
 # VoiceFlow
 
-> 本地优先的 Windows 语音输入层。按下快捷键，说话，最终文本落到当前光标；即使粘贴失败，文字也不会丢。
+> 离线，即刻，不丢一个字。
 
 [![中文](https://img.shields.io/badge/中文-当前-111827)](README.md)
 [![English](https://img.shields.io/badge/English-Switch-6B7280)](README.en.md)
@@ -12,7 +12,7 @@
 
 ![VoiceFlow 演示](docs/voiceflow-demo.svg)
 
-VoiceFlow 的目标不是做一个录音玩具，而是做一个真正可用的系统级输入工具：
+VoiceFlow 是一个本地优先的 Windows 语音输入层。它的目标不是做一个录音玩具，而是做一个真正可用的系统级输入工具：
 按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先复制到剪贴板，再尝试粘贴到当前光标位置。
 
 它的底线很简单：**只要识别出了文字，文字就不能丢。** 如果当前应用没有可编辑输入框，或者 `Ctrl+V` 没有落到目标位置，结果仍然保留在剪贴板和本地历史里。
