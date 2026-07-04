@@ -375,14 +375,14 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
     assert svg.count('id="demo-pill"') == 1
-    assert 'id="demo-text-viewport"' in svg
-    assert 'id="demo-waveform"' in svg
-    assert 'id="demo-check"' in svg
-    assert 'id="demo-text"' in svg
-    assert "@keyframes pillState" in svg
-    assert "@keyframes waveformState" in svg
+    assert 'id="wave"' in svg
+    assert 'id="check"' in svg
+    assert 'id="liveText"' in svg
+    assert 'id="finalText"' in svg
+    assert "@keyframes waveState" in svg
     assert "@keyframes checkState" in svg
-    assert "@keyframes textState" in svg
+    assert "@keyframes liveTextState" in svg
+    assert "@keyframes finalTextState" in svg
     assert 'id="demo-spinner"' not in svg
     assert "@keyframes spinnerState" not in svg
     assert "Cursor and Codex at the cursor" not in svg
@@ -393,16 +393,27 @@ def test_readme_demo_copies_real_overlay_geometry_and_clips_text():
 
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
-    assert 'values="86;86;158;312;312;312;86"' in svg
-    assert 'values="36;36;108;262;262;262;36"' in svg
-    assert "Bounded live preview -> complete final output -> clipboard first" in svg
-    assert 'overflow="hidden"' in svg[svg.index('id="demo-text-viewport"'):svg.index('id="demo-text"', svg.index('id="demo-text-viewport"'))]
+    assert 'width="312" height="34" rx="17"' in svg
+    assert "说完，即刻落字。最终文本已复制。" in svg
+    assert "按下快捷键，说话。最终文本先进入剪贴板，再落到当前光标。" in svg
+    assert "overflow=\"hidden\"" not in svg
     assert 'width="2"' in svg
     assert 'height="7"' in svg
     assert 'height="12"' in svg
     assert 'height="8"' in svg
-    assert 'stdDeviation="3"' in svg
-    assert 'stdDeviation="8"' in svg
-    done_idx = svg.index('class="ui-font done-text"')
-    done_block = svg[done_idx:svg.index("</text>", done_idx)]
-    assert "<animate" not in done_block
+    assert 'stdDeviation="16"' in svg
+
+
+def test_readme_defaults_to_chinese_with_english_switch():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    assert "https://img.shields.io/badge/中文-当前-111827" in readme
+    assert "(README.en.md)" in readme
+    assert "本地优先的 Windows 语音输入层" in readme
+    assert "## 为什么这个项目值得看" in readme
+    assert "## 技术栈" in readme
+    assert "## 快速开始" in readme
+    assert "https://img.shields.io/badge/English-Current-111827" in english
+    assert "(README.md)" in english
+    assert "Local-first dictation for Windows" in english

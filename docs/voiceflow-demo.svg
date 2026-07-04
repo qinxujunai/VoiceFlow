@@ -1,53 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
-  <title id="title">VoiceFlow compact dictation overlay demo</title>
-  <desc id="desc">A faithful animated preview of the real short-dictation VoiceFlow pill: waveform, bounded tail-follow text, and the final muted text with a checkmark.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">VoiceFlow actual overlay states</title>
+  <desc id="desc">A faithful preview of the actual VoiceFlow short dictation overlay: red waveform while recording, complete short text in the pill, then a green checkmark with muted final text.</desc>
   <defs>
-    <filter id="shadow" x="-20%" y="-80%" width="140%" height="260%">
-      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#000" flood-opacity="0.10"/>
-      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.12"/>
-      <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#000" flood-opacity="0.07"/>
+    <filter id="pillShadow" x="-30%" y="-130%" width="160%" height="360%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000000" flood-opacity="0.18"/>
     </filter>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f7f8fb"/>
-      <stop offset="1" stop-color="#eceff5"/>
-    </linearGradient>
-    <linearGradient id="pillFill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#27272b" stop-opacity="0.94"/>
-      <stop offset="1" stop-color="#161719" stop-opacity="0.92"/>
-    </linearGradient>
     <style>
-      .ui-font { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
-      #demo-pill { animation: pillState 6.8s cubic-bezier(0.2, 0, 0, 1) infinite; }
-      #demo-waveform { animation: waveformState 6.8s ease infinite; }
-      #demo-check { animation: checkState 6.8s ease infinite; }
-      #demo-text { animation: textState 6.8s ease infinite; }
+      .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Microsoft YaHei", Arial, sans-serif; }
+      #wave { animation: waveState 5.8s ease infinite; }
+      #check { animation: checkState 5.8s ease infinite; }
+      #liveText { animation: liveTextState 5.8s ease infinite; }
+      #finalText { animation: finalTextState 5.8s ease infinite; }
       .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
       .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
-      .live-text { animation: liveTextState 6.8s ease infinite; }
-      .done-text { animation: doneTextState 6.8s ease infinite; }
-      @keyframes pillState {
-        0%, 9%, 100% { opacity: 0; }
-        12%, 88% { opacity: 1; }
-      }
-      @keyframes waveformState {
-        0%, 10%, 68%, 100% { opacity: 0; }
-        14%, 64% { opacity: 1; }
+      @keyframes waveState {
+        0%, 12%, 68%, 100% { opacity: 0; }
+        16%, 64% { opacity: 1; }
       }
       @keyframes checkState {
-        0%, 68%, 100% { opacity: 0; }
+        0%, 66%, 100% { opacity: 0; }
         72%, 88% { opacity: 1; }
       }
-      @keyframes textState {
-        0%, 16%, 100% { opacity: 0; }
-        23%, 88% { opacity: 1; }
-      }
       @keyframes liveTextState {
-        0%, 18%, 68%, 100% { opacity: 0; }
-        24%, 64% { opacity: 1; }
+        0%, 12%, 68%, 100% { opacity: 0; }
+        16%, 64% { opacity: 1; }
       }
-      @keyframes doneTextState {
-        0%, 68%, 100% { opacity: 0; }
+      @keyframes finalTextState {
+        0%, 66%, 100% { opacity: 0; }
         72%, 88% { opacity: 1; }
       }
       @keyframes barA {
@@ -65,43 +46,34 @@
     </style>
   </defs>
 
-  <rect width="960" height="320" fill="url(#bg)"/>
-  <rect x="72" y="62" width="816" height="196" rx="28" fill="#fff" opacity="0.74"/>
-  <text x="96" y="108" class="ui-font" font-size="18" font-weight="650" fill="#202124">VoiceFlow</text>
-  <text x="96" y="134" class="ui-font" font-size="13" fill="#69707d">Local-first, clipboard-first, never lose text.</text>
-
-  <g filter="url(#shadow)">
-    <rect id="demo-pill" x="437" y="143" width="86" height="34" rx="17" fill="url(#pillFill)" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5">
-      <animate attributeName="x" values="437;437;401;324;324;324;437" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
-      <animate attributeName="width" values="86;86;158;312;312;312;86" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
-    </rect>
+  <rect width="1200" height="420" fill="#f5f5f7"/>
+  <g class="ui">
+    <text x="600" y="92" text-anchor="middle" font-size="34" font-weight="760" fill="#1d1d1f">VoiceFlow</text>
+    <text x="600" y="130" text-anchor="middle" font-size="18" font-weight="430" fill="#6e7480">按下快捷键，说话。最终文本先进入剪贴板，再落到当前光标。</text>
   </g>
 
-  <g>
-    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;336 160;336 160;336 160;449 160" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
+  <g transform="translate(444 178)" filter="url(#pillShadow)">
+    <rect id="demo-pill" x="0" y="0" width="312" height="34" rx="17" fill="#1c1c1e" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5"/>
 
-    <g id="demo-waveform" transform="translate(0 -9)">
-      <rect class="bar-a" x="2" y="5.5" width="2" height="7" rx="1" fill="#ff453a"/>
-      <rect class="bar-b" x="8" y="3" width="2" height="12" rx="1" fill="#ff453a"/>
-      <rect class="bar-c" x="14" y="5" width="2" height="8" rx="1" fill="#ff453a"/>
+    <g id="wave" transform="translate(16 8)">
+      <rect class="bar-a" x="0" y="5.5" width="2" height="7" rx="1" fill="#ff453a"/>
+      <rect class="bar-b" x="6" y="3" width="2" height="12" rx="1" fill="#ff453a"/>
+      <rect class="bar-c" x="12" y="5" width="2" height="8" rx="1" fill="#ff453a"/>
     </g>
 
-    <path id="demo-check" d="M5 -1 l4 5.5 l8 -10" fill="none" stroke="#32d74b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="check" d="M17 8.5 l4 5.5 l8 -10" fill="none" stroke="#32d74b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <text id="liveText" class="ui" x="44" y="22" font-size="13" font-weight="470" fill="#f5f5f7">说完，即刻落字。最终文本已复制。</text>
+    <text id="finalText" class="ui" x="44" y="22" font-size="13" font-weight="470" fill="#c7c7cc">说完，即刻落字。最终文本已复制。</text>
   </g>
 
-  <svg id="demo-text-viewport" x="475" y="151" width="36" height="18" overflow="hidden">
-    <animate attributeName="x" values="475;475;439;362;362;362;475" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
-    <animate attributeName="width" values="36;36;108;262;262;262;36" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
-    <g id="demo-text">
-      <text class="ui-font live-text" x="105" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#f5f5f7">
-        我现在用 Cursor 和 Codex 写代码，停顿后自动校正，最后完整粘贴
-        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-48 0;-132 0;-132 0;0 0" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
-      </text>
-      <text class="ui-font done-text" x="131" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#c7c7cc">停顿后自动校正，最后完整粘贴</text>
-    </g>
-  </svg>
+  <g class="ui" transform="translate(310 270)">
+    <text x="0" y="0" font-size="15" font-weight="650" fill="#1d1d1f">真实状态</text>
+    <text x="0" y="30" font-size="14" fill="#6e7480">录音中：红色波形 + 实时预览</text>
+    <text x="0" y="56" font-size="14" fill="#6e7480">停止后：绿色勾 + 最终文本变淡收束</text>
 
-  <text x="480" y="236" text-anchor="middle" class="ui-font" font-size="13" fill="#69707d">
-    Bounded live preview -> complete final output -> clipboard first
-  </text>
+    <text x="430" y="0" font-size="15" font-weight="650" fill="#1d1d1f">可靠输出</text>
+    <text x="430" y="30" font-size="14" fill="#6e7480">最终文本先复制到剪贴板</text>
+    <text x="430" y="56" font-size="14" fill="#6e7480">即使光标不在输入框，文字也不会丢</text>
+  </g>
 </svg>
