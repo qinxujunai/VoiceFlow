@@ -377,14 +377,14 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     assert svg.count('id="demo-pill"') == 1
     assert 'id="demo-text-viewport"' in svg
     assert 'id="demo-waveform"' in svg
-    assert 'id="demo-spinner"' in svg
     assert 'id="demo-check"' in svg
     assert 'id="demo-text"' in svg
     assert "@keyframes pillState" in svg
     assert "@keyframes waveformState" in svg
-    assert "@keyframes spinnerState" in svg
     assert "@keyframes checkState" in svg
     assert "@keyframes textState" in svg
+    assert 'id="demo-spinner"' not in svg
+    assert "@keyframes spinnerState" not in svg
     assert "Cursor and Codex at the cursor" not in svg
 
 
@@ -393,8 +393,8 @@ def test_readme_demo_copies_real_overlay_geometry_and_clips_text():
 
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
-    assert 'values="86;86;158;312;312;112;86"' in svg
-    assert 'values="36;36;108;262;262;62;36"' in svg
+    assert 'values="86;86;158;312;312;312;86"' in svg
+    assert 'values="36;36;108;262;262;262;36"' in svg
     assert "Bounded live preview -> complete final output -> clipboard first" in svg
     assert 'overflow="hidden"' in svg[svg.index('id="demo-text-viewport"'):svg.index('id="demo-text"', svg.index('id="demo-text-viewport"'))]
     assert 'width="2"' in svg
