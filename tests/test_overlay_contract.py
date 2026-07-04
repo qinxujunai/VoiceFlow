@@ -395,16 +395,17 @@ def test_readme_demo_copies_real_overlay_geometry_and_expands_capsule():
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
     assert 'width="86" height="34" rx="17"' in svg
-    assert 'values="86;86;132;172;172;172;86"' in svg
-    assert 'values="557 190;557 190;534 190;514 190;514 190;514 190;557 190"' in svg
-    assert "说完，即刻落字。" in svg
-    assert "按下，说话。松开，文字已经在光标处。" in svg
+    assert 'values="86;86;170;236;236;236;86"' in svg
+    assert 'values="557 190;557 190;515 190;482 190;482 190;482 190;557 190"' in svg
+    assert "明早十点，把方案同步给团队。" in svg
+    assert "把声音收束成文字，把文字送回光标。" in svg
     assert "overflow=\"hidden\"" not in svg
     assert 'width="2"' in svg
     assert 'height="7"' in svg
     assert 'height="12"' in svg
     assert 'height="8"' in svg
-    assert 'rotate(42 7 7)' in svg
+    assert 'transform="translate(12 8)"' in svg
+    assert 'M4.5 9.2 L7.5 12.2 L13.5 5.8' in svg
     assert 'stdDeviation="18"' in svg
 
 

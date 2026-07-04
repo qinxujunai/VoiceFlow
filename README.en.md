@@ -1,6 +1,6 @@
 # VoiceFlow
 
-> Local-first dictation for Windows. Press a key, speak, and final text lands at the cursor with clipboard-first recovery.
+> Offline, immediate, never lost.
 
 [![中文](https://img.shields.io/badge/中文-切换-6B7280)](README.md)
 [![English](https://img.shields.io/badge/English-Current-111827)](README.en.md)
@@ -12,7 +12,7 @@
 
 ![VoiceFlow demo](docs/voiceflow-demo.svg)
 
-VoiceFlow is a Windows local-first dictation layer. Press `F2`, `Right Ctrl`,
+Local-first dictation for Windows: press `F2`, `Right Ctrl`,
 or a mouse side button to start recording, press again to stop, and the final
 text is copied to the clipboard before VoiceFlow attempts to paste it at the
 current cursor.
