@@ -38,7 +38,7 @@ body {
 .pill {
     width: var(--target-width);
     height: 34px;
-    max-width: 340px;
+    max-width: 312px;
     display: grid;
     grid-template-columns: 18px minmax(0, 1fr);
     align-items: center;
@@ -83,6 +83,10 @@ body {
 
 .pill.streaming {
     border-color: rgba(255, 69, 58, 0.16);
+}
+
+.pill.streaming.corrected {
+    border-color: rgba(50, 215, 75, 0.24);
 }
 
 .pill.processing,
@@ -272,10 +276,14 @@ const ticker = document.getElementById('ticker');
 const txt = document.getElementById('txt');
 
 const MIN_WIDTH = 86;
-const MAX_WIDTH = 340;
+const MAX_WIDTH = 312;
+const MAX_DISPLAY_CHARS = 96;
+const DISPLAY_HEAD_CHARS = 18;
+const DISPLAY_TAIL_CHARS = 72;
 let activeSession = 0;
 let maxStreamingWidth = MIN_WIDTH;
 let lastStreamingText = '';
+let correctionTimer = 0;
 
 function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -300,13 +308,22 @@ function measureTextWidth(text) {
     return w;
 }
 
+function displayTextForPill(text) {
+    text = text || '';
+    if (text.length <= MAX_DISPLAY_CHARS) {
+        return text;
+    }
+    return text.slice(0, DISPLAY_HEAD_CHARS) + ' … ' + text.slice(-DISPLAY_TAIL_CHARS);
+}
+
 function setWidthForText(text, lockGrowth) {
-    txt.textContent = text || '';
-    if (!text) {
+    var displayText = displayTextForPill(text);
+    txt.textContent = displayText;
+    if (!displayText) {
         pill.style.removeProperty('--target-width');
         return MIN_WIDTH;
     }
-    var est = measureTextWidth(text);
+    var est = measureTextWidth(displayText);
     var width = clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH);
     if (lockGrowth) {
         width = Math.max(maxStreamingWidth, width);
@@ -363,6 +380,7 @@ function updateTickerOffset(targetWidth, mode) {
 
 function resetTextMotion() {
     cancelAnimationFrame(_tickerRaf);
+    clearTimeout(correctionTimer);
     setTickerOffset(0);
     ticker.classList.remove('overflowing');
     ticker.style.textAlign = '';
@@ -422,10 +440,26 @@ function showRecording(sessionId) {
 function updateStreaming(text, sessionId) {
     if (!text) return;
     if (sessionId !== activeSession) return;
+    clearTimeout(correctionTimer);
     pill.className = 'pill streaming';
     lastStreamingText = text;
     var width = setWidthForText(text, true);
     updateTickerOffset(width);
+}
+
+function updateCorrection(text, sessionId) {
+    if (!text) return;
+    if (sessionId !== activeSession) return;
+    clearTimeout(correctionTimer);
+    pill.className = 'pill streaming corrected';
+    lastStreamingText = text;
+    var width = setWidthForText(text, true);
+    updateTickerOffset(width, 'settled');
+    correctionTimer = setTimeout(() => {
+        if (sessionId === activeSession && pill.classList.contains('corrected')) {
+            pill.className = 'pill streaming';
+        }
+    }, 520);
 }
 
 function showProcessing() {

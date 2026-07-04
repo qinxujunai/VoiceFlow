@@ -37,7 +37,7 @@ def test_verify_quality_gate_keeps_bootstrap_contract_tests():
     bootstrap_tests = (ROOT / "tests" / "test_bootstrap.py").read_text(encoding="utf-8")
 
     assert "test_start_bat_runs_bootstrap_before_launching_app" in bootstrap_tests
-    assert "test_bootstrap_never_downloads_models_implicitly" in bootstrap_tests
+    assert "test_bootstrap_only_downloads_models_after_visible_confirmation" in bootstrap_tests
 
 
 def test_verify_forces_utf8_subprocess_output():

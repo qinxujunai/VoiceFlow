@@ -95,6 +95,10 @@ def _models_present() -> bool:
     return all(path.exists() for path in MODEL_FILES)
 
 
+def _missing_model_files() -> list[Path]:
+    return [path for path in MODEL_FILES if not path.exists()]
+
+
 def _read_bootstrap_state() -> dict[str, object]:
     try:
         return json.loads(BOOTSTRAP_STATE.read_text(encoding="utf-8"))
@@ -238,6 +242,32 @@ def run_doctor() -> int:
     return completed.returncode
 
 
+def maybe_download_missing_models() -> bool:
+    missing = _missing_model_files()
+    if not missing:
+        return True
+
+    print("[Setup] Missing local ASR model files:", flush=True)
+    for path in missing:
+        print(f"        {path.relative_to(ROOT)}", flush=True)
+    print("", flush=True)
+    print("[Setup] VoiceFlow is offline by default and will not download models silently.", flush=True)
+    if not sys.stdin.isatty():
+        print("[Setup] Run this command in a terminal to download the default model:", flush=True)
+        print("        venv\\Scripts\\python.exe scripts\\download_models.py", flush=True)
+        return False
+
+    answer = input("[Setup] Download the default SenseVoice model now? [y/N] ").strip().lower()
+    if answer not in {"y", "yes"}:
+        print("[Setup] Model download skipped.", flush=True)
+        print("        venv\\Scripts\\python.exe scripts\\download_models.py", flush=True)
+        return False
+
+    completed = _run([str(VENV_PYTHON), "scripts/download_models.py"])
+    _print_output(completed)
+    return completed.returncode == 0 and _models_present()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare VoiceFlow runtime before launch.")
     parser.add_argument("--base-python", default=sys.executable)
@@ -255,6 +285,8 @@ def main() -> int:
 
         print("[Setup] Checking Python environment...", flush=True)
         ensure_venv(args.base_python)
+        if not maybe_download_missing_models():
+            return 1
         if args.ensure_shortcut:
             ensure_shortcut(force=True)
         if not args.skip_doctor:

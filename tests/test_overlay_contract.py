@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_streaming_update_writes_text_before_measuring_width():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     set_width_idx = html.index("function setWidthForText(text")
-    text_write_idx = html.index("txt.textContent = text || '';", set_width_idx)
-    measure_idx = html.index("var est = measureTextWidth(text);", set_width_idx)
+    text_write_idx = html.index("txt.textContent = displayText;", set_width_idx)
+    measure_idx = html.index("var est = measureTextWidth(displayText);", set_width_idx)
 
     assert text_write_idx < measure_idx
     assert "setWidthForText(text, true)" in html[html.index("function updateStreaming(text, sessionId)"):]
@@ -22,11 +22,37 @@ def test_streaming_pill_width_animates_and_keeps_content_driven_growth():
 
     assert "width 180ms cubic-bezier(0.2, 0, 0, 1)" in html
     assert "let maxStreamingWidth = MIN_WIDTH;" in html
-    assert "var est = measureTextWidth(text);" in set_width_block
+    assert "var est = measureTextWidth(displayText);" in set_width_block
     assert "Math.max(maxStreamingWidth, width)" in set_width_block
     assert "maxStreamingWidth = width;" in set_width_block
     assert "setWidthForText(text, true)" in streaming_block
     assert "ticker.style.textAlign = 'center';" not in streaming_block
+
+
+def test_streaming_pill_keeps_system_overlay_width_not_banner_width():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    set_width_idx = html.index("function setWidthForText(text")
+    set_width_block = html[set_width_idx:html.index("let _tickerRaf", set_width_idx)]
+
+    assert "max-width: 312px;" in html
+    assert "const MAX_WIDTH = 312;" in html
+    assert "clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH)" in set_width_block
+
+
+def test_streaming_pill_caps_rendered_text_for_long_dictation_performance():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    display_idx = html.index("function displayTextForPill(text)")
+    set_width_idx = html.index("function setWidthForText(text")
+    display_block = html[display_idx:set_width_idx]
+    set_width_block = html[set_width_idx:html.index("let _tickerTarget", set_width_idx)]
+
+    assert "const MAX_DISPLAY_CHARS = 96;" in html
+    assert "const DISPLAY_HEAD_CHARS = 18;" in html
+    assert "const DISPLAY_TAIL_CHARS = 72;" in html
+    assert "text.slice(0, DISPLAY_HEAD_CHARS) + ' … ' + text.slice(-DISPLAY_TAIL_CHARS)" in display_block
+    assert "var displayText = displayTextForPill(text);" in set_width_block
+    assert "txt.textContent = displayText;" in set_width_block
+    assert "measureTextWidth(displayText)" in set_width_block
 
 
 def test_streaming_ticker_only_overflows_after_reaching_max_width():
@@ -66,6 +92,25 @@ def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
     assert "restartTextRefresh" not in html
     assert "updateTickerOffset(width);" in streaming_block
     assert "if (nextTarget > _tickerCurrent)" in ticker_block
+
+
+def test_pause_correction_is_distinct_and_non_flashing():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    correction_block = html[html.index("function updateCorrection(text, sessionId)"):html.index("function showProcessing()")]
+    stream_idx = main.index("def _start_streaming")
+    stop_idx = main.index("def _stop_streaming", stream_idx)
+    stream_block = main[stream_idx:stop_idx]
+
+    assert ".pill.streaming.corrected" in html
+    assert "text-replace" not in html
+    assert "pill.className = 'pill streaming corrected';" in correction_block
+    assert "updateTickerOffset(width, 'settled');" in correction_block
+    assert "correctionTimer = setTimeout" in correction_block
+    assert "def update_correction(self, text, session_id):" in overlay
+    assert "updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
+    assert "self.overlay.update_correction(clean, generation)" in stream_block
 
 
 def test_finalizing_and_final_text_are_session_guarded():
@@ -184,6 +229,22 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)" in settings_block
     assert "QTabWidget" not in overlay
     assert "QLabel#sectionTitle" in settings_block
+
+
+def test_settings_status_page_exposes_language_and_model_setup_action():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert "self.language_status = QLabel()" in settings_block
+    assert "(\"语言\", self.language_status)" in settings_block
+    assert "self.language_status.setText(self._current_language_label())" in settings_block
+    assert "def _current_language_label(self):" in settings_block
+    assert "QPushButton(\"下载模型\")" in settings_block
+    assert "download.clicked.connect(self._open_model_setup)" in settings_block
+    assert "def _open_model_setup(self):" in settings_block
+    assert "scripts\\\\download_models.py" in settings_block
 
 
 def test_tray_primary_click_opens_settings_not_raw_overlay():
@@ -332,8 +393,9 @@ def test_readme_demo_copies_real_overlay_geometry_and_clips_text():
 
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
-    assert 'values="86;86;158;260;260;112;86"' in svg
-    assert 'values="36;36;108;210;210;62;36"' in svg
+    assert 'values="86;86;158;312;312;112;86"' in svg
+    assert 'values="36;36;108;262;262;62;36"' in svg
+    assert "Bounded live preview -> complete final output -> clipboard first" in svg
     assert 'overflow="hidden"' in svg[svg.index('id="demo-text-viewport"'):svg.index('id="demo-text"', svg.index('id="demo-text-viewport"'))]
     assert 'width="2"' in svg
     assert 'height="7"' in svg

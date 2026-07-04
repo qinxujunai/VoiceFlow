@@ -33,9 +33,8 @@ inspectable, and boring in the best way.
 - **Local history**: successful outputs are appended to `logs/history.jsonl`.
 - **Deterministic cleanup**: `TextCleaner` and `knowledge-base/corrections.txt`
   handle stable, known ASR mistakes without calling a model.
-- **Native-feeling overlay**: short text stays centered; long text sweeps once
-  through the pill and settles, so motion communicates change without becoming a
-  marquee.
+- **Native-feeling overlay**: short text stays centered; long dictation stays
+  smooth by rendering a bounded head/tail preview with tail-follow motion.
 
 ## Quick Start
 
@@ -56,16 +55,29 @@ launcher detects that setup is needed, it opens `start.bat` so repair feedback i
 visible.
 
 On launch, VoiceFlow opens a small app window with recent transcriptions, search,
-per-row copy actions, status, and diagnostics. Clicking the desktop shortcut
-again focuses the existing app instead of opening another VoiceFlow process. The
-recording overlay remains the compact bottom pill.
+per-row copy actions, model/language status, explicit model setup, and diagnostics.
+Clicking the desktop shortcut again focuses the existing app instead of opening
+another VoiceFlow process. The recording overlay remains the compact bottom pill.
 
 VoiceFlow stays offline by default. If local ASR model files are missing, setup
-stops with an explicit instruction instead of downloading in the background:
+opens a visible setup path and asks before downloading the default model. It
+does not download models silently. You can also run the model setup directly:
 
 ```bat
 venv\Scripts\python.exe scripts\download_models.py
 ```
+
+For a fresh clone, the intended path is:
+
+```bat
+git clone https://github.com/qinxujunai/VoiceFlow.git
+cd VoiceFlow
+start.bat
+```
+
+`start.bat` repairs Python dependencies and the desktop shortcut automatically.
+If the model is missing, confirm the visible prompt or run `download_models.py`
+yourself. After setup, future launches use the no-console desktop shortcut.
 
 Or run the app directly:
 
@@ -192,7 +204,7 @@ VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctr
 - 不默认接入大模型校对，避免慢、跑偏和交互不稳定。
 - 录音中显示实时预览；停顿时会把胶囊刷新为更完整的阶段性转写。
 - 长语音会边录边缓存带重叠的稳定音频段，停止时补最后尾巴并去重拼接，最终输出仍覆盖完整音频。
-- 悬浮胶囊保持克制：短文本居中，长文本单次扫过后停住，停止时优先粘贴再反馈。
+- 悬浮胶囊保持克制：短文本居中，长文本只渲染有头有尾的轻量预览并跟随尾部，停止时优先粘贴再反馈。
 - 桌面图标启动后打开主窗口，可搜索最近转录、逐条复制、重新粘贴；重复点击图标会唤起已有窗口，不会堆出多个进程。
 - 准确率优先走本地可控闭环：真实样本评测，加确定性的 `wrong=correct` 修正。
 
@@ -201,4 +213,5 @@ VoiceFlow 是一个 Windows 本地优先语音输入工具。按 `F2`、`右 Ctr
 - Better visual regression coverage for the overlay.
 - More benchmark manifests for Chinese and mixed Chinese-English dictation.
 - A release build flow that keeps models external but setup simple.
+- Local ASR evaluation manifests for long Chinese and mixed Chinese-English dictation.
 - Optional model comparison only when local benchmarks prove a better tradeoff.
