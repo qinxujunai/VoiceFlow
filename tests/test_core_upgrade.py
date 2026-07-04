@@ -2,6 +2,8 @@ import json
 import numpy as np
 import subprocess
 import sys
+import threading
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -28,17 +30,30 @@ class HistoryStoreTests(unittest.TestCase):
 
         with TemporaryDirectory() as tmp:
             store = HistoryStore(Path(tmp) / "history.jsonl")
-            store.append(raw_text="科瑟", clean_text="Cursor", corrected_text="Cursor", output_status="pasted")
+            store.append(
+                raw_text="科瑟",
+                clean_text="Cursor",
+                corrected_text="Cursor",
+                output_status="clipboard_copied_paste_sent",
+            )
 
             last = store.last()
             self.assertEqual(last["raw_text"], "科瑟")
             self.assertEqual(last["clean_text"], "Cursor")
             self.assertEqual(last["corrected_text"], "Cursor")
-            self.assertEqual(last["output_status"], "pasted")
+            self.assertEqual(last["output_status"], "clipboard_copied_paste_sent")
 
             rows = (Path(tmp) / "history.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(rows), 1)
             self.assertEqual(json.loads(rows[0])["clean_text"], "Cursor")
+
+
+class OutputHandlerContractTests(unittest.TestCase):
+    def test_clipboard_status_is_truthful_about_paste_uncertainty(self):
+        output_handler = (ROOT / "src" / "output_handler.py").read_text(encoding="utf-8")
+
+        self.assertIn("clipboard_copied_paste_sent", output_handler)
+        self.assertNotIn('return "pasted"', output_handler)
 
 
 class VocabularyTests(unittest.TestCase):
@@ -268,17 +283,67 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertLessEqual(VoiceInputSystem._stream_preview_interval(system, 180), 5.0)
         self.assertLessEqual(VoiceInputSystem._stream_preview_interval(system, 600), 5.0)
 
-    def test_streaming_preview_transcribes_recent_window_not_full_chunk(self):
+    def test_streaming_preview_transcribes_recent_window_not_full_chunk_while_speaking(self):
+        main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+        preview_idx = main.index("def _stream_preview_text")
+        final_idx = main.index("def _reset_final_cache", preview_idx)
+        preview_block = main[preview_idx:final_idx]
+
+        self.assertIn(
+            "preview_audio = chunk if prefer_complete else self._stream_preview_audio(chunk)",
+            preview_block,
+        )
+        self.assertIn("return self._transcribe_audio(preview_audio, blocking=False)", preview_block)
+
+    def test_pause_refresh_uses_complete_preview_before_stop(self):
         main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
         stream_idx = main.index("def _start_streaming")
         stop_idx = main.index("def _stop_streaming", stream_idx)
         stream_block = main[stream_idx:stop_idx]
 
-        self.assertIn("preview_audio = self._stream_preview_audio(chunk)", stream_block)
-        self.assertIn(
-            "self.transcriber.transcribe(preview_audio, self.audio.sample_rate)",
-            stream_block,
+        self.assertIn("A pause is a correction point", stream_block)
+        self.assertIn("prefer_complete=True", stream_block)
+        self.assertLess(
+            stream_block.index("prefer_complete=True"),
+            stream_block.index("last_len = len(chunk)"),
         )
+
+    def test_transcribe_audio_serializes_recognizer_access(self):
+        from main import VoiceInputSystem
+
+        class FakeAudio:
+            sample_rate = 16000
+
+        class FakeTranscriber:
+            def __init__(self):
+                self.active = 0
+                self.max_active = 0
+                self.lock = threading.Lock()
+
+            def transcribe(self, audio, sample_rate):
+                with self.lock:
+                    self.active += 1
+                    self.max_active = max(self.max_active, self.active)
+                time.sleep(0.02)
+                with self.lock:
+                    self.active -= 1
+                return "文本"
+
+        system = object.__new__(VoiceInputSystem)
+        system.audio = FakeAudio()
+        system.transcriber = FakeTranscriber()
+        system._transcribe_lock = threading.Lock()
+
+        threads = [
+            threading.Thread(target=VoiceInputSystem._transcribe_audio, args=(system, [1, 2, 3]))
+            for _ in range(3)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(system.transcriber.max_active, 1)
 
     def test_stop_final_still_transcribes_complete_audio(self):
         main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
@@ -287,6 +352,7 @@ class FinalTextSelectionTests(unittest.TestCase):
         stop_block = main[stop_idx:stream_idx]
 
         self.assertIn("raw_text = self._transcribe_final_text(data)", stop_block)
+        self.assertIn("self.overlay.show_final_text(text, final_generation)", stop_block)
 
     def test_next_final_segment_keeps_recent_tail_unfinalized(self):
         from main import VoiceInputSystem
@@ -343,7 +409,49 @@ class FinalTextSelectionTests(unittest.TestCase):
         text = VoiceInputSystem._transcribe_final_text(system, data)
 
         self.assertEqual(text, "前半段 尾巴")
-        self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 20])
+        self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 21])
+
+    def test_ten_minute_final_keeps_cached_body_and_transcribes_remaining_tail(self):
+        from main import VoiceInputSystem
+
+        class FakeAudio:
+            sample_rate = 16000
+
+        class FakeAudioData:
+            def __init__(self, length):
+                self.length = length
+
+            def __len__(self):
+                return self.length
+
+            def __getitem__(self, item):
+                if isinstance(item, slice):
+                    start = item.start or 0
+                    stop = self.length if item.stop is None else item.stop
+                    return FakeAudioData(max(0, stop - start))
+                raise TypeError(item)
+
+        class FakeTranscriber:
+            def __init__(self):
+                self.lengths = []
+
+            def transcribe(self, audio, sample_rate):
+                self.lengths.append(len(audio))
+                return "最后一分钟"
+
+        system = object.__new__(VoiceInputSystem)
+        system.audio = FakeAudio()
+        system.transcriber = FakeTranscriber()
+        system._transcribe_lock = None
+        system._final_segments = ["前九分钟"]
+        system._finalized_audio_len = FakeAudio.sample_rate * 540
+        system._final_cache_lock = None
+        data = FakeAudioData(FakeAudio.sample_rate * 600)
+
+        text = VoiceInputSystem._transcribe_final_text(system, data)
+
+        self.assertEqual(text, "前九分钟 最后一分钟")
+        self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 61])
 
     def test_short_final_still_transcribes_complete_audio_once(self):
         from main import VoiceInputSystem

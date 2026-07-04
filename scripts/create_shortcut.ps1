@@ -5,13 +5,18 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$StartBat = Join-Path $ProjectRoot "start.bat"
+$Pythonw = Join-Path $ProjectRoot "venv\Scripts\pythonw.exe"
+$Launcher = Join-Path $ProjectRoot "scripts\launch_voiceflow.pyw"
 $IconPath = Join-Path $ProjectRoot "assets\voiceflow.ico"
 $Desktop = [Environment]::GetFolderPath("Desktop")
 $ShortcutPath = Join-Path $Desktop "$ShortcutName.lnk"
 
-if (-not (Test-Path $StartBat)) {
-    throw "start.bat not found: $StartBat"
+if (-not (Test-Path $Pythonw)) {
+    throw "pythonw.exe not found: $Pythonw"
+}
+
+if (-not (Test-Path $Launcher)) {
+    throw "launcher not found: $Launcher"
 }
 
 if (-not (Test-Path $IconPath)) {
@@ -20,7 +25,8 @@ if (-not (Test-Path $IconPath)) {
 
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath = $StartBat
+$Shortcut.TargetPath = $Pythonw
+$Shortcut.Arguments = "`"$Launcher`""
 $Shortcut.WorkingDirectory = $ProjectRoot
 if (Test-Path $IconPath) {
     $Shortcut.IconLocation = $IconPath

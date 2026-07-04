@@ -56,7 +56,7 @@ class OutputHandler:
         self.last_text = text
 
         if self.mode == "clipboard":
-            return "pasted" if self._paste(text) else "fallback"
+            return "clipboard_copied_paste_sent" if self._paste(text) else "fallback"
         return "typed" if self._type(text) else "fallback"
 
     def repeat_last(self):

@@ -18,6 +18,9 @@ def test_doctor_reports_current_runtime_ok():
     assert checks["active_engine"]["detail"] == "sensevoice"
     assert checks["provider"]["detail"] == "cpu"
     assert checks["num_threads"]["detail"] == "6"
+    assert checks["python_version"]["status"] == "ok"
+    assert checks["app_icon"]["status"] == "ok"
+    assert checks["logs_dir"]["status"] == "ok"
 
 
 def test_doctor_reports_missing_active_model(tmp_path):
@@ -32,3 +35,15 @@ def test_doctor_reports_missing_active_model(tmp_path):
     checks = {item["name"]: item for item in result["checks"]}
     assert result["ok"] is False
     assert checks["model_path"]["status"] == "missing"
+
+
+def test_doctor_treats_missing_shortcut_as_warning(monkeypatch, tmp_path):
+    from scripts import doctor
+
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    result = doctor.run_doctor(ROOT)
+    checks = {item["name"]: item for item in result["checks"]}
+
+    assert checks["desktop_shortcut"]["status"] == "warning"
+    assert result["ok"] is True

@@ -33,6 +33,13 @@ def test_verify_runs_the_project_quality_gate():
     assert "stderr=subprocess.STDOUT" in verify_script
 
 
+def test_verify_quality_gate_keeps_bootstrap_contract_tests():
+    bootstrap_tests = (ROOT / "tests" / "test_bootstrap.py").read_text(encoding="utf-8")
+
+    assert "test_start_bat_runs_bootstrap_before_launching_app" in bootstrap_tests
+    assert "test_bootstrap_never_downloads_models_implicitly" in bootstrap_tests
+
+
 def test_verify_forces_utf8_subprocess_output():
     from scripts import verify
 

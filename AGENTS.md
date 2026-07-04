@@ -124,11 +124,11 @@ Use `wrong=correct` only in correction files.
 
 ## Troubleshooting
 
-- **Desktop shortcut runs stale code:** The shortcut points to `start.bat` which uses source code directly. But if an old process is still running, it holds the old config in memory. After changing `config.yaml` or `hotkey_manager.py`, kill all Python processes before restarting:
+- **Desktop shortcut runs stale code:** The shortcut points to the windowed source launcher, `scripts\launch_voiceflow.pyw`, through `venv\Scripts\pythonw.exe`. It still uses source code directly. But if an old process is still running, it holds the old config in memory. After changing `config.yaml` or `hotkey_manager.py`, kill all Python processes before restarting:
   ```powershell
   Stop-Process -Name python -Force
   ```
-- **`dist/VoiceFlow.exe` is a frozen snapshot.** If the desktop shortcut ever points to the exe instead of `start.bat`, the exe must be rebuilt with `venv\Scripts\pyinstaller.exe VoiceFlow.spec` to pick up config changes.
+- **`dist/VoiceFlow.exe` is a frozen snapshot.** If the desktop shortcut ever points to the exe instead of the windowed source launcher, the exe must be rebuilt with `venv\Scripts\pyinstaller.exe VoiceFlow.spec` to pick up config changes.
 
 
 ## Craft Standard
@@ -144,7 +144,7 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 - **Final text overwritten by streaming preview.** The old failure mode was one queued `updateStreaming` arriving after `show_result`. Keep `_stop_streaming()` joining `self._stream_thread`, and keep generation/session guards on `prepareRecording()` and `updateStreaming()`.
 
-- **Long dictation preview cost.** Streaming preview is UI feedback and may use only a recent audio window. Long recordings may use progressive final segments plus a stop-time tail pass, but do not output preview text as final unless final transcription is empty and the existing safety fallback is the only available text.
+- **Long dictation preview cost.** Streaming preview is UI feedback and may use only a recent audio window while the user is actively speaking. A pause during recording is a correction point and may refresh the pill with a more complete in-progress transcription. Long recordings may use progressive final segments plus a stop-time tail pass, but do not output preview text as final unless final transcription is empty and the existing safety fallback is the only available text.
 
 ## Coding Rules
 
