@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
   <title id="title">VoiceFlow compact dictation overlay demo</title>
-  <desc id="desc">A faithful animated preview of the real VoiceFlow pill: waveform, bounded tail-follow text, processing spinner, and done checkmark.</desc>
+  <desc id="desc">A faithful animated preview of the real short-dictation VoiceFlow pill: waveform, bounded tail-follow text, and the final muted text with a checkmark.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-80%" width="140%" height="260%">
       <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#000" flood-opacity="0.10"/>
@@ -19,13 +19,11 @@
       .ui-font { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
       #demo-pill { animation: pillState 6.8s cubic-bezier(0.2, 0, 0, 1) infinite; }
       #demo-waveform { animation: waveformState 6.8s ease infinite; }
-      #demo-spinner { animation: spinnerState 6.8s ease infinite; }
       #demo-check { animation: checkState 6.8s ease infinite; }
       #demo-text { animation: textState 6.8s ease infinite; }
       .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
       .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
-      .spin-ring { animation: spin 780ms linear infinite; transform-box: fill-box; transform-origin: center; }
       .live-text { animation: liveTextState 6.8s ease infinite; }
       .done-text { animation: doneTextState 6.8s ease infinite; }
       @keyframes pillState {
@@ -33,28 +31,24 @@
         12%, 88% { opacity: 1; }
       }
       @keyframes waveformState {
-        0%, 10%, 66%, 100% { opacity: 0; }
-        14%, 62% { opacity: 1; }
-      }
-      @keyframes spinnerState {
-        0%, 62%, 77%, 100% { opacity: 0; }
-        66%, 73% { opacity: 1; }
+        0%, 10%, 68%, 100% { opacity: 0; }
+        14%, 64% { opacity: 1; }
       }
       @keyframes checkState {
-        0%, 74%, 100% { opacity: 0; }
-        79%, 88% { opacity: 1; }
+        0%, 68%, 100% { opacity: 0; }
+        72%, 88% { opacity: 1; }
       }
       @keyframes textState {
         0%, 16%, 100% { opacity: 0; }
         23%, 88% { opacity: 1; }
       }
       @keyframes liveTextState {
-        0%, 18%, 74%, 100% { opacity: 0; }
-        24%, 68% { opacity: 1; }
+        0%, 18%, 68%, 100% { opacity: 0; }
+        24%, 64% { opacity: 1; }
       }
       @keyframes doneTextState {
-        0%, 75%, 100% { opacity: 0; }
-        80%, 88% { opacity: 1; }
+        0%, 68%, 100% { opacity: 0; }
+        72%, 88% { opacity: 1; }
       }
       @keyframes barA {
         0%, 100% { transform: scaleY(0.55); opacity: 0.55; }
@@ -68,9 +62,6 @@
         0%, 100% { transform: scaleY(0.50); opacity: 0.60; }
         45% { transform: scaleY(1.28); opacity: 1; }
       }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
     </style>
   </defs>
 
@@ -81,13 +72,13 @@
 
   <g filter="url(#shadow)">
     <rect id="demo-pill" x="437" y="143" width="86" height="34" rx="17" fill="url(#pillFill)" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5">
-      <animate attributeName="x" values="437;437;401;324;324;424;437" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
-      <animate attributeName="width" values="86;86;158;312;312;112;86" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="x" values="437;437;401;324;324;324;437" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="width" values="86;86;158;312;312;312;86" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
     </rect>
   </g>
 
   <g>
-    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;336 160;336 160;436 160;449 160" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;336 160;336 160;336 160;449 160" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
 
     <g id="demo-waveform" transform="translate(0 -9)">
       <rect class="bar-a" x="2" y="5.5" width="2" height="7" rx="1" fill="#ff453a"/>
@@ -95,23 +86,18 @@
       <rect class="bar-c" x="14" y="5" width="2" height="8" rx="1" fill="#ff453a"/>
     </g>
 
-    <g id="demo-spinner" transform="translate(9 0)">
-      <circle cx="0" cy="0" r="6.5" fill="none" stroke="#f5f5f7" stroke-opacity="0.22" stroke-width="1.6"/>
-      <circle class="spin-ring" cx="0" cy="0" r="6.5" fill="none" stroke="#f5f5f7" stroke-opacity="0.92" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="20 21"/>
-    </g>
-
     <path id="demo-check" d="M5 -1 l4 5.5 l8 -10" fill="none" stroke="#32d74b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
   <svg id="demo-text-viewport" x="475" y="151" width="36" height="18" overflow="hidden">
-    <animate attributeName="x" values="475;475;439;362;362;462;475" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
-    <animate attributeName="width" values="36;36;108;262;262;62;36" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animate attributeName="x" values="475;475;439;362;362;362;475" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
+    <animate attributeName="width" values="36;36;108;262;262;262;36" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
     <g id="demo-text">
       <text class="ui-font live-text" x="105" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#f5f5f7">
         我现在用 Cursor 和 Codex 写代码，停顿后自动校正，最后完整粘贴
-        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-48 0;-132 0;-132 0;0 0" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-48 0;-132 0;-132 0;0 0" keyTimes="0;0.16;0.36;0.50;0.68;0.88;1" dur="6.8s" repeatCount="indefinite"/>
       </text>
-      <text class="ui-font done-text" x="31" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#c7c7cc">已完成</text>
+      <text class="ui-font done-text" x="131" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#c7c7cc">停顿后自动校正，最后完整粘贴</text>
     </g>
   </svg>
 
