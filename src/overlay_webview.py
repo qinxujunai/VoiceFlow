@@ -148,11 +148,13 @@ class _SettingsWindow(QMainWindow):
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(12)
         self.model_status = QLabel()
+        self.language_status = QLabel()
         self.hotkey_status = QLabel("F2 / Right Ctrl / XButton1 / XButton2")
         self.mic_status = QLabel("使用系统默认麦克风")
         self.mode_status = QLabel("离线优先，无隐藏云调用")
         rows = (
             ("模型", self.model_status),
+            ("语言", self.language_status),
             ("快捷键", self.hotkey_status),
             ("麦克风", self.mic_status),
             ("模式", self.mode_status),
@@ -164,6 +166,16 @@ class _SettingsWindow(QMainWindow):
             grid.addWidget(name_label, row, 0)
             grid.addWidget(value, row, 1)
         layout.addLayout(grid)
+
+        actions = QHBoxLayout()
+        download = QPushButton("下载模型")
+        download.clicked.connect(self._open_model_setup)
+        diagnose = QPushButton("运行检查")
+        diagnose.clicked.connect(lambda: (self.sidebar.setCurrentRow(2), self._run_doctor()))
+        actions.addWidget(download)
+        actions.addWidget(diagnose)
+        actions.addStretch(1)
+        layout.addLayout(actions)
         layout.addStretch(1)
         return page
 
@@ -194,7 +206,21 @@ class _SettingsWindow(QMainWindow):
         ready = os.path.exists(model) and os.path.exists(tokens)
         self.status_badge.setText("就绪" if ready else "需要设置")
         self.model_status.setText("SenseVoice 已就绪" if ready else "模型缺失")
+        self.language_status.setText(self._current_language_label())
         self._refresh_history()
+
+    def _current_language_label(self):
+        try:
+            import yaml
+            with open(os.path.join(self.root, "config.yaml"), "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            engine = config.get("engine", {})
+            active = engine.get("active", "sensevoice")
+            language = (engine.get(active) or {}).get("language", "zh")
+            labels = {"zh": "中文", "en": "English", "auto": "自动检测"}
+            return f"{labels.get(language, language)} ({active})"
+        except Exception:
+            return "配置读取失败"
 
     def _refresh_history(self):
         path = os.path.join(self.root, "logs", "history.jsonl")
@@ -324,6 +350,16 @@ class _SettingsWindow(QMainWindow):
         import pyperclip
         pyperclip.copy("\n\n".join(texts))
         self.status_badge.setText("已复制")
+
+    def _open_model_setup(self):
+        python = os.path.join(self.root, "venv", "Scripts", "python.exe")
+        command = f'"{python}" scripts\\download_models.py & pause'
+        subprocess.Popen(
+            ["cmd.exe", "/c", command],
+            cwd=self.root,
+            creationflags=0x00000010,
+        )
+        self.status_badge.setText("模型下载已打开")
 
     def _run_doctor(self):
         python = os.path.join(self.root, "venv", "Scripts", "python.exe")
@@ -744,6 +780,9 @@ class OverlayWindow:
 
     def update_streaming(self, text, session_id):
         self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
+
+    def update_correction(self, text, session_id):
+        self._js(f"updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
 
     def show_processing(self):
         self._tray_state(TRAY_ICON_PROCESSING)

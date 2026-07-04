@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
   <title id="title">VoiceFlow compact dictation overlay demo</title>
-  <desc id="desc">A faithful animated preview of the real VoiceFlow pill: waveform, clipped live text, processing spinner, and done checkmark.</desc>
+  <desc id="desc">A faithful animated preview of the real VoiceFlow pill: waveform, bounded tail-follow text, processing spinner, and done checkmark.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-80%" width="140%" height="260%">
       <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#000" flood-opacity="0.10"/>
@@ -81,13 +81,13 @@
 
   <g filter="url(#shadow)">
     <rect id="demo-pill" x="437" y="143" width="86" height="34" rx="17" fill="url(#pillFill)" stroke="#ffffff" stroke-opacity="0.10" stroke-width="0.5">
-      <animate attributeName="x" values="437;437;401;350;350;424;437" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
-      <animate attributeName="width" values="86;86;158;260;260;112;86" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="x" values="437;437;401;324;324;424;437" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+      <animate attributeName="width" values="86;86;158;312;312;112;86" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
     </rect>
   </g>
 
   <g>
-    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;362 160;362 160;436 160;449 160" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="translate" values="449 160;449 160;413 160;336 160;336 160;436 160;449 160" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
 
     <g id="demo-waveform" transform="translate(0 -9)">
       <rect class="bar-a" x="2" y="5.5" width="2" height="7" rx="1" fill="#ff453a"/>
@@ -104,18 +104,18 @@
   </g>
 
   <svg id="demo-text-viewport" x="475" y="151" width="36" height="18" overflow="hidden">
-    <animate attributeName="x" values="475;475;439;388;388;462;475" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
-    <animate attributeName="width" values="36;36;108;210;210;62;36" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animate attributeName="x" values="475;475;439;362;362;462;475" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+    <animate attributeName="width" values="36;36;108;262;262;62;36" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
     <g id="demo-text">
       <text class="ui-font live-text" x="105" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#f5f5f7">
-        我现在用 Cursor 和 Codex 写代码
-        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-34 0;-74 0;-74 0;0 0" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
+        我现在用 Cursor 和 Codex 写代码，停顿后自动校正，最后完整粘贴
+        <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0;-48 0;-132 0;-132 0;0 0" keyTimes="0;0.16;0.36;0.50;0.70;0.82;1" dur="6.8s" repeatCount="indefinite"/>
       </text>
       <text class="ui-font done-text" x="31" y="13" text-anchor="middle" font-size="13" font-weight="470" fill="#c7c7cc">已完成</text>
     </g>
   </svg>
 
   <text x="480" y="236" text-anchor="middle" class="ui-font" font-size="13" fill="#69707d">
-    Recent-window preview -> full final transcription -> clipboard first
+    Bounded live preview -> complete final output -> clipboard first
   </text>
 </svg>

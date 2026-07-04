@@ -358,7 +358,7 @@ class VoiceInputSystem:
                                         self._latest_text = text
                                         clean = self.cleaner.clean(text)
                                         if clean and generation == self._stream_generation:
-                                            self.overlay.update_streaming(clean, generation)
+                                            self.overlay.update_correction(clean, generation)
                                 last_len = len(chunk)
                                 time.sleep(0.25)
                                 continue

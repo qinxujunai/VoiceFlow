@@ -44,11 +44,14 @@ def test_windowed_launcher_opens_visible_setup_only_when_repair_is_needed():
     assert "stdout=subprocess.DEVNULL" in launcher
 
 
-def test_bootstrap_never_downloads_models_implicitly():
+def test_bootstrap_only_downloads_models_after_visible_confirmation():
     source = (ROOT / "scripts" / "bootstrap.py").read_text(encoding="utf-8")
 
     assert "download_models.py" in source
-    assert "[str(VENV_PYTHON), \"scripts/download_models.py\"]" not in source
+    assert "[str(VENV_PYTHON), \"scripts/download_models.py\"]" in source
+    assert "VoiceFlow is offline by default and will not download models silently." in source
+    assert "if not sys.stdin.isatty():" in source
+    assert "Download the default SenseVoice model now? [y/N]" in source
     assert "snapshot_download" not in source
 
 
