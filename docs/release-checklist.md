@@ -1,0 +1,39 @@
+# VoiceFlow Release Checklist
+
+Use this checklist before updating the GitHub default branch or publishing a
+build.
+
+## Local Verification
+
+```bat
+git status --short
+venv\Scripts\python.exe scripts\verify.py
+```
+
+- Working tree is clean before merge.
+- Verify passes on the branch being released.
+- Desktop shortcut starts the no-console launcher.
+- Launching twice focuses the existing app instead of opening another main
+  process.
+- Short dictation stops quickly and shows the final checkmark.
+- Long dictation keeps the overlay responsive and writes final text to clipboard
+  and history.
+
+## GitHub Verification
+
+- Default branch README shows the current `docs/voiceflow-demo.svg`.
+- About description matches the product positioning.
+- Quick Start matches the actual setup path.
+- Model files remain outside Git.
+- `docs/quality-gate.md` and `docs/asr-evaluation-plan.md` are linked from the
+  README.
+
+## Packaging Verification
+
+```bat
+venv\Scripts\pyinstaller.exe VoiceFlow.spec
+```
+
+- The packaged app includes overlay, config, knowledge base, and icon.
+- Large model files remain external under `models/`.
+- Missing models produce a readable setup path instead of a silent failure.
