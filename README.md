@@ -19,6 +19,9 @@ VoiceFlow is intentionally not a cloud assistant. There are no hidden cloud ASR
 calls and no default LLM correction layer. The default path is local, fast,
 inspectable, and boring in the best way.
 
+Built and maintained with Codex-assisted engineering workflows; Codex is used
+for development and review, not as a runtime dependency.
+
 ## Highlights
 
 - **Push-to-talk dictation**: press `F2`, `Right Ctrl`, or a mouse side button to
@@ -35,6 +38,41 @@ inspectable, and boring in the best way.
   handle stable, known ASR mistakes without calling a model.
 - **Native-feeling overlay**: short text stays centered; long dictation stays
   smooth by rendering a bounded head/tail preview with tail-follow motion.
+
+## Why This Project Is Worth Looking At
+
+VoiceFlow is not a toy recorder. It is a Windows system input layer with a clear
+reliability contract: speech becomes text at the active cursor, and recognized
+text must never disappear. That forces product and engineering decisions that a
+simple demo can avoid:
+
+- **Preview is not truth**: streaming text is only feedback; final output always
+  comes from the final transcription path.
+- **Clipboard-first output**: even if the cursor is not in a text field or
+  `Ctrl+V` lands nowhere, the text remains recoverable.
+- **Long dictation is explicit**: stable segments are cached while recording,
+  then the remaining tail is finalized on stop.
+- **Local-first delivery**: setup can repair Python dependencies and shortcuts,
+  while model download is visible and user-confirmed.
+- **Maintained like a product**: doctor, verify, benchmark, integration tests,
+  and docs all describe the same runtime behavior.
+
+## Tech Stack
+
+- **Runtime**: Python 3.12 on Windows.
+- **Desktop UI**: PyQt6 + PyQt6 WebEngine for the app window, tray integration,
+  and the compact HTML overlay.
+- **Speech recognition**: `sherpa-onnx` with local SenseVoice ONNX models.
+- **Audio and input**: `sounddevice`, `keyboard`, and `pynput` for microphone,
+  keyboard triggers, right-Ctrl detection, and mouse side buttons.
+- **Output**: `pyperclip` plus simulated `Ctrl+V`, with local JSONL history as
+  a recovery path.
+- **Packaging**: PyInstaller spec with external model files.
+
+GitHub's language bar reports source-code composition. VoiceFlow's speech
+language is configured separately in `config.yaml`; the default is `zh`, and the
+current engine config supports `zh`, `en`, and `auto` style language settings
+where the underlying model supports them.
 
 ## Quick Start
 
@@ -123,6 +161,45 @@ final output still covers the complete stopped audio. If final transcription
 returns empty but a streaming preview exists, VoiceFlow uses the preview as a
 safety fallback.
 
+## Reliability and Performance
+
+- **Startup self-healing**: `start.bat` validates that the virtual environment's
+  Python executable actually runs, rebuilds a broken venv, installs missing
+  dependencies, creates logs, and restores the desktop shortcut.
+- **Fast normal launches**: once the runtime signature is healthy, bootstrap uses
+  a cached fast path instead of running the full doctor on every start.
+- **Long overlay performance**: the pill renders a bounded head/tail preview
+  instead of placing an unbounded transcript into the DOM.
+- **Recognizer safety**: transcription access is serialized so preview and final
+  work do not compete for the same recognizer instance.
+- **Quality gate**: `scripts/verify.py` runs doctor, compile checks, tests,
+  benchmark, and integration before a change is considered ready.
+
+## Known Product Constraints
+
+- VoiceFlow cannot force another app to accept paste when the cursor is not in
+  an editable field. The final text still remains in the clipboard and
+  `logs/history.jsonl`.
+- Model files are large and stay outside Git. The setup path asks before
+  downloading them instead of making a hidden network call.
+- Streaming preview can be partial or temporarily wrong; final output is the
+  source of truth.
+- Cloud ASR and cloud LLM correction are intentionally out of the default path
+  to keep latency, privacy, and failure modes predictable.
+
+## Interview Notes / Engineering Highlights
+
+- Designed a small system-level product around a simple invariant: never lose
+  recognized text.
+- Built a three-layer UX: tray app for control/history, compact overlay for
+  real-time feedback, and clipboard/history as recovery.
+- Handled long-running dictation with progressive final segments, overlap, and a
+  stop-time tail pass.
+- Added startup bootstrap, doctor, shortcut recovery, and no-console launcher so
+  a fresh clone has a practical Windows setup path.
+- Kept model quality work measurable through ASR benchmarks and deterministic
+  correction files instead of opaque post-processing.
+
 ## Project Structure
 
 ```text
@@ -191,6 +268,12 @@ venv\Scripts\pyinstaller.exe VoiceFlow.spec
 
 `VoiceFlow.spec` includes the overlay, config, knowledge base, and app icon.
 Large model files are intentionally kept outside the executable under `models/`.
+
+## Maintenance Docs
+
+- [Quality gate](docs/quality-gate.md)
+- [ASR evaluation plan](docs/asr-evaluation-plan.md)
+- [Release checklist](docs/release-checklist.md)
 
 ## 中文说明
 
