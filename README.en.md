@@ -12,10 +12,10 @@
 
 ![VoiceFlow demo](docs/voiceflow-demo.svg)
 
-Local-first dictation for Windows: press `F2`, `Right Ctrl`,
-or a mouse side button to start recording, press again to stop, and the final
-text is copied to the clipboard before VoiceFlow attempts to paste it at the
-current cursor.
+VoiceFlow is local-first dictation for Windows. It treats speech as live input,
+not as a file to process: press `F2`, `Right Ctrl`, or a mouse side button,
+speak, press again, and the final text is copied to the clipboard before
+VoiceFlow attempts to paste it at the current cursor.
 
 The product contract is simple: **recognized text must not be lost.** If the
 target app does not accept paste, the text is still recoverable from the

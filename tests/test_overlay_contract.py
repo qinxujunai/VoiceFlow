@@ -395,8 +395,10 @@ def test_readme_demo_copies_real_overlay_geometry_and_expands_capsule():
     assert 'height="34"' in svg
     assert 'rx="17"' in svg
     assert 'width="86" height="34" rx="17"' in svg
-    assert 'values="86;86;170;236;236;236;86"' in svg
-    assert 'values="557 190;557 190;515 190;482 190;482 190;482 190;557 190"' in svg
+    assert 'values="1;1;0;0;1"' in svg
+    assert 'keyTimes="0;0.88;0.92;0.99;1"' in svg
+    assert 'values="86;86;170;236;236;86;86"' in svg
+    assert 'values="557 190;557 190;515 190;482 190;482 190;557 190;557 190"' in svg
     assert "明早十点，把方案同步给团队。" in svg
     assert "把声音收束成文字，把文字送回光标。" in svg
     assert "overflow=\"hidden\"" not in svg
@@ -421,4 +423,4 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## 快速开始" in readme
     assert "https://img.shields.io/badge/English-Current-111827" in english
     assert "(README.md)" in english
-    assert "Local-first dictation for Windows" in english
+    assert "local-first dictation for Windows" in english
