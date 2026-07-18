@@ -129,7 +129,9 @@ body {
     height: 7px;
     border-radius: 2px;
     background: var(--muted);
-    transition: height 120ms ease, background 120ms ease, opacity 120ms ease;
+    transform: scaleY(var(--level, 0.45));
+    transition: transform 90ms linear, background 120ms ease, opacity 120ms ease;
+    transform-origin: center;
 }
 
 .mark span:nth-child(2) { height: 12px; }
@@ -138,19 +140,14 @@ body {
 .listening .mark span:nth-child(1),
 .streaming .mark span:nth-child(1) {
     background: var(--red);
-    animation: bar1 720ms ease-in-out infinite;
 }
 .listening .mark span:nth-child(2),
 .streaming .mark span:nth-child(2) {
     background: var(--red);
-    animation: bar2 880ms ease-in-out infinite;
-    animation-delay: 140ms;
 }
 .listening .mark span:nth-child(3),
 .streaming .mark span:nth-child(3) {
     background: var(--red);
-    animation: bar3 790ms ease-in-out infinite;
-    animation-delay: 260ms;
 }
 
 .processing .mark span,
@@ -230,19 +227,6 @@ body {
     color: var(--text);
 }
 
-@keyframes bar1 {
-    0%, 100% { transform: scaleY(0.55); opacity: 0.55; }
-    50% { transform: scaleY(1.22); opacity: 1; }
-}
-@keyframes bar2 {
-    0%, 100% { transform: scaleY(0.60); opacity: 0.50; }
-    55% { transform: scaleY(1.15); opacity: 1; }
-}
-@keyframes bar3 {
-    0%, 100% { transform: scaleY(0.50); opacity: 0.60; }
-    45% { transform: scaleY(1.28); opacity: 1; }
-}
-
 @keyframes confirm {
     0% { transform: scale(1); }
     35% { transform: scale(1.028); }
@@ -292,6 +276,29 @@ let activeSession = 0;
 let maxStreamingWidth = MIN_WIDTH;
 let lastStreamingText = '';
 let correctionTimer = 0;
+
+function meterScale(level) {
+    // Compress real microphone RMS into a calm but legible 18 px meter.
+    return clamp(0.36 + Math.sqrt(clamp(level, 0, 0.16) / 0.16) * 0.92, 0.36, 1.28);
+}
+
+function resetAudioLevel() {
+    pill.style.setProperty('--level-1', '0.45');
+    pill.style.setProperty('--level-2', '0.45');
+    pill.style.setProperty('--level-3', '0.45');
+    const bars = pill.querySelectorAll('.mark span');
+    bars.forEach((bar, index) => bar.style.setProperty('--level', `var(--level-${index + 1})`));
+}
+
+function updateAudioLevel(levels, sessionId) {
+    if (sessionId !== activeSession) return;
+    if (!pill.classList.contains('listening') && !pill.classList.contains('streaming')) return;
+    const values = Array.isArray(levels) ? levels.slice(0, 3) : [];
+    while (values.length < 3) values.push(0);
+    values.forEach((level, index) => {
+        pill.style.setProperty(`--level-${index + 1}`, meterScale(Number(level) || 0).toFixed(3));
+    });
+}
 
 function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -394,6 +401,7 @@ function resetTextMotion() {
     ticker.style.textAlign = '';
     maxStreamingWidth = MIN_WIDTH;
     lastStreamingText = '';
+    resetAudioLevel();
 }
 
 function resetHidden() {

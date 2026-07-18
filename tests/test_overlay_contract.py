@@ -105,6 +105,20 @@ def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
     assert mailbox.take() is None
 
 
+def test_recording_meter_is_driven_by_real_audio_without_animation_backlog():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+    assert "function updateAudioLevel(levels, sessionId)" in html
+    assert "meterScale(Number(level) || 0)" in html
+    assert "animation: bar1" not in html
+    assert "level_js_requested = Signal(str)" in overlay
+    assert "self._level_mailbox = _LatestPreviewMailbox()" in overlay
+    assert "def update_audio_level(self, levels, session_id):" in overlay
+    assert "self.audio.set_level_callback(self._on_audio_levels)" in main
+
+
 def test_streaming_bridge_uses_coalesced_preview_channel():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
@@ -420,44 +434,38 @@ def test_overlay_keeps_single_stable_mark_and_text_regions():
     assert body.count('id="txt"') == 1
 
 
-def test_readme_demo_uses_single_product_pill_state_machine():
-    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
+def test_readme_uses_current_runtime_captures_instead_of_a_drawn_demo():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    screenshots = ROOT / "docs" / "screenshots"
+    names = (
+        "settings-dictation.png",
+        "overlay-recording.png",
+        "overlay-streaming.png",
+        "overlay-finalizing.png",
+        "overlay-completed.png",
+    )
 
-    assert svg.count('id="demo-pill"') == 1
-    assert svg.count('id="capsule"') == 1
-    assert 'id="wave"' in svg
-    assert 'id="check"' in svg
-    assert 'id="liveText"' in svg
-    assert 'id="finalText"' in svg
-    assert "@keyframes waveState" in svg
-    assert "@keyframes checkState" in svg
-    assert "@keyframes liveTextState" in svg
-    assert "@keyframes finalTextState" in svg
-    assert 'id="demo-spinner"' not in svg
-    assert "@keyframes spinnerState" not in svg
-    assert "Cursor and Codex at the cursor" not in svg
+    assert not (ROOT / "docs" / "voiceflow-demo.svg").exists()
+    for name in names:
+        payload = (screenshots / name).read_bytes()
+        assert payload.startswith(b"\x89PNG\r\n\x1a\n")
+        assert f"docs/screenshots/{name}" in readme
 
 
-def test_readme_demo_copies_real_overlay_geometry_and_expands_capsule():
-    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
+def test_readme_runtime_captures_keep_real_overlay_geometry():
+    screenshots = ROOT / "docs" / "screenshots"
 
-    assert 'height="34"' in svg
-    assert 'rx="17"' in svg
-    assert 'width="86" height="34" rx="17"' in svg
-    assert 'values="1;1;0;0;1"' in svg
-    assert 'keyTimes="0;0.88;0.92;0.99;1"' in svg
-    assert 'values="86;86;170;236;236;86;86"' in svg
-    assert 'values="557 190;557 190;515 190;482 190;482 190;557 190;557 190"' in svg
-    assert "明早十点，把方案同步给团队。" in svg
-    assert "把声音收束成文字，把文字送回光标。" in svg
-    assert "overflow=\"hidden\"" not in svg
-    assert 'width="2"' in svg
-    assert 'height="7"' in svg
-    assert 'height="12"' in svg
-    assert 'height="8"' in svg
-    assert 'transform="translate(12 8)"' in svg
-    assert 'M4.5 9.2 L7.5 12.2 L13.5 5.8' in svg
-    assert 'stdDeviation="18"' in svg
+    for name in (
+        "overlay-recording.png",
+        "overlay-streaming.png",
+        "overlay-finalizing.png",
+        "overlay-completed.png",
+    ):
+        payload = (screenshots / name).read_bytes()
+        width = int.from_bytes(payload[16:20], "big")
+        height = int.from_bytes(payload[20:24], "big")
+        assert width * 48 == height * 380
+        assert height in (48, 60, 72, 96)
 
 
 def test_readme_defaults_to_chinese_with_english_switch():

@@ -28,8 +28,8 @@ from qt_compat import (  # noqa: E402
 
 
 OVERLAY_STATES = {
-    "recording": "prepareRecording(1)",
-    "streaming": "prepareRecording(2); updateStreaming('正在整理 VoiceFlow 的完整转写', 2)",
+    "recording": "prepareRecording(1); updateAudioLevel([0.018, 0.092, 0.044], 1)",
+    "streaming": "prepareRecording(2); updateStreaming('正在整理 VoiceFlow 的完整转写', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
     "correction": "prepareRecording(3); updateCorrection('正在整理 VoiceFlow 的完整转写', 3)",
     "finalizing": "prepareRecording(4); showFinalizing(4)",
     "completed": "prepareRecording(5); showFinalText('完整文字已保留', 5)",

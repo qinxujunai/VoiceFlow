@@ -50,6 +50,7 @@ class AudioCapture:
         # VAD 状态
         self._last_speech_time = None
         self._on_silence_callback = None
+        self._on_level_callback = None
 
     def start_recording(self):
         """开始录音"""
@@ -78,6 +79,17 @@ class AudioCapture:
                     self._audio_buffer.append(block)
                     self._total_samples += len(block)
                     self._audio_buffer_ends.append(self._total_samples)
+                if self._on_level_callback is not None:
+                    mono = block.reshape(-1).astype(np.float32) / 32768.0
+                    windows = np.array_split(mono, 3)
+                    levels = [
+                        float(np.sqrt(np.mean(window * window))) if len(window) else 0.0
+                        for window in windows
+                    ]
+                    try:
+                        self._on_level_callback(levels)
+                    except Exception:
+                        pass
                 # VAD：检查当前帧是否有语音活动
                 if self.vad_enabled:
                     energy = np.abs(indata).mean() / 32768.0
@@ -149,6 +161,10 @@ class AudioCapture:
     def set_silence_callback(self, callback):
         """设置静音超时回调"""
         self._on_silence_callback = callback
+
+    def set_level_callback(self, callback):
+        """Receive three real RMS samples for the compact recording meter."""
+        self._on_level_callback = callback
 
     def check_silence(self):
         """

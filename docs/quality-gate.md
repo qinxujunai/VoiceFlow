@@ -44,7 +44,8 @@ and 200% scale.
 
 ## Review Checklist
 
-- README and demo assets match the current runtime behavior.
+- README screenshots are recaptured from the current runtime and match its behavior.
+- The recording meter is driven by microphone RMS through a latest-only UI channel; fixed decorative waveform loops are rejected.
 - `scripts\doctor.py` reports missing dependencies, model files, shortcuts, and
   knowledge-base files clearly.
 - UI changes keep the overlay small and bounded.

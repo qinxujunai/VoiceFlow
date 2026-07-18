@@ -10,7 +10,18 @@
 [![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
 [![Tests](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
-![VoiceFlow demo](docs/voiceflow-demo.svg)
+![VoiceFlow dictation settings captured from the running app](docs/screenshots/settings-dictation.png)
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/overlay-recording.png" alt="Recording state driven by real microphone energy"><br><sub>Listening: the meter follows real microphone energy</sub></td>
+    <td align="center"><img src="docs/screenshots/overlay-streaming.png" alt="Bounded live preview state"><br><sub>Live preview: latest tail only, with no render backlog</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/overlay-finalizing.png" alt="Finalizing state after stop"><br><sub>After stop: complete the final audio tail</sub></td>
+    <td align="center"><img src="docs/screenshots/overlay-completed.png" alt="Recoverable completion state"><br><sub>Complete: text is in the clipboard and local history</sub></td>
+  </tr>
+</table>
 
 VoiceFlow is local-first dictation for Windows. It treats speech as live input,
 not as a file to process: press `F2`, `Right Ctrl`, or a mouse side button,
@@ -28,6 +39,7 @@ Codex is used for engineering workflow support, not as a runtime dependency.
 
 - **System input layer**: designed for real cursor-level dictation across apps.
 - **Final output is truth**: streaming preview is only feedback.
+- **Truthful input feedback**: the 18 px meter follows real microphone RMS instead of playing a decorative loop, and its UI channel keeps only the latest frame.
 - **Clipboard-first recovery**: paste can fail; text should not disappear.
 - **Long dictation support**: stable segments are cached while recording, with a
   final tail pass on stop.

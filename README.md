@@ -10,7 +10,18 @@
 [![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
 [![测试](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
-![VoiceFlow 演示](docs/voiceflow-demo.svg)
+![VoiceFlow 听写设置真实截图](docs/screenshots/settings-dictation.png)
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/overlay-recording.png" alt="真实麦克风能量驱动的录音状态"><br><sub>正在听：三柱随真实麦克风能量变化</sub></td>
+    <td align="center"><img src="docs/screenshots/overlay-streaming.png" alt="有界的实时预览状态"><br><sub>实时预览：只显示最新尾部，不制造积压</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/overlay-finalizing.png" alt="停止后的整理状态"><br><sub>停止后：补齐最终尾部</sub></td>
+    <td align="center"><img src="docs/screenshots/overlay-completed.png" alt="可恢复的完成状态"><br><sub>已完成：文字已进入剪贴板与历史</sub></td>
+  </tr>
+</table>
 
 VoiceFlow 是一个本地优先的 Windows 语音输入层。它不把语音当成文件处理，而是把说话变成当前光标处的即时输入：
 按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先进入剪贴板，再尝试粘贴到当前光标位置。
@@ -23,6 +34,7 @@ VoiceFlow 默认离线运行。没有隐藏云 ASR 调用，也没有默认大�
 
 - **系统级输入层**：不是文件转写器，而是面向任意应用的即时语音输入。
 - **最终结果可信**：流式预览只负责反馈，真正输出永远来自最终转写路径。
+- **真实输入反馈**：18 px 三柱标记读取麦克风 RMS，不播放与声音无关的装饰循环；UI 通道只保留最新一帧。
 - **剪贴板优先**：先复制，再粘贴；即使光标不在输入框，文字也可恢复。
 - **长语音完整性**：录音中缓存稳定音频段，停止时补最后尾巴并去重拼接。
 - **本地可交付**：启动器能修复 venv、安装依赖、恢复快捷方式；模型下载是显式确认，不偷偷联网。

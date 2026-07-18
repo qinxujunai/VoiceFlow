@@ -119,6 +119,7 @@ class VoiceInputSystem:
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
         self.audio = AudioCapture(self.config_path)
+        self.audio.set_level_callback(self._on_audio_levels)
         self.session = RecordingSession(self.audio)
 
         print("[启动] ASR...", flush=True)
@@ -142,6 +143,11 @@ class VoiceInputSystem:
         print("[启动] 就绪", flush=True)
 
     # ---- 录音 ----
+
+    def _on_audio_levels(self, levels):
+        if self._recording_state.current is not RecordingState.RECORDING:
+            return
+        self.overlay.update_audio_level(levels, self._stream_generation)
 
     def _on_record_toggle(self, triggered_at=None):
         state = self._recording_state.current
