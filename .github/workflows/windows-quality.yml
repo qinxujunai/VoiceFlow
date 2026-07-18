@@ -1,5 +1,8 @@
 name: Windows quality
 
+env:
+  PYTHONUTF8: "1"
+
 on:
   push:
     branches: [master]

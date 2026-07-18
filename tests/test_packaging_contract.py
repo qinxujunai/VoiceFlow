@@ -5,6 +5,14 @@ import struct
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_windows_ci_forces_utf8_for_chinese_diagnostics():
+    workflow = (ROOT / ".github" / "workflows" / "windows-quality.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'PYTHONUTF8: "1"' in workflow
+
+
 def test_release_spec_bundles_runtime_assets():
     spec = (ROOT / "VoiceFlow.spec").read_text(encoding="utf-8")
 
