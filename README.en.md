@@ -1,57 +1,32 @@
 # VoiceFlow
 
-> Offline, immediate, never lost.
+<p align="right">
+  <a href="README.md">简体中文</a> · <strong>English</strong>
+</p>
 
-[![中文](https://img.shields.io/badge/中文-切换-6B7280)](README.md)
-[![English](https://img.shields.io/badge/English-Current-111827)](README.en.md)
+> Offline. Immediate. Never lose a word.
 
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#)
-[![Local First](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
-[![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
-[![Tests](https://img.shields.io/badge/tests-pytest-0A7)](#)
+[![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
+[![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#privacy-and-networking)
+[![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
 
-![VoiceFlow demo](docs/voiceflow-demo.svg)
+![VoiceFlow animated demo](docs/voiceflow-demo.svg)
 
-VoiceFlow is local-first dictation for Windows. It treats speech as live input,
-not as a file to process: press `F2`, `Right Ctrl`, or a mouse side button,
-speak, press again, and the final text is copied to the clipboard before
-VoiceFlow attempts to paste it at the current cursor.
+VoiceFlow is local-first dictation for Windows. Press `F2`, speak, and press it again—the text returns to your current cursor. Recognition, vocabulary, and history stay on your device by default. If the target app does not accept the paste, the result remains recoverable from the clipboard and local history.
 
-The product contract is simple: **recognized text must not be lost.** If the
-target app does not accept paste, the text is still recoverable from the
-clipboard and local history.
+## Core Capabilities
 
-VoiceFlow has no hidden cloud ASR calls and no default LLM correction layer.
-Codex is used for engineering workflow support, not as a runtime dependency.
-
-## Why It Matters
-
-- **System input layer**: designed for real cursor-level dictation across apps.
-- **Final output is truth**: streaming preview is only feedback.
-- **Truthful input feedback**: the 18 px meter follows real microphone RMS instead of playing a decorative loop, and its UI channel keeps only the latest frame.
-- **Clipboard-first recovery**: paste can fail; text should not disappear.
-- **Long dictation support**: stable segments are cached while recording, with a
-  final tail pass on stop.
-- **Local delivery path**: bootstrap can repair Python dependencies, logs, and
-  shortcuts; model download is visible and user-confirmed.
-- **Quality gate**: doctor, compile checks, pytest, benchmark, and integration
-  are wired into `scripts\verify.py`.
-
-## Tech Stack
-
-- Python 3.12 on Windows
-- PySide6 + Qt WebEngine on the LGPL release path
-- `sherpa-onnx` adapters for SenseVoice, Qwen3-ASR, and Fun-ASR Nano
-- Offline Silero VAD before ASR suppresses silence hallucinations without deleting genuine one-word dictation
-- `sounddevice`, `keyboard`, and `pynput`
-- `pyperclip` plus simulated `Ctrl+V`
-- PyInstaller for packaged builds
-
-GitHub's language bar reports source-code composition. Speech language is
-configured separately in `config.yaml`; the default is `zh`, with model-backed
-settings such as `zh`, `en`, and `auto`.
+- **Dictate wherever you type**: use `F2`, Right Ctrl, or a mouse side button in the app already in front of you.
+- **Offline recognition**: no cloud ASR calls or online LLM processing in the default path.
+- **Recoverable output**: text reaches the clipboard before paste is attempted and is also saved to local history.
+- **Smooth long dictation**: preview, audio retention, and UI work stay bounded instead of growing with recording duration.
+- **Truthful feedback**: the waveform follows actual microphone input; preview communicates progress, while final transcription produces the output.
+- **Quiet presence**: tray operation, single-instance startup, and a compact overlay keep VoiceFlow out of the way.
 
 ## Quick Start
+
+VoiceFlow is currently distributed as a source preview. A signed Windows installer is not available yet.
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -59,63 +34,68 @@ cd VoiceFlow
 start.bat
 ```
 
-`start.bat` validates the virtual environment, installs dependencies when
-needed, creates logs, restores the desktop shortcut, and opens a visible setup
-path if the local ASR model is missing.
+The first run validates the Python environment, installs dependencies, and guides you through preparing a local model. Model files are not stored in Git; downloads are always explicit and assets are verified before activation.
 
-Models are intentionally kept out of Git. To download the default model:
+Once setup is complete, the desktop shortcut starts VoiceFlow without a console window. Starting it again brings the existing instance forward instead of creating another process.
 
-```bat
-venv\Scripts\python.exe scripts\download_models.py
-```
+### Requirements
 
-## Shortcuts
+- Windows 10 or Windows 11
+- A working microphone
+- Network access for initial environment and model setup; everyday recognition runs offline
+
+## Controls
 
 | Key | Action |
 | --- | --- |
 | `F2` | Start / stop dictation |
 | `Right Ctrl` | Start / stop dictation |
-| `xbutton1` / `xbutton2` | Start / stop with mouse side buttons |
-| `Esc` | Cancel current recording |
+| `xbutton1` / `xbutton2` | Start / stop with a mouse side button |
+| `Esc` | Cancel the current recording without output |
 
-## Architecture
+The normal output path is:
 
 ```text
-Hotkey
-  -> RecordingSession
-  -> AudioCapture
-  -> Transcriber
-  -> TextCleaner + Vocabulary
-  -> Clipboard
-  -> Ctrl+V
-  -> logs/history.jsonl
+Speech → Local ASR → Deterministic cleanup → Clipboard → Current cursor → Local history
 ```
 
-For short recordings, VoiceFlow runs one complete final pass. For long
-recordings, it caches stable final segments while recording, then transcribes
-the remaining tail on stop and de-duplicates transcript joins.
+Text shown while recording is a live preview. After you stop, VoiceFlow finishes the remaining audio before it outputs the complete result. Short recordings use one full final pass; long recordings progressively settle stable segments and finish the tail on stop.
 
-Live preview work is duration-independent: it reads a bounded recent audio
-window, releases PCM after stable segments are cached, drops stale recognition
-results, and coalesces UI updates into a one-slot latest-only queue. The final
-path still covers the complete recording.
+## Reliability by Design
 
-## Verification
+- **Silence protection**: local VAD rejects background noise, key sounds, and punctuation-only hallucinations without discarding genuine one-word dictation.
+- **Complete tail coverage**: final output must include all stopped audio; preview is never treated as the final transcript.
+- **Bounded live work**: preview reads a fixed recent audio window, and old PCM is released after stable segments settle.
+- **Latest state wins**: the overlay renders the newest state instead of queueing stale recognition results or animation frames.
+- **Failure recovery**: recognized text remains in the clipboard and `logs/history.jsonl` even when automatic paste fails.
+
+## Models and Languages
+
+The current default engine is offline SenseVoice. VoiceFlow also provides a common model adapter and local evaluation tooling for SenseVoice, Qwen3-ASR, and Fun-ASR Nano. Candidates are compared on accuracy, latency, tail completeness, and resource use; only an engine that passes every product gate can become the default.
+
+Recognition language is configured in `config.yaml`. Options such as `zh`, `en`, and `auto` depend on the selected model's actual capabilities.
+
+## Development and Verification
 
 ```bat
 venv\Scripts\python.exe scripts\verify.py
+venv\Scripts\python.exe scripts\verify.py --release
 ```
 
-The gate runs doctor, py_compile, pytest, 500 deterministic lifecycle cycles, a
-quick ASR benchmark, and integration. `scripts\verify.py --release` also
-enforces recorded responsiveness evidence.
-
-Model promotion is handled by `scripts\evaluate_asr.py`. It writes per-sample
-JSONL results and refuses promotion when coverage or any hard product gate is
-missing. Runtime audio and private evaluation data stay local.
-
-## Maintenance
+The standard gate covers environment diagnostics, compile checks, automated tests, 500 deterministic lifecycle cycles, a quick ASR benchmark, and integration. Release validation also requires recorded performance evidence, DPI screenshots, keyboard and Narrator tasks, long recordings, device switching, and residency testing.
 
 - [Quality gate](docs/quality-gate.md)
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
 - [Release checklist](docs/release-checklist.md)
+
+## Privacy and Networking
+
+Recordings, transcripts, vocabulary, and history stay on the local machine by default. Runtime does not automatically download models, check for updates, or call cloud recognition services. Network access occurs only when the user explicitly starts model setup. Private evaluation audio lives in a Git-ignored directory and is never uploaded by the evaluation tools.
+
+## Project Status
+
+VoiceFlow is a source preview approaching public beta. Core dictation, long-recording handling, clipboard recovery, and local quality gates are available. A signed end-user installer still requires final model redistribution review, clean-machine installation validation, and code signing.
+
+## License
+
+VoiceFlow source code is available under the [MIT License](LICENSE). Models and third-party components remain subject to their respective licenses and are reviewed separately before public redistribution.

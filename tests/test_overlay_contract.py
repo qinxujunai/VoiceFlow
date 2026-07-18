@@ -469,12 +469,14 @@ def test_readme_defaults_to_chinese_with_english_switch():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
 
-    assert "https://img.shields.io/badge/中文-当前-111827" in readme
-    assert "(README.en.md)" in readme
-    assert "本地优先的 Windows 语音输入层" in readme
-    assert "## 为什么这个项目值得看" in readme
-    assert "## 技术栈" in readme
+    assert '<strong>简体中文</strong> · <a href="README.en.md">English</a>' in readme
+    assert "Windows 上的本地语音输入工具" in readme
+    assert "## 核心能力" in readme
     assert "## 快速开始" in readme
-    assert "https://img.shields.io/badge/English-Current-111827" in english
-    assert "(README.md)" in english
+    assert "面试" not in readme
+    assert "Codex" not in readme
+    assert "GitHub 右侧的语言统计" not in readme
+    assert '<a href="README.md">简体中文</a> · <strong>English</strong>' in english
     assert "local-first dictation for Windows" in english
+    assert "## Core Capabilities" in english
+    assert "## Quick Start" in english
