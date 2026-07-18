@@ -10,18 +10,7 @@
 [![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
 [![Tests](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
-![VoiceFlow dictation settings captured from the running app](docs/screenshots/settings-dictation.png)
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/overlay-recording.png" alt="Recording state driven by real microphone energy"><br><sub>Listening: the meter follows real microphone energy</sub></td>
-    <td align="center"><img src="docs/screenshots/overlay-streaming.png" alt="Bounded live preview state"><br><sub>Live preview: latest tail only, with no render backlog</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/screenshots/overlay-finalizing.png" alt="Finalizing state after stop"><br><sub>After stop: complete the final audio tail</sub></td>
-    <td align="center"><img src="docs/screenshots/overlay-completed.png" alt="Recoverable completion state"><br><sub>Complete: text is in the clipboard and local history</sub></td>
-  </tr>
-</table>
+![VoiceFlow demo](docs/voiceflow-demo.svg)
 
 VoiceFlow is local-first dictation for Windows. It treats speech as live input,
 not as a file to process: press `F2`, `Right Ctrl`, or a mouse side button,

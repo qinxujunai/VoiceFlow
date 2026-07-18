@@ -44,7 +44,7 @@ and 200% scale.
 
 ## Review Checklist
 
-- README screenshots are recaptured from the current runtime and match its behavior.
+- README and the animated product demo match the current runtime states and product promise.
 - The recording meter is driven by microphone RMS through a latest-only UI channel; fixed decorative waveform loops are rejected.
 - `scripts\doctor.py` reports missing dependencies, model files, shortcuts, and
   knowledge-base files clearly.

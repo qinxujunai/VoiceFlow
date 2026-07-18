@@ -22,7 +22,7 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 
 ## GitHub Verification
 
-- Default branch README shows the current runtime captures under `docs/screenshots/`.
+- Default branch README shows the animated `docs/voiceflow-demo.svg` product story.
 - About description matches the product positioning.
 - Quick Start matches the actual setup path.
 - Model files remain outside Git.

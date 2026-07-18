@@ -1,7 +1,11 @@
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 
 def test_streaming_update_writes_text_before_measuring_width():
@@ -434,38 +438,31 @@ def test_overlay_keeps_single_stable_mark_and_text_regions():
     assert body.count('id="txt"') == 1
 
 
-def test_readme_uses_current_runtime_captures_instead_of_a_drawn_demo():
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    screenshots = ROOT / "docs" / "screenshots"
-    names = (
-        "settings-dictation.png",
-        "overlay-recording.png",
-        "overlay-streaming.png",
-        "overlay-finalizing.png",
-        "overlay-completed.png",
-    )
+def test_readme_demo_uses_single_product_pill_state_machine():
+    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
-    assert not (ROOT / "docs" / "voiceflow-demo.svg").exists()
-    for name in names:
-        payload = (screenshots / name).read_bytes()
-        assert payload.startswith(b"\x89PNG\r\n\x1a\n")
-        assert f"docs/screenshots/{name}" in readme
+    assert svg.count('id="demo-pill"') == 1
+    assert svg.count('id="capsule"') == 1
+    assert 'id="wave"' in svg
+    assert 'id="check"' in svg
+    assert 'id="liveText"' in svg
+    assert 'id="finalText"' in svg
+    assert "@keyframes waveState" in svg
+    assert "@keyframes checkState" in svg
+    assert "@keyframes liveTextState" in svg
+    assert "@keyframes finalTextState" in svg
+    assert 'id="demo-spinner"' not in svg
+    assert "@keyframes spinnerState" not in svg
 
 
-def test_readme_runtime_captures_keep_real_overlay_geometry():
-    screenshots = ROOT / "docs" / "screenshots"
+def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
+    svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
-    for name in (
-        "overlay-recording.png",
-        "overlay-streaming.png",
-        "overlay-finalizing.png",
-        "overlay-completed.png",
-    ):
-        payload = (screenshots / name).read_bytes()
-        width = int.from_bytes(payload[16:20], "big")
-        height = int.from_bytes(payload[20:24], "big")
-        assert width * 48 == height * 380
-        assert height in (48, 60, 72, 96)
+    assert 'width="86" height="34" rx="17"' in svg
+    assert 'values="86;86;170;236;236;86;86"' in svg
+    assert "明早十点，把方案同步给团队。" in svg
+    assert "把声音收束成文字，把文字送回光标。" in svg
+    assert "真实胶囊状态：录音预览 → 最终确认 → 剪贴板兜底" in svg
 
 
 def test_readme_defaults_to_chinese_with_english_switch():
