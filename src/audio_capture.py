@@ -10,6 +10,7 @@ import queue
 import time
 import yaml
 import os
+from bisect import bisect_left, bisect_right
 
 
 class AudioCapture:
@@ -37,6 +38,11 @@ class AudioCapture:
         # 录音状态
         self._is_recording = False
         self._audio_buffer = []
+        self._audio_buffer_ends = []
+        self._buffer_start_sample = 0
+        self._total_samples = 0
+        self._last_buffer_start_sample = 0
+        self._last_total_samples = 0
         self._lock = threading.Lock()
         self._stream = None
         self._recording_start_time = None
@@ -44,6 +50,7 @@ class AudioCapture:
         # VAD 状态
         self._last_speech_time = None
         self._on_silence_callback = None
+        self._on_level_callback = None
 
     def start_recording(self):
         """开始录音"""
@@ -52,6 +59,11 @@ class AudioCapture:
 
         with self._lock:
             self._audio_buffer = []
+            self._audio_buffer_ends = []
+            self._buffer_start_sample = 0
+            self._total_samples = 0
+            self._last_buffer_start_sample = 0
+            self._last_total_samples = 0
             self._is_recording = True
             self._recording_start_time = time.time()
             self._last_speech_time = time.time()
@@ -60,7 +72,24 @@ class AudioCapture:
             if status:
                 pass
             if self._is_recording:
-                self._audio_buffer.append(indata.copy())
+                block = indata.copy()
+                with self._lock:
+                    if not self._is_recording:
+                        return
+                    self._audio_buffer.append(block)
+                    self._total_samples += len(block)
+                    self._audio_buffer_ends.append(self._total_samples)
+                if self._on_level_callback is not None:
+                    mono = block.reshape(-1).astype(np.float32) / 32768.0
+                    windows = np.array_split(mono, 3)
+                    levels = [
+                        float(np.sqrt(np.mean(window * window))) if len(window) else 0.0
+                        for window in windows
+                    ]
+                    try:
+                        self._on_level_callback(levels)
+                    except Exception:
+                        pass
                 # VAD：检查当前帧是否有语音活动
                 if self.vad_enabled:
                     energy = np.abs(indata).mean() / 32768.0
@@ -97,11 +126,18 @@ class AudioCapture:
                 pass
             self._stream = None
 
-        if not self._audio_buffer:
+        with self._lock:
+            blocks = self._audio_buffer
+            self._last_buffer_start_sample = self._buffer_start_sample
+            self._last_total_samples = self._total_samples
+            self._audio_buffer = []
+            self._audio_buffer_ends = []
+            self._buffer_start_sample = 0
+            self._total_samples = 0
+        if not blocks:
             return np.array([], dtype=np.int16)
 
-        audio = np.concatenate(self._audio_buffer, axis=0)
-        self._audio_buffer = []
+        audio = np.concatenate(blocks, axis=0)
         return audio.flatten()
 
     def cancel_recording(self):
@@ -115,12 +151,20 @@ class AudioCapture:
             except Exception:
                 pass
             self._stream = None
-        self._audio_buffer = []
+        with self._lock:
+            self._audio_buffer = []
+            self._audio_buffer_ends = []
+            self._buffer_start_sample = 0
+            self._total_samples = 0
         self._recording_start_time = None
 
     def set_silence_callback(self, callback):
         """设置静音超时回调"""
         self._on_silence_callback = callback
+
+    def set_level_callback(self, callback):
+        """Receive three real RMS samples for the compact recording meter."""
+        self._on_level_callback = callback
 
     def check_silence(self):
         """
@@ -138,6 +182,56 @@ class AudioCapture:
     @property
     def is_recording(self):
         return self._is_recording
+
+    @property
+    def sample_count(self):
+        with self._lock:
+            return self._total_samples
+
+    @property
+    def buffer_start_sample(self):
+        with self._lock:
+            return self._buffer_start_sample
+
+    @property
+    def last_buffer_start_sample(self):
+        with self._lock:
+            return self._last_buffer_start_sample
+
+    @property
+    def last_total_samples(self):
+        with self._lock:
+            return self._last_total_samples
+
+    def snapshot_audio(self, start_sample=0, end_sample=None):
+        """Copy only the requested mono PCM range from the growing recording."""
+        with self._lock:
+            total = self._total_samples
+            available_start = getattr(self, "_buffer_start_sample", 0)
+            start = max(available_start, min(int(start_sample), total))
+            end = total if end_sample is None else max(start, min(int(end_sample), total))
+            if start >= end or not self._audio_buffer:
+                return np.array([], dtype=np.int16)
+            first = bisect_right(self._audio_buffer_ends, start)
+            last = bisect_left(self._audio_buffer_ends, end) + 1
+            blocks = tuple(self._audio_buffer[first:last])
+            base = available_start if first == 0 else self._audio_buffer_ends[first - 1]
+        if not blocks:
+            return np.array([], dtype=np.int16)
+        selected = np.concatenate(blocks, axis=0).flatten()
+        return selected[start - base:end - base].copy()
+
+    def discard_before(self, sample_index):
+        """Release complete PCM blocks older than a globally indexed sample."""
+        with self._lock:
+            target = max(self._buffer_start_sample, min(int(sample_index), self._total_samples))
+            drop_count = bisect_right(self._audio_buffer_ends, target)
+            if drop_count <= 0:
+                return self._buffer_start_sample
+            self._buffer_start_sample = self._audio_buffer_ends[drop_count - 1]
+            del self._audio_buffer[:drop_count]
+            del self._audio_buffer_ends[:drop_count]
+            return self._buffer_start_sample
 
     @staticmethod
     def list_devices():

@@ -19,10 +19,30 @@ engine:
     num_threads: 6              # Ryzen 7 5800H 上的低延迟默认值
 
   qwen3-asr:
-    model_path: "models/qwen3-asr/model.onnx"
-    tokens_path: "models/qwen3-asr/tokens.txt"
+    conv_frontend_path: "models/qwen3-asr/conv_frontend.onnx"
+    encoder_path: "models/qwen3-asr/encoder.int8.onnx"
+    decoder_path: "models/qwen3-asr/decoder.int8.onnx"
+    tokenizer_path: "models/qwen3-asr/tokenizer"
+    hotwords: ""                # 可选热词，以空格分隔
+    provider: "cpu"
+    num_threads: 6
+
+  fun-asr-nano:
+    encoder_adaptor_path: "models/fun-asr-nano/encoder_adaptor.int8.onnx"
+    llm_path: "models/fun-asr-nano/llm.int8.onnx"
+    embedding_path: "models/fun-asr-nano/embedding.int8.onnx"
+    tokenizer_path: "models/fun-asr-nano/Qwen3-0.6B"
     language: "zh"
-    prompt: ""                  # 可选的文本提示（引导识别方向）
+    use_itn: true
+    hotwords: ""
+    provider: "cpu"
+    num_threads: 6
+
+  whisper-turbo:
+    encoder_path: "models/whisper-turbo/turbo-encoder.int8.onnx"
+    decoder_path: "models/whisper-turbo/turbo-decoder.int8.onnx"
+    tokens_path: "models/whisper-turbo/turbo-tokens.txt"
+    language: "zh"
     provider: "cpu"
     num_threads: 6
 
@@ -41,12 +61,20 @@ audio:
 # ============================================================
 vad:
   enabled: true
-  # 静音多少秒后自动停止（仅 Push-to-Talk 模式生效）
+  # VAD 默认只辅助识别静音边界，不自动结束用户的录音。
+  auto_stop_on_silence: false
+  # 仅在显式开启 auto_stop_on_silence 后使用。
   silence_timeout: 1.5
   # 最少录多久才允许自动停（防止误触立即停）
   min_recording: 1.0
   # 能量阈值：低于此值视为静音（0.0-1.0）
   energy_threshold: 0.02
+  # 极低能量快速拒绝门；真正的人声判断由本地 Silero VAD 完成。
+  asr_energy_floor: 0.002
+  model_path: "assets/silero_vad.onnx"
+  speech_probability_threshold: 0.5
+  # 至少累计 90ms 人声才调用 ASR，过滤底噪和按键声，不删除单字。
+  min_speech_ms: 90
 
 # ============================================================
 # 快捷键配置

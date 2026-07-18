@@ -64,14 +64,23 @@ def main() -> int:
         help="Skip the slower integration test while keeping doctor, compile, pytest, and benchmark.",
     )
     parser.add_argument("--benchmark-limit", type=int, default=3)
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="Also enforce recorded P95 performance evidence for a public build.",
+    )
     args = parser.parse_args()
 
     commands = [
         ("doctor", [sys.executable, "scripts/doctor.py"]),
         ("py_compile", [sys.executable, "-m", "py_compile", *PYTHON_FILES]),
         ("pytest", [sys.executable, "-m", "pytest", "tests", "-q"]),
+        ("stability", [sys.executable, "scripts/stability_gate.py", "--cycles", "500"]),
         ("benchmark", [sys.executable, "scripts/benchmark_models.py", "--limit", str(args.benchmark_limit)]),
     ]
+    if args.release:
+        commands.append(("ui-quality", [sys.executable, "scripts/ui_quality_gate.py"]))
+        commands.append(("performance", [sys.executable, "scripts/performance_gate.py"]))
     if not args.quick:
         commands.append(("integration", [sys.executable, "test_integration.py"]))
 

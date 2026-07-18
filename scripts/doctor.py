@@ -8,6 +8,7 @@ not record from the microphone and does not paste text anywhere.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import json
 import os
@@ -25,13 +26,14 @@ REQUIRED_IMPORTS = (
     "sounddevice",
     "soundfile",
     "pyperclip",
-    "PyQt6",
-    "PyQt6.QtWebEngineWidgets",
+    "PySide6",
+    "PySide6.QtWebEngineWidgets",
     "pynput",
     "yaml",
 )
 REQUIRED_SAMPLE_WAVS = ("zh.wav", "en.wav")
 WARNING_STATUSES = {"warning"}
+SILERO_VAD_SHA256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
 
 
 def _is_required_ok(item: dict[str, str]) -> bool:
@@ -85,7 +87,23 @@ def _check_active_engine(root: Path, config: dict[str, Any]) -> list[dict[str, s
     active_name = engine.get("active", "sensevoice")
     active_config = engine.get(active_name) or {}
     rows.append({"name": "active_engine", "status": "ok" if active_config else "missing", "detail": str(active_name)})
-    for key in ("model_path", "tokens_path"):
+    asset_keys = {
+        "sensevoice": ("model_path", "tokens_path"),
+        "qwen3-asr": (
+            "conv_frontend_path",
+            "encoder_path",
+            "decoder_path",
+            "tokenizer_path",
+        ),
+        "fun-asr-nano": (
+            "encoder_adaptor_path",
+            "llm_path",
+            "embedding_path",
+            "tokenizer_path",
+        ),
+        "whisper-turbo": ("encoder_path", "decoder_path", "tokens_path"),
+    }
+    for key in asset_keys.get(active_name, ()):
         raw_path = active_config.get(key, "")
         path = root / raw_path
         rows.append({
@@ -116,6 +134,21 @@ def _check_samples(root: Path) -> list[dict[str, str]]:
         path = wav_dir / filename
         rows.append({"name": f"sample:{filename}", "status": "ok" if path.exists() else "missing", "detail": str(path)})
     return rows
+
+
+def _check_vad(root: Path, config: dict[str, Any]) -> list[dict[str, str]]:
+    vad = config.get("vad", {})
+    path = root / vad.get("model_path", "assets/silero_vad.onnx")
+    if not vad.get("enabled", True):
+        return [{"name": "silero_vad_model", "status": "warning", "detail": "disabled"}]
+    if not path.is_file():
+        return [{"name": "silero_vad_model", "status": "missing", "detail": str(path)}]
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return [{
+        "name": "silero_vad_model",
+        "status": "ok" if digest == SILERO_VAD_SHA256 else "invalid",
+        "detail": f"{path} sha256={digest}",
+    }]
 
 
 def _check_delivery_files(root: Path) -> list[dict[str, str]]:
@@ -150,6 +183,7 @@ def run_doctor(root: Path = ROOT) -> dict[str, Any]:
     checks.extend(_check_active_engine(root, config))
     checks.extend(_check_knowledge_base(root, config))
     checks.extend(_check_samples(root))
+    checks.extend(_check_vad(root, config))
     checks.extend(_check_delivery_files(root))
     ok = all(_is_required_ok(item) for item in checks)
     return {"ok": ok, "checks": checks}

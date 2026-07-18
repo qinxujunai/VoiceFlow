@@ -48,6 +48,8 @@ def _variant_configs(config):
     engine = config.get("engine", {})
     sense = copy.deepcopy(engine.get("sensevoice", {}))
     qwen = copy.deepcopy(engine.get("qwen3-asr", {}))
+    fun_asr = copy.deepcopy(engine.get("fun-asr-nano", {}))
+    whisper = copy.deepcopy(engine.get("whisper-turbo", {}))
 
     if sense:
         int8 = copy.deepcopy(config)
@@ -62,12 +64,32 @@ def _variant_configs(config):
             fp32["engine"]["sensevoice"]["model_path"] = "models/sensevoice/model.onnx"
             variants.append(("sensevoice-fp32", fp32))
 
-    qwen_model = ROOT / qwen.get("model_path", "")
-    qwen_tokens = ROOT / qwen.get("tokens_path", "")
-    if qwen and qwen_model.exists() and qwen_tokens.exists():
+    qwen_assets = [
+        ROOT / qwen.get(key, "")
+        for key in ("conv_frontend_path", "encoder_path", "decoder_path", "tokenizer_path")
+    ]
+    if qwen and all(path.exists() for path in qwen_assets):
         qwen_cfg = copy.deepcopy(config)
         qwen_cfg["engine"]["active"] = "qwen3-asr"
         variants.append(("qwen3-asr", qwen_cfg))
+
+    fun_assets = [
+        ROOT / fun_asr.get(key, "")
+        for key in ("encoder_adaptor_path", "llm_path", "embedding_path", "tokenizer_path")
+    ]
+    if fun_asr and all(path.exists() for path in fun_assets):
+        fun_cfg = copy.deepcopy(config)
+        fun_cfg["engine"]["active"] = "fun-asr-nano"
+        variants.append(("fun-asr-nano", fun_cfg))
+
+    whisper_assets = [
+        ROOT / whisper.get(key, "")
+        for key in ("encoder_path", "decoder_path", "tokens_path")
+    ]
+    if whisper and all(path.exists() for path in whisper_assets):
+        whisper_cfg = copy.deepcopy(config)
+        whisper_cfg["engine"]["active"] = "whisper-turbo"
+        variants.append(("whisper-turbo", whisper_cfg))
 
     return variants
 

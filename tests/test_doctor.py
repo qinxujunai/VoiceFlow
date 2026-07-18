@@ -20,6 +20,7 @@ def test_doctor_reports_current_runtime_ok():
     assert checks["num_threads"]["detail"] == "6"
     assert checks["python_version"]["status"] == "ok"
     assert checks["app_icon"]["status"] == "ok"
+    assert checks["silero_vad_model"]["status"] == "ok"
     assert checks["logs_dir"]["status"] == "ok"
 
 
@@ -35,6 +36,28 @@ def test_doctor_reports_missing_active_model(tmp_path):
     checks = {item["name"]: item for item in result["checks"]}
     assert result["ok"] is False
     assert checks["model_path"]["status"] == "missing"
+
+
+def test_doctor_checks_qwen_asset_contract(tmp_path):
+    from scripts import doctor
+
+    config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    config["engine"]["active"] = "qwen3-asr"
+    qwen_dir = tmp_path / "models" / "qwen3-asr"
+    (qwen_dir / "tokenizer").mkdir(parents=True)
+    for filename in ("conv_frontend.onnx", "encoder.int8.onnx"):
+        (qwen_dir / filename).write_text(filename, encoding="utf-8")
+    (tmp_path / "config.yaml").write_text(
+        yaml.safe_dump(config, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+    result = doctor.run_doctor(tmp_path)
+    checks = {item["name"]: item for item in result["checks"]}
+
+    assert result["ok"] is False
+    assert checks["decoder_path"]["status"] == "missing"
+    assert checks["tokenizer_path"]["status"] == "ok"
 
 
 def test_doctor_treats_missing_shortcut_as_warning(monkeypatch, tmp_path):

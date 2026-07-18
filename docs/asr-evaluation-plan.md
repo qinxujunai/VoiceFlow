@@ -1,5 +1,9 @@
 # VoiceFlow ASR Evaluation Plan
 
+The latest local smoke report is
+[`model-lab-2026-07-18-preliminary.md`](model-lab-2026-07-18-preliminary.md).
+It is intentionally preliminary and did not promote a model.
+
 VoiceFlow should choose speech models by product evidence, not by popularity.
 The default remains local-first and offline.
 
@@ -56,9 +60,14 @@ example manifest can use public or synthetic audio only.
 - A stronger model that adds noticeable stop latency should not replace the
   default unless accuracy gains are large enough to justify a separate mode.
 
-## Next Implementation Step
+## Implemented Model Lab
 
-Add `scripts/evaluate_asr.py --manifest <path> --engine <name>` and write JSONL
-results into `logs/asr-eval.jsonl`. The script should reuse the production
-transcriber, cleaner, vocabulary, and history metadata fields so benchmark
-results match real dictation behavior.
+```bat
+venv\Scripts\python.exe scripts\evaluate_asr.py --manifest eval\private\local.jsonl
+```
+
+The command evaluates every installed, hash-verified candidate, writes
+per-sample JSONL plus a summary, applies the fixed weighted score and hard
+gates, and leaves the default unchanged when coverage is incomplete. Add
+`--promote` only for a controlled run; promotion still happens only when every
+gate passes.

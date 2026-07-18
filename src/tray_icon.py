@@ -2,8 +2,7 @@
 Small, status-aware tray icons for VoiceFlow.
 """
 
-from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from qt_compat import QPointF, Qt, QColor, QIcon, QPainter, QPen, QPixmap
 
 
 TRAY_ICON_IDLE = "idle"
