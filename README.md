@@ -1,47 +1,32 @@
 # VoiceFlow
 
+<p align="right">
+  <strong>简体中文</strong> · <a href="README.en.md">English</a>
+</p>
+
 > 离线，即刻，不丢一个字。
 
-[![中文](https://img.shields.io/badge/中文-当前-111827)](README.md)
-[![English](https://img.shields.io/badge/English-Switch-6B7280)](README.en.md)
+[![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#系统要求)
+[![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#隐私与联网)
+[![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
 
-[![平台](https://img.shields.io/badge/platform-Windows-0078D4)](#)
-[![本地优先](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
-[![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
-[![测试](https://img.shields.io/badge/tests-pytest-0A7)](#)
+![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
 
-![VoiceFlow 演示](docs/voiceflow-demo.svg)
+VoiceFlow 是 Windows 上的本地语音输入工具。按 `F2` 开始说话，再按一次，文字就会回到当前光标处。识别、词库与历史默认留在本机；即使目标应用没有接住粘贴，结果仍可从剪贴板和本地历史中找回。
 
-VoiceFlow 是一个本地优先的 Windows 语音输入层。它不把语音当成文件处理，而是把说话变成当前光标处的即时输入：
-按 `F2`、`右 Ctrl` 或鼠标侧键开始说话，再按一次停止，最终文本会先进入剪贴板，再尝试粘贴到当前光标位置。
+## 核心能力
 
-它的核心承诺很简单：**只要识别出了文字，文字就不能丢。** 如果当前应用没有可编辑输入框，或者 `Ctrl+V` 没有落到目标位置，结果仍然保留在剪贴板和本地历史里。
-
-VoiceFlow 默认离线运行。没有隐藏云 ASR 调用，也没有默认大模型润色链路。Codex 只用于开发和维护流程，不是运行时依赖。
-
-## 为什么这个项目值得看
-
-- **系统级输入层**：不是文件转写器，而是面向任意应用的即时语音输入。
-- **最终结果可信**：流式预览只负责反馈，真正输出永远来自最终转写路径。
-- **真实输入反馈**：18 px 三柱标记读取麦克风 RMS，不播放与声音无关的装饰循环；UI 通道只保留最新一帧。
-- **剪贴板优先**：先复制，再粘贴；即使光标不在输入框，文字也可恢复。
-- **长语音完整性**：录音中缓存稳定音频段，停止时补最后尾巴并去重拼接。
-- **本地可交付**：启动器能修复 venv、安装依赖、恢复快捷方式；模型下载是显式确认，不偷偷联网。
-- **质量门明确**：doctor、编译、测试、500 次状态循环、benchmark、integration 统一由 `scripts\verify.py` 执行。
-
-## 技术栈
-
-- **运行时**：Python 3.12，Windows 本地运行。
-- **桌面 UI**：PySide6 + Qt WebEngine（LGPL 发布路径），负责设置、托盘和悬浮胶囊。
-- **语音识别**：统一 `EngineAdapter` 接入 SenseVoice、Qwen3-ASR 与 Fun-ASR Nano；默认模型只由本机 Model Lab 数据晋级。
-- **静音保护**：ASR 前置本地 Silero VAD；底噪、按键声和标点-only 幻听不会进入剪贴板，真实单字仍保留。
-- **音频与输入**：`sounddevice` 采集麦克风，`keyboard` / `pynput` 处理 F2、右 Ctrl 和鼠标侧键。
-- **输出链路**：`pyperclip.copy(text)` -> `Ctrl+V` -> `logs/history.jsonl`。
-- **交付**：`start.bat` + bootstrap 自检修复，PyInstaller 用于窗口化打包。
-
-GitHub 右侧的语言统计是代码语言组成。语音识别语言由 `config.yaml` 控制，当前默认 `zh`，并按模型能力支持 `zh / en / auto` 等配置。
+- **在任何输入框里说话**：通过 `F2`、右 `Ctrl` 或鼠标侧键，在当前应用直接输入。
+- **离线识别**：默认不调用云端 ASR，也不把录音交给在线大模型处理。
+- **结果可恢复**：先写入剪贴板，再尝试粘贴，并同步保存到本地历史。
+- **长语音持续流畅**：预览、音频缓存与 UI 更新都有固定上限，不随录音时长持续堆积。
+- **反馈真实而克制**：录音波形来自麦克风实际音量；预览只表达进度，最终转写才会输出。
+- **安静驻留**：托盘运行、单实例启动、小尺寸悬浮胶囊，不打断当前工作。
 
 ## 快速开始
+
+VoiceFlow 目前以源码预览形式提供，尚未发布签名的 Windows 安装包。
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -49,131 +34,55 @@ cd VoiceFlow
 start.bat
 ```
 
-`start.bat` 会检查 `venv\Scripts\python.exe` 是否真的可运行；如果 venv 损坏，会重建环境并安装 `requirements.txt`。它也会创建 `logs\`，恢复桌面快捷方式。
+首次启动会检查 Python 环境、安装依赖并引导准备本地模型。模型文件不进入 Git 仓库；任何下载都需要用户明确触发，并在启用前校验版本与文件完整性。
 
-模型文件较大，不放进 Git。如果模型缺失，启动器会打开可见 setup 流程并询问是否下载基线模型；下载固定 revision，并在切换前校验大小与 SHA-256：
+环境准备完成后，可通过桌面快捷方式安静启动。重复启动只会唤起现有窗口，不会产生多个主进程。
 
-```bat
-venv\Scripts\python.exe scripts\download_models.py
-venv\Scripts\python.exe scripts\download_models.py --engine qwen3-asr
-venv\Scripts\python.exe scripts\download_models.py --engine fun-asr-nano
-```
+### 系统要求
 
-环境健康后，桌面快捷方式会通过 `venv\Scripts\pythonw.exe + scripts\launch_voiceflow.pyw` 无控制台启动。重复点击桌面图标会唤起已有窗口，不会堆出多个主进程。
+- Windows 10 或 Windows 11
+- 可用麦克风
+- 首次准备环境与模型时需要网络；日常识别可离线运行
 
-## 快捷键
+## 使用方式
 
 | 按键 | 行为 |
 | --- | --- |
 | `F2` | 开始 / 停止语音输入 |
 | `Right Ctrl` | 开始 / 停止语音输入 |
-| `xbutton1` / `xbutton2` | 鼠标侧键开始 / 停止 |
+| `xbutton1` / `xbutton2` | 用鼠标侧键开始 / 停止 |
 | `Esc` | 取消当前录音，不输出文字 |
 
-## 工作流
+正常链路始终是：
 
 ```text
-Hotkey
-  -> RecordingSession
-  -> AudioCapture
-  -> Transcriber
-  -> TextCleaner + Vocabulary
-  -> Clipboard
-  -> Ctrl+V
-  -> logs/history.jsonl
+说话 → 本地识别 → 确定性文本清理 → 剪贴板 → 当前光标 → 本地历史
 ```
 
-录音时看到的胶囊文字是即时反馈，不是最终真相。用户停顿时，VoiceFlow 会尝试用更完整的阶段性结果刷新胶囊；用户停止后，最终文本先复制和粘贴，再显示完成反馈。
+录音时的胶囊文字是即时预览。停止后，VoiceFlow 会完成剩余音频的最终转写，再输出完整结果。短语音执行一次完整识别；长语音会持续收束稳定片段，并在停止时补齐尾部。
 
-短语音走一次完整 final pass。长语音会在录音中缓存稳定段，停止时只补剩余尾巴并做拼接去重，确保最终输出覆盖完整音频。
+## 可靠性设计
 
-## 可靠性与性能
+- **静音保护**：本地 VAD 会拦截底噪、按键声和纯标点幻听，同时保留真实的单字输入。
+- **完整尾部**：最终结果必须覆盖停止时的全部音频，流式预览不能替代最终转写。
+- **有界实时链路**：预览只读取最近的固定音频窗口；稳定片段完成后释放旧 PCM。
+- **最新帧优先**：悬浮层只渲染最新状态，过期识别结果和 UI 帧不会排队追赶。
+- **故障兜底**：即使自动粘贴失败，已识别文字仍保留在剪贴板与 `logs/history.jsonl`。
 
-- **启动自愈**：检测 venv 是否可执行，必要时重建并安装依赖。
-- **快速正常启动**：环境健康后走缓存 fast path，不每次完整 doctor。
-- **时长无关的实时链路**：预览只读取固定音频窗口，稳定段完成后立即释放旧 PCM；无论全局录音时间多长，每轮工作量都保持有界。
-- **长文本不卡胶囊**：悬浮层只渲染最新尾部，UI 更新采用 latest-only 队列，不把全文或过期帧塞进 DOM。
-- **转写串行保护**：preview 和 final 不同时抢同一个 recognizer。
-- **质量门**：`scripts\verify.py` 覆盖 doctor、编译、测试、500 次状态循环、benchmark 和 integration；`--release` 额外执行真实历史 P95 门。
-- **响应性记录**：历史条目记录快捷键到反馈、转写和停止到粘贴耗时，用真实 P95 而非主观体感判断退化。
+## 模型与语言
 
-## 已知产品边界
+当前默认引擎是离线 SenseVoice。VoiceFlow 也提供统一的模型适配与本机评测工具，用同一套准确率、延迟、尾部完整性和资源门槛比较 SenseVoice、Qwen3-ASR 与 Fun-ASR Nano；只有通过全部质量门的候选才会成为默认模型。
 
-- 如果光标不在可编辑输入框，任何工具都不能保证 `Ctrl+V` 落到目标位置；VoiceFlow 的兜底是剪贴板和本地历史。
-- 模型文件不入库，下载必须显式触发。
-- 流式预览可能临时不完整；最终输出才是可信结果。
-- 默认不接云 ASR 或云 LLM，避免隐私、延迟和不可控失败模式。
+识别语言在 `config.yaml` 中配置。当前支持的 `zh`、`en`、`auto` 等选项取决于所选模型的实际能力。
 
-## 面试可讲的工程亮点
-
-- 用一个明确 invariant 驱动设计：识别出的文字不能丢。
-- 把体验拆成三层：主窗口管理历史与诊断，悬浮胶囊提供状态反馈，剪贴板/历史负责恢复。
-- 长语音不是简单堆全文，而是稳定段缓存 + overlap + stop-time tail pass。
-- Windows 交付路径完整：bootstrap、doctor、快捷方式恢复、无控制台 launcher、单实例保护。
-- 准确率优化走本地 benchmark 和确定性修正，不用不可解释的黑盒后处理掩盖问题。
-
-## 项目结构
-
-```text
-src/
-  main.py              # 编排录音、流式预览、最终输出
-  hotkey_manager.py    # F2、右 Ctrl、鼠标侧键
-  recording_session.py # 录音生命周期
-  audio_capture.py     # 麦克风适配
-  transcriber.py       # 稳定转写门面
-  engine_adapter.py    # 模型能力与资产合同
-  model_lab.py         # CER、评分和硬淘汰门
-  text_cleaner.py      # 确定性清理和修正
-  vocabulary.py        # 本地词表
-  output_handler.py    # 剪贴板优先，再 Ctrl+V
-  history_store.py     # JSONL 历史
-  overlay_webview.py   # PySide6 设置、悬浮窗、托盘桥接
-  overlay.html         # 小胶囊 UI
-scripts/
-  bootstrap.py         # 启动前自检与修复
-  launch_voiceflow.pyw # 无控制台桌面启动器
-  benchmark_models.py  # 本地 ASR benchmark
-  evaluate_asr.py      # Model Lab JSONL 评测与晋级
-  ui_quality_gate.py   # 100%/125%/150%/200% UI 截图门
-  download_models.py   # 显式模型下载
-  create_shortcut.ps1  # 桌面快捷方式
-```
-
-## 准确率工作流
-
-VoiceFlow 不假装普通词表等于 ASR 热词注入。当前可控链路是确定性的：
-
-1. 录制真实私有样本。
-2. 写 manifest，包含 reference 和重要 terms。
-3. 跑 benchmark。
-4. 把稳定错字写入 `knowledge-base/corrections.txt`。
-5. 复测 raw / clean 结果。
-
-```bat
-venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\private\local.jsonl
-venv\Scripts\python.exe scripts\evaluate_asr.py --manifest eval\private\local.jsonl
-venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
-```
-
-## 验证
+## 开发与验证
 
 ```bat
 venv\Scripts\python.exe scripts\verify.py
 venv\Scripts\python.exe scripts\verify.py --release
 ```
 
-普通质量门运行 doctor、py_compile、pytest、500 次状态循环、快速 ASR benchmark 和 integration。公开构建还必须通过性能历史、DPI 截图、键盘/Narrator 人工任务、长录音和驻留测试。
-
-## 打包
-
-```bat
-venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
-"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\VoiceFlow.iss
-```
-
-`VoiceFlow.spec` 生成启动更快、可替换 Qt 动态库的 onedir 目录。Inno Setup 负责按用户安装、同 AppId 升级、开机启动任务和卸载。模型是否进入公开安装包由 `model-manifest.json` 的许可证审查结果与 Model Lab 最终赢家共同决定。
-
-## 维护文档
+质量门覆盖环境诊断、编译检查、自动化测试、500 次确定性生命周期循环、快速 ASR benchmark 与集成测试。发布检查还要求真实性能记录、DPI 截图、键盘与 Narrator 任务、长录音、设备切换和驻留测试。
 
 - [质量门](docs/quality-gate.md)
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
@@ -181,10 +90,12 @@ venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 
 ## 隐私与联网
 
-录音、转写、词库和历史默认只保存在本机。运行时不会下载模型、检查更新或调用云 ASR；只有用户显式运行模型管理/下载命令时才联网。私有评测音频位于 Git 忽略目录，Model Lab 不上传音频。
+录音、转写、词库和历史默认只保存在本机。运行时不会自动下载模型、检查更新或调用云端识别服务；只有用户明确运行模型准备命令时才会联网。私有评测音频位于 Git 忽略目录，评测工具不会上传音频。
 
-## 公开 Beta 尚需完成
+## 项目状态
 
-- 用完整公开集与本机私有校准集跑完盲测并生成最终晋级报告。
-- 完成 24 小时驻留、睡眠唤醒、设备切换、真实 500 次启停与跨应用粘贴矩阵。
-- 使用发布主体的代码签名证书签名安装器；若 SenseVoice 胜出，先完成其模型许可证重分发审查。
+VoiceFlow 正处于公开 Beta 前的源码预览阶段。核心语音输入、长语音处理、剪贴板兜底和本地质量门已经可用；面向普通用户的签名安装包仍需完成最终模型授权审查、干净环境安装验证与代码签名。
+
+## 许可证
+
+项目代码基于 [MIT License](LICENSE) 开源。模型及第三方组件遵循各自许可证，公开分发前会单独完成授权审查。
