@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "auxiliary_assets": {
+    "silero-vad": {
+      "target": "assets/silero_vad.onnx",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "size": 643854,
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "license": "MIT"
+    }
+  },
+  "models": {
+    "sensevoice-small-int8": {
+      "runtime_engine": "sensevoice",
+      "role": "baseline",
+      "target_dir": "models/sensevoice",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+        "revision": "2365baeacb507f821a0c8120fcee3d484dba7a07",
+        "upstream": "FunAudioLLM/SenseVoiceSmall"
+      },
+      "license": {
+        "spdx": "LicenseRef-Model-License",
+        "name": "FunAudioLLM model license",
+        "distribution_review_required": true
+      },
+      "download_bytes": 240500355,
+      "files": [
+        {
+          "path": "model.int8.onnx",
+          "size": 239233841,
+          "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 315894,
+          "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+        },
+        {"path": "test_wavs/en.wav", "size": 228908, "sha256": "eb1eb008904465b74c304aad8342e8c7d3c6e61ffe9f66adcaca9cf0f76a93f4"},
+        {"path": "test_wavs/ja.wav", "size": 230444, "sha256": "460bd8dccb0d2a5f4e29c628f837be4082d13defc64c3fc21dd1b6bb0e119095"},
+        {"path": "test_wavs/ko.wav", "size": 147500, "sha256": "0dc797a5c81ed30fc339d91f3da718ab02854e17ffa37cb93c4c039ac5c6bb9c"},
+        {"path": "test_wavs/yue.wav", "size": 164780, "sha256": "0960b2db54ae202071d250e6462fbf74a3c863f0e3e7f01273e4939c996875a0"},
+        {"path": "test_wavs/zh.wav", "size": 178988, "sha256": "b77f1794fe374a0ba1ee1dc458bfaf9349496cbbfc32780c50ba3c5a7ad8e373"}
+      ]
+    },
+    "qwen3-asr-0.6b-int8": {
+      "runtime_engine": "qwen3-asr",
+      "role": "accuracy_challenger",
+      "target_dir": "models/qwen3-asr",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+        "revision": "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a",
+        "upstream": "Qwen/Qwen3-ASR-0.6B"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "distribution_review_required": false
+      },
+      "download_bytes": 987015347,
+      "files": [
+        {"path": "conv_frontend.onnx", "size": 44148281, "sha256": "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e"},
+        {"path": "decoder.int8.onnx", "size": 755914231, "sha256": "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771"},
+        {"path": "encoder.int8.onnx", "size": 182491662, "sha256": "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9"},
+        {"path": "tokenizer/merges.txt", "size": 1671853, "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"},
+        {"path": "tokenizer/tokenizer_config.json", "size": 12487, "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c"},
+        {"path": "tokenizer/vocab.json", "size": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"}
+      ]
+    },
+    "fun-asr-nano-0.8b-int8": {
+      "runtime_engine": "fun-asr-nano",
+      "role": "chinese_hotword_challenger",
+      "target_dir": "models/fun-asr-nano",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "csukuangfj/sherpa-onnx-funasr-nano-int8-2025-12-30",
+        "revision": "6f16bd378457e13f36ccf3910df9017f96c346fb",
+        "upstream": "FunAudioLLM/Fun-ASR-Nano-2512"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "distribution_review_required": false
+      },
+      "download_bytes": 1009605061,
+      "files": [
+        {"path": "embedding.int8.onnx", "size": 155584380, "sha256": "95e61cd0c9c3b9543339a4cf973c95c116815e745ccc1e0285cbd81f76d18644"},
+        {"path": "encoder_adaptor.int8.onnx", "size": 237792748, "sha256": "f36dea2e30fbc33b5db1d7a7265cc976c5e5586c77b042d5adb1ad27c72db422"},
+        {"path": "llm.int8.onnx", "size": 600356593, "sha256": "dfbf9aa3be41bccc257587f151e15c63fbe1b549f2b517f5ccd5bdce3bf4322a"},
+        {"path": "Qwen3-0.6B/merges.txt", "size": 1671853, "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"},
+        {"path": "Qwen3-0.6B/tokenizer.json", "size": 11422654, "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"},
+        {"path": "Qwen3-0.6B/vocab.json", "size": 2776833, "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"}
+      ]
+    },
+    "qwen3-asr-1.7b-conditional": {
+      "runtime_engine": "qwen3-asr-1.7b",
+      "role": "conditional_accuracy_challenger",
+      "eligible": false,
+      "ineligibility_reason": "No pinned sherpa-onnx int8 export is available and upstream weights exceed the 2.5 GB product memory gate.",
+      "target_dir": "models/qwen3-asr-1.7b",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "Qwen/Qwen3-ASR-1.7B",
+        "revision": "7278e1e70fe206f11671096ffdd38061171dd6e5",
+        "upstream": "Qwen/Qwen3-ASR-1.7B"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "distribution_review_required": false
+      },
+      "download_bytes": 4698521512,
+      "files": [
+        {"path": "model-00001-of-00002.safetensors", "size": 4220320824, "sha256": "a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6"},
+        {"path": "model-00002-of-00002.safetensors", "size": 478200688, "sha256": "6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc"}
+      ]
+    },
+    "whisper-large-v3-turbo-int8": {
+      "runtime_engine": "whisper-turbo",
+      "role": "multilingual_control",
+      "eligible": true,
+      "target_dir": "models/whisper-turbo",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "csukuangfj/sherpa-onnx-whisper-turbo",
+        "revision": "2ca6ff69fc878651b770880507669577ac41c2ff",
+        "upstream": "openai/whisper-large-v3-turbo"
+      },
+      "license": {
+        "spdx": "MIT",
+        "name": "MIT License",
+        "distribution_review_required": false
+      },
+      "download_bytes": 1036613791,
+      "files": [
+        {"path": "turbo-decoder.int8.onnx", "size": 361080764, "sha256": "20accd02388482eb3a46bd615631adfdc85e1eb2c7db9ea3f02a40ffe6b81547"},
+        {"path": "turbo-encoder.int8.onnx", "size": 674716297, "sha256": "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b"},
+        {"path": "turbo-tokens.txt", "size": 816730, "sha256": "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126"}
+      ]
+    }
+  }
+}

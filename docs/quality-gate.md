@@ -15,8 +15,21 @@ This gate runs:
 - runtime doctor
 - Python compilation for project files
 - pytest
+- deterministic 500-cycle recording state test
 - quick ASR benchmark
 - integration test
+
+For a release candidate, run:
+
+```bat
+venv\Scripts\python.exe scripts\verify.py --release
+venv\Scripts\python.exe scripts\ui_quality_gate.py
+```
+
+Release mode also requires at least 20 real samples in each responsiveness
+bucket and rejects trigger-to-feedback P95 >= 100 ms, short stop-to-paste P95
+> 700 ms, or two-minute P95 > 2.5 seconds. UI capture covers 100%, 125%, 150%,
+and 200% scale.
 
 ## Product Invariants
 
@@ -31,7 +44,8 @@ This gate runs:
 
 ## Review Checklist
 
-- README and demo assets match the current runtime behavior.
+- README and the animated product demo match the current runtime states and product promise.
+- The recording meter is driven by microphone RMS through a latest-only UI channel; fixed decorative waveform loops are rejected.
 - `scripts\doctor.py` reports missing dependencies, model files, shortcuts, and
   knowledge-base files clearly.
 - UI changes keep the overlay small and bounded.

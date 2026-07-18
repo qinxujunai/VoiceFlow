@@ -1,0 +1,2 @@
+{"id":"official_zh_hours","audio":"../models/sensevoice/test_wavs/zh.wav","reference":"开放时间早上9点至下午5点。","terms":["9点","5点"],"category":"zh_numbers","source":"sherpa-onnx official SenseVoice sample"}
+{"id":"official_en_gold","audio":"../models/sensevoice/test_wavs/en.wav","reference":"The tribal chieftain called for the boy and presented him with 50 pieces of gold.","terms":["50","gold"],"category":"en_numbers","source":"sherpa-onnx official SenseVoice sample"}

@@ -2,35 +2,34 @@
 # 安装: pip install -r requirements.txt
 
 # 核心推理框架
-sherpa-onnx>=1.10.0
+sherpa-onnx==1.13.3
 
 # 音频采集
-sounddevice>=0.4.6
-soundfile>=0.12.1
+sounddevice==0.5.5
+soundfile==0.14.0
 
 # 全局快捷键（真正拦截输入法）
-keyboard>=0.13.0
-pynput>=1.7.7
+keyboard==0.13.5
+pynput==1.8.2
 
 # 文字输出
-pyautogui>=0.9.54
-pyperclip>=1.8.2
+pyautogui==0.9.54
+pyperclip==1.11.0
 
 # 配置文件
-pyyaml>=6.0
+pyyaml==6.0.3
 
 # 模型下载
-huggingface_hub>=0.20.0
+huggingface_hub==1.21.0
 
 # 音频处理（可选，用于重采样等）
-numpy>=1.24.0
+numpy==2.5.0
 
-# UI 界面
-PyQt6>=6.5.0
-PyQt6-WebEngine>=6.5.0
+# UI 界面（LGPL，公开 Beta 发布路径）
+PySide6==6.11.1
 
 # 测试
-pytest>=8.0.0
+pytest==9.1.1
 
 # 打包
-pyinstaller>=6.0.0
+pyinstaller==6.21.0
