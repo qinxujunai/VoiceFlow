@@ -36,8 +36,8 @@ REQUIRED_IMPORTS = (
     "sounddevice",
     "soundfile",
     "pyperclip",
-    "PyQt6",
-    "PyQt6.QtWebEngineWidgets",
+    "PySide6",
+    "PySide6.QtWebEngineWidgets",
     "pynput",
     "yaml",
 )

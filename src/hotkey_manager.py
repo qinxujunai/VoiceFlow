@@ -31,7 +31,6 @@ class HotkeyManager:
         self.cancel_key = hk_cfg.get("cancel", "escape").lower().strip()
 
         self.callbacks = callbacks or {}
-        self._recording = False
         self._lock = threading.Lock()
         self._last_event_time = 0
         self._mouse_listener = None
@@ -49,15 +48,14 @@ class HotkeyManager:
 
     def _trigger_ptt(self):
         now = time.time()
+        event_time = time.perf_counter()
         with self._lock:
             if now - self._last_event_time < 0.5:
                 return
             self._last_event_time = now
-            self._recording = not self._recording
-            cb_name = "on_record_start" if self._recording else "on_record_stop"
-        cb = self.callbacks.get(cb_name)
+        cb = self.callbacks.get("on_record_toggle")
         if cb:
-            threading.Thread(target=cb, daemon=True).start()
+            threading.Thread(target=cb, args=(event_time,), daemon=True).start()
 
     def _on_mouse_click(self, x, y, button, pressed):
         if not pressed:
@@ -65,21 +63,9 @@ class HotkeyManager:
         btn_name = self._mouse_buttons.get(button)
         if btn_name not in self.ptt_keys:
             return
-        now = time.time()
-        with self._lock:
-            if now - self._last_event_time < 0.5:
-                return
-            self._last_event_time = now
-            self._recording = not self._recording
-            cb_name = "on_record_start" if self._recording else "on_record_stop"
-        cb = self.callbacks.get(cb_name)
-        if cb:
-            threading.Thread(target=cb, daemon=True).start()
+        self._trigger_ptt()
 
     def _on_cancel(self):
-        with self._lock:
-            if self._recording:
-                self._recording = False
         cb = self.callbacks.get("on_record_cancel")
         if cb:
             threading.Thread(target=cb, daemon=True).start()
@@ -124,7 +110,3 @@ class HotkeyManager:
                 self._pynput_kb_listener.stop()
             except Exception:
                 pass
-
-    @property
-    def is_recording(self):
-        return self._recording

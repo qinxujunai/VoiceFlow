@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import argparse
+import logging
 import threading
 import yaml
 import numpy as np
@@ -21,6 +22,12 @@ from overlay_webview import OverlayWindow
 from text_cleaner import TextCleaner
 from history_store import HistoryStore
 from recording_session import RecordingSession
+from recording_state import RecordingState, RecordingStateMachine
+from runtime_logging import configure_runtime_logging
+from audio_activity import SileroSpeechDetector, has_lexical_content, has_speech_activity
+
+
+logger = logging.getLogger("voiceflow.runtime")
 
 
 class _InitWorker(threading.Thread):
@@ -41,6 +48,7 @@ class _InitWorker(threading.Thread):
 class VoiceInputSystem:
     STREAM_PREVIEW_WINDOW_SECONDS = 18.0
     STREAM_FULL_PREVIEW_MAX_SECONDS = 45.0
+    STREAM_PREVIEW_MAX_LAG_SECONDS = 2.0
     FINAL_SEGMENT_SECONDS = 18.0
     FINAL_SEGMENT_OVERLAP_SECONDS = 1.0
     FINAL_SEGMENT_HOLD_SECONDS = 2.0
@@ -51,22 +59,42 @@ class VoiceInputSystem:
 
     def __init__(self, config_path=None):
         self.base_dir = self._resolve_base_dir(config_path)
+        configure_runtime_logging(os.path.join(self.base_dir, "logs", "runtime.jsonl"))
         if config_path is None:
             config_path = os.path.join(self.base_dir, "config.yaml")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.config_path = config_path
-        self._is_processing = False
-        self._actively_recording = False
+        self._recording_state = RecordingStateMachine()
         self._shutdown_started = False
         self._streaming = False
         self._stream_generation = 0
         self._latest_text = ""  # 后台转写的最新结果
+        self._last_trigger_to_feedback_ms = None
         self._final_segments = []
         self._finalized_audio_len = 0
         self._final_cache_lock = threading.Lock()
         self._transcribe_lock = threading.Lock()
+        vad_config = self.config.get("vad", {})
+        self._speech_gate_enabled = bool(vad_config.get("enabled", True))
+        self._speech_rms_threshold = float(vad_config.get("asr_energy_floor", 0.002))
+        self._speech_min_active_ms = int(vad_config.get("min_speech_ms", 90))
+        self._speech_detector = None
+        if self._speech_gate_enabled:
+            vad_model = os.path.join(
+                self.base_dir,
+                vad_config.get("model_path", "assets/silero_vad.onnx"),
+            )
+            try:
+                self._speech_detector = SileroSpeechDetector(
+                    vad_model,
+                    threshold=float(vad_config.get("speech_probability_threshold", 0.5)),
+                    min_speech_ms=self._speech_min_active_ms,
+                    sample_rate=int(self.config.get("audio", {}).get("sample_rate", 16000)),
+                )
+            except Exception:
+                logger.exception("Silero VAD unavailable; using the energy safety gate")
         self.overlay = OverlayWindow()
         self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
 
@@ -115,29 +143,39 @@ class VoiceInputSystem:
 
     # ---- 录音 ----
 
-    def _on_record_start(self):
-        if self._is_processing or self._actively_recording:
+    def _on_record_toggle(self, triggered_at=None):
+        state = self._recording_state.current
+        if state is RecordingState.RECORDING:
+            self._on_record_stop(triggered_at)
+        elif state is RecordingState.IDLE:
+            self._on_record_start(triggered_at)
+
+    def _on_record_start(self, triggered_at=None):
+        if not self._recording_state.claim_start():
             return
-        self._actively_recording = True
         try:
             self.session.start()
             self._stream_generation += 1
             generation = self._stream_generation
             self.overlay.show_recording(generation)
+            if triggered_at is not None:
+                self._last_trigger_to_feedback_ms = (
+                    time.perf_counter() - triggered_at
+                ) * 1000
             self._latest_text = ""
             self._reset_final_cache()
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
         except Exception as e:
-            self._actively_recording = False
+            self._recording_state.abort_start()
             self.overlay.show_error(str(e))
+            logger.exception("recording start failed")
             print(f"[错误] {e}", flush=True)
 
-    def _on_record_stop(self):
-        if not self._actively_recording:
+    def _on_record_stop(self, triggered_at=None):
+        stop_started = triggered_at if triggered_at is not None else time.perf_counter()
+        if not self._recording_state.claim_stop():
             return
-        self._actively_recording = False
-        self._is_processing = True
         final_generation = self._stop_streaming()
 
         try:
@@ -146,23 +184,33 @@ class VoiceInputSystem:
             if len(data) == 0:
                 self.overlay.show_error("无音频")
                 self.overlay.hide_after(2000)
-                self._is_processing = False
                 return
 
-            duration = result.duration or (len(data) / self.audio.sample_rate)
+            total_samples = result.total_samples or len(data)
+            duration = result.duration or (total_samples / self.audio.sample_rate)
             if self._should_show_finalizing(duration):
                 self.overlay.show_finalizing(final_generation)
 
-            raw_text = self._transcribe_final_text(data)
+            transcription_started = time.perf_counter()
+            raw_text = self._transcribe_final_text(
+                data,
+                buffer_start_sample=result.start_sample,
+                total_samples=total_samples,
+            )
             text = self.cleaner.clean(raw_text) if raw_text else ""
+            if text and not has_lexical_content(text):
+                text = ""
+            transcription_ms = (time.perf_counter() - transcription_started) * 1000
 
             # Safety: if final transcription empty but streaming had text, use streaming text
             if not text and self._latest_text:
-                text = self.cleaner.clean(self._latest_text)
+                preview_text = self.cleaner.clean(self._latest_text)
+                text = preview_text if has_lexical_content(preview_text) else ""
 
             if text:
                 print(f"[转写] {text} ({duration:.1f}s)", flush=True)
                 output_status = self.output_handler.output(text)
+                stop_to_paste_ms = (time.perf_counter() - stop_started) * 1000
                 segment_count = len(self._snapshot_final_cache()[0])
                 self.history.append(
                     raw_text=raw_text,
@@ -174,6 +222,9 @@ class VoiceInputSystem:
                     segment_count=segment_count,
                     final_length=len(text),
                     final_tail=text[-10:],
+                    trigger_to_feedback_ms=self._last_trigger_to_feedback_ms,
+                    stop_to_paste_ms=stop_to_paste_ms,
+                    transcription_ms=transcription_ms,
                 )
                 self.overlay.show_final_text(text, final_generation)
                 self.overlay.hide_after(self._final_text_hold_ms(duration))
@@ -183,41 +234,62 @@ class VoiceInputSystem:
         except Exception as e:
             self.overlay.show_error(str(e))
             self.history.append(output_status="error", error=str(e))
+            logger.exception("recording finalization failed")
             import traceback
             traceback.print_exc()
         finally:
-            self._is_processing = False
+            self._recording_state.complete_processing()
 
     def _stream_preview_interval(self, elapsed_seconds):
-        if elapsed_seconds < 30:
-            return 0.6
-        if elapsed_seconds < 120:
-            return 2.0
-        return 4.0
+        return 0.8
 
-    def _stream_preview_audio(self, chunk):
-        max_samples = int(self.audio.sample_rate * self.STREAM_PREVIEW_WINDOW_SECONDS)
-        if max_samples <= 0 or len(chunk) <= max_samples:
-            return chunk
-        return chunk[-max_samples:]
+    def _audio_sample_count(self):
+        sample_count = getattr(self.audio, "sample_count", None)
+        if sample_count is not None:
+            return int(sample_count)
+        return sum(len(block) for block in getattr(self.audio, "_audio_buffer", []))
 
-    def _stream_preview_text(self, chunk, finalized_len=0, *, prefer_complete=False):
-        elapsed = len(chunk) / self.audio.sample_rate
-        if prefer_complete and elapsed <= self.STREAM_FULL_PREVIEW_MAX_SECONDS:
-            return self._transcribe_audio(chunk, blocking=False)
+    def _audio_buffer_start_sample(self):
+        return int(getattr(self.audio, "buffer_start_sample", 0))
 
-        parts, cached_len = self._snapshot_final_cache()
-        if parts and cached_len > 0:
-            overlap_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
-            start = max(0, cached_len - overlap_samples)
-            tail = chunk[start:]
-            tail_text = self._transcribe_audio(tail, blocking=False) if len(tail) else ""
-            if tail_text is None:
-                return None
-            return self._join_transcript_parts(parts + [tail_text])
+    def _audio_snapshot(self, start_sample, end_sample):
+        snapshot = getattr(self.audio, "snapshot_audio", None)
+        if snapshot is not None:
+            return snapshot(start_sample, end_sample)
+        blocks = getattr(self.audio, "_audio_buffer", [])
+        if not blocks:
+            return np.array([], dtype=np.int16)
+        chunk = np.concatenate(tuple(blocks), axis=0).flatten()
+        return chunk[max(0, start_sample):max(0, end_sample)].copy()
 
-        preview_audio = chunk if prefer_complete else self._stream_preview_audio(chunk)
-        return self._transcribe_audio(preview_audio, blocking=False)
+    def _preview_result_is_fresh(self, captured_sample_count):
+        lag_samples = self._audio_sample_count() - int(captured_sample_count)
+        max_lag = int(self.audio.sample_rate * self.STREAM_PREVIEW_MAX_LAG_SECONDS)
+        return lag_samples <= max_lag
+
+    def _stream_preview_range(self, total_samples, finalized_audio_len, *, prefer_complete=False):
+        available_start = self._audio_buffer_start_sample()
+        complete_limit = int(self.audio.sample_rate * self.STREAM_FULL_PREVIEW_MAX_SECONDS)
+        if prefer_complete and available_start == 0 and total_samples <= complete_limit:
+            return 0, total_samples
+        if finalized_audio_len > 0:
+            overlap = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
+            return max(available_start, finalized_audio_len - overlap), total_samples
+        window = int(self.audio.sample_rate * self.STREAM_PREVIEW_WINDOW_SECONDS)
+        return max(available_start, total_samples - window), total_samples
+
+    def _stream_preview_snapshot(self, total_samples, *, prefer_complete=False):
+        parts, finalized_audio_len = self._snapshot_final_cache(tail_parts=1)
+        start, end = self._stream_preview_range(
+            total_samples,
+            finalized_audio_len,
+            prefer_complete=prefer_complete,
+        )
+        preview_audio = self._audio_snapshot(start, end)
+        tail_text = self._transcribe_audio(preview_audio, blocking=False) if len(preview_audio) else ""
+        if tail_text is None:
+            return None
+        return self._join_transcript_parts(parts + [tail_text]) if parts else tail_text
 
     def _reset_final_cache(self):
         with self._final_cache_lock:
@@ -225,29 +297,44 @@ class VoiceInputSystem:
             self._finalized_audio_len = 0
 
     def _next_final_segment(self, chunk, finalized_audio_len):
+        segment_range = self._next_final_segment_range(len(chunk), finalized_audio_len)
+        if segment_range is None:
+            return None, finalized_audio_len
+        start, end = segment_range
+        return chunk[start:end], end
+
+    def _next_final_segment_range(self, total_samples, finalized_audio_len):
         segment_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_SECONDS)
         overlap_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
         hold_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_HOLD_SECONDS)
-        stable_len = max(0, len(chunk) - hold_samples)
+        stable_len = max(0, total_samples - hold_samples)
         if segment_samples <= 0 or stable_len - finalized_audio_len < segment_samples:
-            return None, finalized_audio_len
+            return None
         start = max(0, finalized_audio_len - overlap_samples)
         end = finalized_audio_len + segment_samples
-        return chunk[start:end], end
+        return start, end
 
     def _append_final_segment(self, text, finalized_audio_len):
         if not text:
             return
+        self._commit_final_segment(text, finalized_audio_len)
+
+    def _commit_final_segment(self, text, finalized_audio_len):
         with self._final_cache_lock:
-            self._final_segments.append(text.strip())
+            if text and text.strip():
+                self._final_segments.append(text.strip())
             self._finalized_audio_len = finalized_audio_len
 
-    def _snapshot_final_cache(self):
+    def _snapshot_final_cache(self, tail_parts=None):
         lock = getattr(self, "_final_cache_lock", None)
         if lock is None:
-            return list(getattr(self, "_final_segments", [])), getattr(self, "_finalized_audio_len", 0)
+            parts = list(getattr(self, "_final_segments", []))
+            if tail_parts is not None:
+                parts = parts[-tail_parts:]
+            return parts, getattr(self, "_finalized_audio_len", 0)
         with lock:
-            return list(self._final_segments), self._finalized_audio_len
+            parts = self._final_segments if tail_parts is None else self._final_segments[-tail_parts:]
+            return list(parts), self._finalized_audio_len
 
     def _join_transcript_parts(self, parts):
         joined = ""
@@ -266,30 +353,83 @@ class VoiceInputSystem:
         if not right:
             return left
         max_overlap = min(len(left), len(right), 80)
-        for size in range(max_overlap, 0, -1):
+        for size in range(max_overlap, 1, -1):
             if left[-size:] == right[:size]:
                 return left + right[size:]
+
+        def normalized(value):
+            chars = []
+            raw_ends = []
+            for index, char in enumerate(value):
+                if char.isalnum() or "\u3400" <= char <= "\u9fff":
+                    chars.append(char.casefold())
+                    raw_ends.append(index + 1)
+            return chars, raw_ends
+
+        left_chars, _ = normalized(left)
+        right_chars, right_ends = normalized(right)
+        max_normalized_overlap = min(len(left_chars), len(right_chars), 80)
+        for size in range(max_normalized_overlap, 1, -1):
+            if left_chars[-size:] == right_chars[:size]:
+                return left + right[right_ends[size - 1]:]
         return f"{left} {right}"
 
-    def _should_use_segmented_final(self, data, parts, finalized_audio_len):
-        duration = len(data) / self.audio.sample_rate
+    def _should_use_segmented_final(
+        self,
+        data,
+        parts,
+        finalized_audio_len,
+        *,
+        buffer_start_sample=0,
+        total_samples=None,
+    ):
+        total_samples = len(data) if total_samples is None else total_samples
+        duration = total_samples / self.audio.sample_rate
         return (
             duration >= self.SEGMENTED_FINAL_MIN_SECONDS
             and bool(parts)
-            and 0 < finalized_audio_len < len(data)
+            and buffer_start_sample < finalized_audio_len <= total_samples
         )
 
-    def _transcribe_final_text(self, data):
+    def _transcribe_final_text(self, data, *, buffer_start_sample=0, total_samples=None):
+        total_samples = len(data) if total_samples is None else total_samples
         parts, finalized_audio_len = self._snapshot_final_cache()
-        if self._should_use_segmented_final(data, parts, finalized_audio_len):
+        if self._should_use_segmented_final(
+            data,
+            parts,
+            finalized_audio_len,
+            buffer_start_sample=buffer_start_sample,
+            total_samples=total_samples,
+        ):
             overlap_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
-            tail_start = max(0, finalized_audio_len - overlap_samples)
-            tail = data[tail_start:]
+            tail_start = max(buffer_start_sample, finalized_audio_len - overlap_samples)
+            tail = data[tail_start - buffer_start_sample:]
             tail_text = self._transcribe_audio(tail) if len(tail) else ""
             return self._join_transcript_parts(parts + [tail_text])
         return self._transcribe_audio(data)
 
-    def _transcribe_audio(self, audio_data, *, blocking=True):
+    def _contains_speech(self, audio_data):
+        if (
+            getattr(self, "_speech_gate_enabled", False)
+            and not has_speech_activity(
+                audio_data,
+                self.audio.sample_rate,
+                rms_threshold=self._speech_rms_threshold,
+                min_active_ms=self._speech_min_active_ms,
+            )
+        ):
+            return False
+        detector = getattr(self, "_speech_detector", None)
+        if detector is not None and not detector.has_speech(
+            audio_data,
+            self.audio.sample_rate,
+        ):
+            return False
+        return True
+
+    def _transcribe_audio(self, audio_data, *, blocking=True, activity_checked=False):
+        if not activity_checked and not self._contains_speech(audio_data):
+            return ""
         lock = getattr(self, "_transcribe_lock", None)
         if lock is None:
             return self.transcriber.transcribe(audio_data, self.audio.sample_rate)
@@ -313,64 +453,95 @@ class VoiceInputSystem:
         return self.config.get("engine", {}).get("active", "sensevoice")
 
     def _start_streaming(self, generation):
-        """后台 ASR 线程：录音期间用最近窗口做预览，停止后仍完整转写"""
+        """后台 ASR：每轮成本有固定上限，停止后仍完整转写。"""
         self._streaming = True
 
-        last_len = 0
-        last_pause_refresh_len = 0
+        last_sample_count = 0
+        last_pause_refresh_sample_count = 0
         def loop():
-            nonlocal last_len, last_pause_refresh_len
+            nonlocal last_sample_count, last_pause_refresh_sample_count
             while self._streaming:
                 try:
-                    buf = self.audio._audio_buffer
-                    if buf:
-                        chunk = np.concatenate(buf, axis=0).flatten()
+                    total_samples = self._audio_sample_count()
+                    if total_samples > 0:
                         _, finalized_len = self._snapshot_final_cache()
-                        segment, segment_end = self._next_final_segment(chunk, finalized_len)
-                        if segment is not None:
-                            segment_text = self._transcribe_audio(segment, blocking=False)
-                            if segment_text:
-                                self._append_final_segment(segment_text, segment_end)
+                        segment_range = self._next_final_segment_range(total_samples, finalized_len)
+                        if segment_range is not None:
+                            segment_start, segment_end = segment_range
+                            segment = self._audio_snapshot(segment_start, segment_end)
+                            has_speech = self._contains_speech(segment)
+                            segment_text = (
+                                self._transcribe_audio(
+                                    segment,
+                                    blocking=False,
+                                    activity_checked=True,
+                                )
+                                if has_speech else ""
+                            )
+                            if segment_text is None:
+                                time.sleep(0.05)
+                                continue
+                            if not has_speech or segment_text:
+                                self._commit_final_segment(segment_text, segment_end)
+                                discard = getattr(self.audio, "discard_before", None)
+                                if discard is not None:
+                                    overlap = int(
+                                        self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS
+                                    )
+                                    discard(max(0, segment_end - overlap))
                             time.sleep(0.05)
                             continue
 
-                        new_samples = len(chunk) - last_len
-                        elapsed = len(chunk) / self.audio.sample_rate
+                        new_samples = total_samples - last_sample_count
+                        elapsed = total_samples / self.audio.sample_rate
                         min_new_seconds = self._stream_preview_interval(elapsed)
 
-                        if new_samples > self.audio.sample_rate * min_new_seconds or last_len == 0:
+                        if new_samples > self.audio.sample_rate * min_new_seconds or last_sample_count == 0:
                             # A pause is a correction point: refresh the visible text instead of skipping it.
-                            new_audio = chunk[last_len:] if last_len > 0 else chunk
+                            recent_start = max(
+                                self._audio_buffer_start_sample(),
+                                last_sample_count,
+                                total_samples - int(self.audio.sample_rate * min_new_seconds),
+                            )
+                            new_audio = self._audio_snapshot(recent_start, total_samples)
                             window = min(len(new_audio), self.audio.sample_rate // 2)
-                            rms = float(np.sqrt(np.mean(new_audio[-window:].astype(np.float64)**2))) / 32768.0
-                            if rms < 0.008 and last_len > 0:
-                                if len(chunk) - last_pause_refresh_len >= int(self.audio.sample_rate * 0.8):
-                                    text = self._stream_preview_text(
-                                        chunk,
-                                        finalized_len,
+                            rms = (
+                                float(np.sqrt(np.mean(new_audio[-window:].astype(np.float64) ** 2)))
+                                / 32768.0
+                                if window else 0.0
+                            )
+                            if rms < 0.008 and last_sample_count > 0:
+                                if total_samples - last_pause_refresh_sample_count >= int(self.audio.sample_rate * 0.8):
+                                    captured_samples = total_samples
+                                    text = self._stream_preview_snapshot(
+                                        total_samples,
                                         prefer_complete=True,
                                     )
                                     if text is None:
                                         time.sleep(0.25)
                                         continue
-                                    last_pause_refresh_len = len(chunk)
+                                    if not self._preview_result_is_fresh(captured_samples):
+                                        continue
+                                    last_pause_refresh_sample_count = total_samples
                                     if text:
                                         self._latest_text = text
                                         clean = self.cleaner.clean(text)
                                         if clean and generation == self._stream_generation:
                                             self.overlay.update_correction(clean, generation)
-                                last_len = len(chunk)
+                                last_sample_count = total_samples
                                 time.sleep(0.25)
                                 continue
-                            text = self._stream_preview_text(
-                                chunk,
-                                finalized_len,
+                            captured_samples = total_samples
+                            text = self._stream_preview_snapshot(
+                                total_samples,
                                 prefer_complete=False,
                             )
                             if text is None:
                                 time.sleep(0.25)
                                 continue
-                            last_len = len(chunk)
+                            if not self._preview_result_is_fresh(captured_samples):
+                                continue
+                            last_sample_count = total_samples
                             if text:
                                 self._latest_text = text
                                 clean = self.cleaner.clean(text)
@@ -384,7 +555,7 @@ class VoiceInputSystem:
                                         if generation == self._stream_generation:
                                             self.overlay.update_streaming(clean, generation)
                 except Exception:
-                    pass
+                    logger.exception("streaming preview failed")
                 time.sleep(0.25)
 
         self._stream_thread = threading.Thread(target=loop, daemon=True)
@@ -395,7 +566,8 @@ class VoiceInputSystem:
         self._stream_generation += 1
         final_generation = self._stream_generation
         if hasattr(self, "_stream_thread") and self._stream_thread:
-            self._stream_thread.join(timeout=0.2)
+            if self._stream_thread is not threading.current_thread():
+                self._stream_thread.join()
             self._stream_thread = None
         return final_generation
 
@@ -406,8 +578,8 @@ class VoiceInputSystem:
         return raw_text, self.cleaner.clean(raw_text), True
 
     def _on_record_cancel(self):
-        if self._actively_recording:
-            self._actively_recording = False
+        should_cancel = self._recording_state.claim_cancel()
+        if should_cancel:
             self._stop_streaming()
             self.session.cancel()
             self.overlay.show_canceled()
@@ -468,13 +640,14 @@ class VoiceInputSystem:
             pass
 
     def _on_overlay_ready(self):
-        from PyQt6.QtCore import QTimer
+        from qt_compat import QTimer
+
+        self.overlay.show_settings_window()
 
         def on_done():
             try:
                 self._start_hotkeys()
                 self.overlay.show_idle()
-                self.overlay.show_settings_window()
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
@@ -489,8 +662,7 @@ class VoiceInputSystem:
         self.hotkey_mgr = HotkeyManager(
             config_path=self.config_path,
             callbacks={
-                "on_record_start": self._on_record_start,
-                "on_record_stop": self._on_record_stop,
+                "on_record_toggle": self._on_record_toggle,
                 "on_record_cancel": self._on_record_cancel,
             },
         )
@@ -502,12 +674,12 @@ class VoiceInputSystem:
         self._shutdown_started = True
 
         self._stop_streaming()
-        if self._actively_recording and hasattr(self, "session"):
+        previous_state = self._recording_state.shutdown()
+        if previous_state is RecordingState.RECORDING and hasattr(self, "session"):
             try:
                 self.session.cancel()
             except Exception:
                 pass
-            self._actively_recording = False
 
         if hasattr(self, "hotkey_mgr"):
             self.hotkey_mgr.stop()

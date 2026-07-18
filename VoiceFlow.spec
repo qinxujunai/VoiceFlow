@@ -2,7 +2,7 @@
 """
 VoiceFlow PyInstaller release build.
 Build: venv\\Scripts\\pyinstaller.exe VoiceFlow.spec
-Output: dist\\VoiceFlow.exe
+Output: dist\\VoiceFlow\\VoiceFlow.exe
 """
 
 import sys
@@ -19,9 +19,13 @@ a = Analysis(
         (str(PROJECT_ROOT / "src" / "overlay.html"), "src"),
         # Runtime config.
         (str(PROJECT_ROOT / "config.yaml"), "."),
+        (str(PROJECT_ROOT / "model-manifest.json"), "."),
+        (str(PROJECT_ROOT / "LICENSE"), "."),
+        (str(PROJECT_ROOT / "THIRD_PARTY_NOTICES.md"), "."),
         # Vocabulary files.
         (str(PROJECT_ROOT / "knowledge-base"), "knowledge-base"),
         (str(PROJECT_ROOT / "assets" / "voiceflow.ico"), "assets"),
+        (str(PROJECT_ROOT / "assets" / "silero_vad.onnx"), "assets"),
         # Models are intentionally not bundled because they are large.
         # (str(PROJECT_ROOT / "models"), "models"),
     ],
@@ -34,11 +38,11 @@ a = Analysis(
         "pyperclip",
         "pyautogui",
         "yaml",
-        "PyQt6",
-        "PyQt6.QtWebEngineWidgets",
-        "PyQt6.QtCore",
-        "PyQt6.QtGui",
-        "PyQt6.QtWidgets",
+        "PySide6",
+        "PySide6.QtWebEngineWidgets",
+        "PySide6.QtCore",
+        "PySide6.QtGui",
+        "PySide6.QtWidgets",
     ],
     hookspath=[],
     hooksconfig={},
@@ -51,6 +55,8 @@ a = Analysis(
         "torch",
         "PIL",
         "cv2",
+        "PyQt5",
+        "PyQt6",
     ],
     noarchive=False,
     optimize=0,
@@ -61,8 +67,6 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
     name="VoiceFlow",
     debug=False,
@@ -72,9 +76,21 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
+    exclude_binaries=True,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon=str(PROJECT_ROOT / "assets" / "voiceflow.ico"),
+    contents_directory=".",
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name="VoiceFlow",
 )

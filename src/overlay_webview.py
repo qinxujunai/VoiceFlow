@@ -6,17 +6,18 @@ import os
 import sys
 import json
 import subprocess
+import threading
+from datetime import datetime
 
-from PyQt6.QtWidgets import (
+from qt_compat import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QSystemTrayIcon, QMenu, QLabel, QPushButton,
     QPlainTextEdit, QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
+    QCheckBox, QComboBox,
+    QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
+    QScreen, QAction, QLocalServer, QLocalSocket,
 )
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import Qt, QUrl, QSize, QObject, pyqtSignal, pyqtSlot, QTimer
-from PyQt6.QtGui import QScreen, QAction
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from tray_icon import (
     TRAY_ICON_ERROR,
@@ -26,19 +27,40 @@ from tray_icon import (
     build_tray_icon,
 )
 from ui_state import UiState, display_for_state
+from settings_store import is_autostart_enabled, set_autostart, update_runtime_settings
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
 
 
+class _LatestPreviewMailbox:
+    """One-slot mailbox so rendering can never build a preview backlog."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._value = None
+
+    def put(self, value):
+        with self._lock:
+            self._value = value
+
+    def take(self):
+        with self._lock:
+            value = self._value
+            self._value = None
+            return value
+
+
 class _SettingsWindow(QMainWindow):
+    doctor_finished = Signal(str, bool)
+
     def __init__(self, on_repaste_text=None):
         super().__init__()
         self.root = os.path.dirname(os.path.dirname(__file__))
         self._on_repaste_text = on_repaste_text
         self._history_rows = []
         self.setWindowTitle("VoiceFlow")
-        self.setMinimumSize(860, 560)
+        self.setMinimumSize(820, 540)
 
         shell = QWidget()
         shell.setObjectName("appShell")
@@ -59,6 +81,7 @@ class _SettingsWindow(QMainWindow):
         header.addStretch(1)
         self.status_badge = QLabel("准备中")
         self.status_badge.setObjectName("statusBadge")
+        self.status_badge.setAccessibleName("VoiceFlow 状态")
         header.addWidget(self.status_badge)
         root.addLayout(header)
 
@@ -66,15 +89,17 @@ class _SettingsWindow(QMainWindow):
         body.setSpacing(16)
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
-        for label in ("最近转录", "状态", "诊断"):
+        for label in ("历史", "听写", "快捷键", "诊断"):
             self.sidebar.addItem(QListWidgetItem(label))
-        self.sidebar.setFixedWidth(132)
+        self.sidebar.setFixedWidth(116)
         self.sidebar.setCurrentRow(0)
+        self.sidebar.setAccessibleName("设置导航")
 
         self.stack = QStackedWidget()
         self.stack.setObjectName("contentStack")
         self.stack.addWidget(self._recent_page())
         self.stack.addWidget(self._status_page())
+        self.stack.addWidget(self._hotkeys_page())
         self.stack.addWidget(self._diagnostics_page())
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
 
@@ -82,7 +107,9 @@ class _SettingsWindow(QMainWindow):
         body.addWidget(self.stack, 1)
         root.addLayout(body, 1)
         self.setCentralWidget(shell)
-        self.setStyleSheet(self._style())
+        if not self._high_contrast_enabled():
+            self.setStyleSheet(self._style())
+        self.doctor_finished.connect(self._finish_doctor)
 
     def _section_header(self, title, subtitle):
         block = QVBoxLayout()
@@ -106,6 +133,7 @@ class _SettingsWindow(QMainWindow):
         toolbar = QHBoxLayout()
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("搜索最近转录")
+        self.search_box.setAccessibleName("搜索历史转录")
         self.search_box.textChanged.connect(self._render_history)
         toolbar.addWidget(self.search_box, 1)
         refresh = QPushButton("刷新")
@@ -115,6 +143,7 @@ class _SettingsWindow(QMainWindow):
 
         self.history_list = QListWidget()
         self.history_list.setObjectName("historyList")
+        self.history_list.setAccessibleName("历史转录列表")
         self.history_list.itemDoubleClicked.connect(lambda item: self._copy_text(item.data(Qt.ItemDataRole.UserRole)))
         layout.addWidget(self.history_list, 1)
 
@@ -142,21 +171,24 @@ class _SettingsWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(16)
-        layout.addLayout(self._section_header("运行状态", "启动、模型、快捷键和本地权限概览"))
+        layout.addLayout(self._section_header("听写", "选择本地模型、语言和输入设备"))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(12)
-        self.model_status = QLabel()
-        self.language_status = QLabel()
-        self.hotkey_status = QLabel("F2 / Right Ctrl / XButton1 / XButton2")
-        self.mic_status = QLabel("使用系统默认麦克风")
-        self.mode_status = QLabel("离线优先，无隐藏云调用")
+        self.model_combo = QComboBox()
+        self.model_combo.setAccessibleName("识别模型")
+        self.language_combo = QComboBox()
+        self.language_combo.setAccessibleName("识别语言")
+        self.microphone_combo = QComboBox()
+        self.microphone_combo.setAccessibleName("麦克风")
+        self.autostart_check = QCheckBox("登录 Windows 后自动启动")
+        self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
+        self.mode_status = QLabel("所有识别均在本机完成")
         rows = (
-            ("模型", self.model_status),
-            ("语言", self.language_status),
-            ("快捷键", self.hotkey_status),
-            ("麦克风", self.mic_status),
+            ("模型", self.model_combo),
+            ("语言", self.language_combo),
+            ("麦克风", self.microphone_combo),
             ("模式", self.mode_status),
         )
         for row, (name, value) in enumerate(rows):
@@ -166,16 +198,52 @@ class _SettingsWindow(QMainWindow):
             grid.addWidget(name_label, row, 0)
             grid.addWidget(value, row, 1)
         layout.addLayout(grid)
+        layout.addWidget(self.autostart_check)
 
         actions = QHBoxLayout()
-        download = QPushButton("下载模型")
+        save = QPushButton("保存设置")
+        save.setObjectName("primaryButton")
+        save.setAccessibleName("保存听写设置")
+        save.clicked.connect(self._save_settings)
+        download = QPushButton("管理模型")
         download.clicked.connect(self._open_model_setup)
         diagnose = QPushButton("运行检查")
-        diagnose.clicked.connect(lambda: (self.sidebar.setCurrentRow(2), self._run_doctor()))
+        diagnose.clicked.connect(lambda: (self.sidebar.setCurrentRow(3), self._run_doctor()))
+        actions.addWidget(save)
         actions.addWidget(download)
         actions.addWidget(diagnose)
         actions.addStretch(1)
         layout.addLayout(actions)
+        layout.addStretch(1)
+        return page
+
+    def _hotkeys_page(self):
+        page = QWidget()
+        page.setObjectName("contentPage")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(18, 16, 18, 18)
+        layout.setSpacing(16)
+        layout.addLayout(self._section_header("快捷键", "单键触发，避免干扰复制、粘贴和输入法"))
+        rows = (
+            ("开始 / 停止", "F2 · 右 Ctrl · 鼠标侧键 1 · 鼠标侧键 2"),
+            ("取消", "Esc"),
+        )
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(14)
+        for index, (name, value) in enumerate(rows):
+            name_label = QLabel(name)
+            name_label.setObjectName("fieldName")
+            value_label = QLabel(value)
+            value_label.setObjectName("fieldValue")
+            value_label.setAccessibleName(f"{name}快捷键：{value}")
+            grid.addWidget(name_label, index, 0)
+            grid.addWidget(value_label, index, 1)
+        layout.addLayout(grid)
+        note = QLabel("组合键不会作为默认触发方式，防止全局抑制正常按键。")
+        note.setObjectName("sectionSubtitle")
+        note.setWordWrap(True)
+        layout.addWidget(note)
         layout.addStretch(1)
         return page
 
@@ -188,26 +256,105 @@ class _SettingsWindow(QMainWindow):
         header = QHBoxLayout()
         header.addLayout(self._section_header("诊断", "检查依赖、模型、知识库和快捷方式"))
         header.addStretch(1)
-        run = QPushButton("运行检查")
-        run.setObjectName("primaryButton")
-        run.clicked.connect(self._run_doctor)
-        header.addWidget(run)
+        self.doctor_button = QPushButton("运行检查")
+        self.doctor_button.setObjectName("primaryButton")
+        self.doctor_button.setAccessibleName("运行 VoiceFlow 诊断")
+        self.doctor_button.clicked.connect(self._run_doctor)
+        header.addWidget(self.doctor_button)
         layout.addLayout(header)
         self.doctor_text = QPlainTextEdit()
         self.doctor_text.setObjectName("doctorOutput")
         self.doctor_text.setReadOnly(True)
+        self.doctor_text.setAccessibleName("诊断结果")
         self.doctor_text.setPlainText("点击“运行检查”查看当前环境状态。")
         layout.addWidget(self.doctor_text, 1)
         return page
 
     def refresh(self):
-        model = os.path.join(self.root, "models", "sensevoice", "model.int8.onnx")
-        tokens = os.path.join(self.root, "models", "sensevoice", "tokens.txt")
-        ready = os.path.exists(model) and os.path.exists(tokens)
+        config = self._load_config()
+        active = config.get("engine", {}).get("active", "sensevoice")
+        ready = self._engine_ready(active, config)
         self.status_badge.setText("就绪" if ready else "需要设置")
-        self.model_status.setText("SenseVoice 已就绪" if ready else "模型缺失")
-        self.language_status.setText(self._current_language_label())
+        self._refresh_settings_controls(config)
         self._refresh_history()
+
+    def _load_config(self):
+        try:
+            import yaml
+            with open(os.path.join(self.root, "config.yaml"), "r", encoding="utf-8") as handle:
+                return yaml.safe_load(handle) or {}
+        except Exception:
+            return {}
+
+    def _engine_ready(self, engine, config):
+        keys = {
+            "sensevoice": ("model_path", "tokens_path"),
+            "qwen3-asr": ("conv_frontend_path", "encoder_path", "decoder_path", "tokenizer_path"),
+            "fun-asr-nano": ("encoder_adaptor_path", "llm_path", "embedding_path", "tokenizer_path"),
+            "whisper-turbo": ("encoder_path", "decoder_path", "tokens_path"),
+        }
+        engine_config = config.get("engine", {}).get(engine, {})
+        return bool(engine_config) and all(
+            os.path.exists(os.path.join(self.root, engine_config.get(key, "")))
+            for key in keys.get(engine, ())
+        )
+
+    def _refresh_settings_controls(self, config):
+        engine = config.get("engine", {})
+        active = engine.get("active", "sensevoice")
+        labels = {
+            "sensevoice": "快速 · SenseVoice",
+            "qwen3-asr": "准确 · Qwen3-ASR 0.6B",
+            "fun-asr-nano": "中文增强 · Fun-ASR Nano",
+            "whisper-turbo": "多语言对照 · Whisper Turbo",
+        }
+        self.model_combo.blockSignals(True)
+        self.model_combo.clear()
+        for name, label in labels.items():
+            suffix = "" if self._engine_ready(name, config) else "（未安装）"
+            self.model_combo.addItem(label + suffix, name)
+        index = self.model_combo.findData(active)
+        self.model_combo.setCurrentIndex(max(0, index))
+        self.model_combo.blockSignals(False)
+
+        self.language_combo.clear()
+        for label, value in (("中文", "zh"), ("自动检测", "auto"), ("English", "en"), ("粤语", "yue")):
+            self.language_combo.addItem(label, value)
+        language = (engine.get(active) or {}).get("language", "zh")
+        self.language_combo.setCurrentIndex(max(0, self.language_combo.findData(language)))
+
+        self.microphone_combo.clear()
+        self.microphone_combo.addItem("系统默认麦克风", None)
+        try:
+            import sounddevice as sd
+            for index, device in enumerate(sd.query_devices()):
+                if int(device.get("max_input_channels", 0)) > 0:
+                    self.microphone_combo.addItem(str(device.get("name", index)), index)
+        except Exception:
+            pass
+        selected_device = config.get("audio", {}).get("device_index")
+        selected_index = self.microphone_combo.findData(selected_device)
+        self.microphone_combo.setCurrentIndex(max(0, selected_index))
+        self.autostart_check.setChecked(is_autostart_enabled(self.root))
+
+    def _save_settings(self):
+        engine = self.model_combo.currentData()
+        config = self._load_config()
+        if not self._engine_ready(engine, config):
+            self.status_badge.setText("请先安装所选模型")
+            return
+        try:
+            update_runtime_settings(
+                os.path.join(self.root, "config.yaml"),
+                engine=engine,
+                language=self.language_combo.currentData(),
+                device_index=self.microphone_combo.currentData(),
+            )
+            set_autostart(self.root, self.autostart_check.isChecked())
+            self.status_badge.setText("已保存，重启后生效")
+        except Exception as error:
+            self.status_badge.setText("保存失败")
+            self.doctor_text.setPlainText(f"设置保存失败: {error}")
 
     def _current_language_label(self):
         try:
@@ -221,6 +368,22 @@ class _SettingsWindow(QMainWindow):
             return f"{labels.get(language, language)} ({active})"
         except Exception:
             return "配置读取失败"
+
+    def _output_status_label(self, status):
+        return {
+            "clipboard_copied_paste_sent": "已复制并发送粘贴",
+            "fallback": "已保留在剪贴板",
+            "typed": "已输入",
+            "error": "处理失败",
+            "unknown": "状态未知",
+        }.get(status, "已处理")
+
+    def _format_timestamp(self, value):
+        try:
+            parsed = datetime.fromisoformat(value)
+            return parsed.strftime("%m月%d日 %H:%M")
+        except Exception:
+            return value
 
     def _refresh_history(self):
         path = os.path.join(self.root, "logs", "history.jsonl")
@@ -252,9 +415,9 @@ class _SettingsWindow(QMainWindow):
             text = row.get("corrected_text") or row.get("clean_text") or row.get("error") or ""
             if query and query not in text.lower():
                 continue
-            timestamp = row.get("timestamp", "")
+            timestamp = self._format_timestamp(row.get("timestamp", ""))
             duration = row.get("duration")
-            status = row.get("output_status", "unknown")
+            status = self._output_status_label(row.get("output_status", "unknown"))
             tail = row.get("final_tail", "")
             meta_parts = [part for part in (timestamp, f"{float(duration):.1f}s" if duration is not None else "", status) if part]
             if tail:
@@ -364,32 +527,66 @@ class _SettingsWindow(QMainWindow):
     def _run_doctor(self):
         python = os.path.join(self.root, "venv", "Scripts", "python.exe")
         self.doctor_text.setPlainText("正在检查...")
+        self.doctor_button.setEnabled(False)
+
+        def run():
+            try:
+                completed = subprocess.run(
+                    [python, "scripts/doctor.py"],
+                    cwd=self.root,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                self.doctor_finished.emit(completed.stdout or "诊断完成", completed.returncode == 0)
+            except Exception as error:
+                self.doctor_finished.emit(f"诊断失败: {error}", False)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @Slot(str, bool)
+    def _finish_doctor(self, output, ok):
+        self.doctor_text.setPlainText(output)
+        self.doctor_button.setEnabled(True)
+        self.status_badge.setText("检查完成" if ok else "需要处理")
+
+    def _high_contrast_enabled(self):
+        if os.name != "nt":
+            return False
         try:
-            completed = subprocess.run(
-                [python, "scripts/doctor.py"],
-                cwd=self.root,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+            import ctypes
+
+            class HighContrast(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", ctypes.c_uint),
+                    ("dwFlags", ctypes.c_uint),
+                    ("lpszDefaultScheme", ctypes.c_wchar_p),
+                ]
+
+            value = HighContrast()
+            value.cbSize = ctypes.sizeof(value)
+            ok = ctypes.windll.user32.SystemParametersInfoW(
+                0x0042,
+                value.cbSize,
+                ctypes.byref(value),
+                0,
             )
-            self.doctor_text.setPlainText(completed.stdout or "诊断完成")
-            self.status_badge.setText("检查完成" if completed.returncode == 0 else "需要处理")
-        except Exception as e:
-            self.doctor_text.setPlainText(f"诊断失败: {e}")
-            self.status_badge.setText("检查失败")
+            return bool(ok and value.dwFlags & 0x00000001)
+        except Exception:
+            return False
 
     def _style(self):
         return """
         QWidget#appShell {
             background: #f5f5f7;
             color: #1d1d1f;
-            font-family: "Segoe UI", "Microsoft YaHei";
+            font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei";
             font-size: 13px;
         }
         QLabel#appTitle {
-            font-size: 24px;
+            font-size: 21px;
             font-weight: 650;
             letter-spacing: 0px;
             color: #1d1d1f;
@@ -416,9 +613,9 @@ class _SettingsWindow(QMainWindow):
             color: #6e6e73;
         }
         QListWidget#sidebar::item:selected {
-            background: #ffffff;
+            background: #e8e8ed;
             color: #1d1d1f;
-            border: 1px solid rgba(0, 0, 0, 0.08);
+            border: none;
         }
         QStackedWidget#contentStack, QWidget#contentPage {
             background: #ffffff;
@@ -433,7 +630,7 @@ class _SettingsWindow(QMainWindow):
             color: #1d1d1f;
             font-weight: 500;
         }
-        QLineEdit, QPlainTextEdit, QListWidget#historyList {
+        QLineEdit, QPlainTextEdit, QComboBox, QListWidget#historyList {
             border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 10px;
             background: #fbfbfd;
@@ -447,7 +644,7 @@ class _SettingsWindow(QMainWindow):
             padding: 0px;
             margin: 5px;
             border-radius: 10px;
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            border: none;
             background: #ffffff;
         }
         QListWidget#historyList::item:selected {
@@ -481,6 +678,10 @@ class _SettingsWindow(QMainWindow):
         }
         QPushButton:hover {
             background: #f2f2f7;
+        }
+        QPushButton:focus, QLineEdit:focus, QPlainTextEdit:focus,
+        QComboBox:focus, QListWidget:focus {
+            border: 2px solid #0a84ff;
         }
         QPushButton#primaryButton {
             background: #007aff;
@@ -779,10 +980,16 @@ class OverlayWindow:
             self._bridge.js_then_show_requested.emit(f"prepareRecording({int(session_id)})")
 
     def update_streaming(self, text, session_id):
-        self._js(f"updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
+        if self._bridge:
+            self._bridge.preview_js_requested.emit(
+                f"updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
+            )
 
     def update_correction(self, text, session_id):
-        self._js(f"updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
+        if self._bridge:
+            self._bridge.preview_js_requested.emit(
+                f"updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
+            )
 
     def show_processing(self):
         self._tray_state(TRAY_ICON_PROCESSING)
@@ -838,29 +1045,33 @@ class OverlayWindow:
 # ============================================================
 
 class _Bridge(QObject):
-    js_requested = pyqtSignal(str)
-    show_requested = pyqtSignal()
-    hide_requested = pyqtSignal()
-    js_then_show_requested = pyqtSignal(str)
-    js_then_hide_requested = pyqtSignal(str)
-    hide_after_requested = pyqtSignal(int)
-    tray_state_requested = pyqtSignal(str)
-    settings_requested = pyqtSignal()
+    js_requested = Signal(str)
+    preview_js_requested = Signal(str)
+    show_requested = Signal()
+    hide_requested = Signal()
+    js_then_show_requested = Signal(str)
+    js_then_hide_requested = Signal(str)
+    hide_after_requested = Signal(int)
+    tray_state_requested = Signal(str)
+    settings_requested = Signal()
 
     def __init__(self, web_view):
         super().__init__()
         self._web_view = web_view
         self._page_ready = False
         self._pending_js = []
+        self._preview_mailbox = _LatestPreviewMailbox()
+        self._preview_flush_scheduled = False
         self._web_view.loadFinished.connect(self._on_load_finished)
         self.js_requested.connect(self._run_js)
+        self.preview_js_requested.connect(self._queue_preview_js)
         self.js_then_show_requested.connect(self._run_js_then_show)
         self.js_then_hide_requested.connect(self._run_js_then_hide)
         # show/hide 信号连接到自身的方法只是为了统一管理，
         # 实际执行由 OverlayWindow._show/_hide 通过外部连接完成
         # 这里只做 JS 桥接
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _on_load_finished(self, ok):
         if not ok:
             return
@@ -869,7 +1080,7 @@ class _Bridge(QObject):
             self._run_js(code)
         self._pending_js = []
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _run_js(self, code):
         if not self._page_ready:
             self._pending_js.append(code)
@@ -877,13 +1088,28 @@ class _Bridge(QObject):
         if self._web_view and self._web_view.page():
             self._web_view.page().runJavaScript(code)
 
-    @pyqtSlot(str)
+    @Slot(str)
+    def _queue_preview_js(self, code):
+        self._preview_mailbox.put(code)
+        if self._preview_flush_scheduled:
+            return
+        self._preview_flush_scheduled = True
+        QTimer.singleShot(16, self._flush_preview_js)
+
+    @Slot()
+    def _flush_preview_js(self):
+        self._preview_flush_scheduled = False
+        code = self._preview_mailbox.take()
+        if code is not None:
+            self._run_js(code)
+
+    @Slot(str)
     def _run_js_then_show(self, code):
         if not self._page_ready or not self._web_view or not self._web_view.page():
             return
         self._web_view.page().runJavaScript(code, lambda _: self.show_requested.emit())
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _run_js_then_hide(self, code):
         if not self._page_ready or not self._web_view or not self._web_view.page():
             self.hide_requested.emit()

@@ -46,10 +46,10 @@ def test_streaming_pill_caps_rendered_text_for_long_dictation_performance():
     display_block = html[display_idx:set_width_idx]
     set_width_block = html[set_width_idx:html.index("let _tickerTarget", set_width_idx)]
 
-    assert "const MAX_DISPLAY_CHARS = 96;" in html
-    assert "const DISPLAY_HEAD_CHARS = 18;" in html
+    assert "const MAX_DISPLAY_CHARS = 72;" in html
+    assert "DISPLAY_HEAD_CHARS" not in html
     assert "const DISPLAY_TAIL_CHARS = 72;" in html
-    assert "text.slice(0, DISPLAY_HEAD_CHARS) + ' … ' + text.slice(-DISPLAY_TAIL_CHARS)" in display_block
+    assert "'… ' + text.slice(-DISPLAY_TAIL_CHARS)" in display_block
     assert "var displayText = displayTextForPill(text);" in set_width_block
     assert "txt.textContent = displayText;" in set_width_block
     assert "measureTextWidth(displayText)" in set_width_block
@@ -67,7 +67,7 @@ def test_streaming_ticker_only_overflows_after_reaching_max_width():
     assert "var nextTarget = overflow > 0 ? -overflow : 0;" in ticker_block
 
 
-def test_streaming_ticker_uses_original_smooth_tail_follow():
+def test_streaming_ticker_jumps_to_latest_tail_without_visual_backlog():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     ticker_idx = html.index("function updateTickerOffset")
     ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
@@ -77,8 +77,8 @@ def test_streaming_ticker_uses_original_smooth_tail_follow():
     assert "text-replace" not in html
     assert "tickerTrack" not in html
     assert "_tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;" in smooth_block
-    assert "_tickerTarget = nextTarget;" in ticker_block
-    assert "_tickerRaf = requestAnimationFrame(smoothTicker);" in ticker_block
+    assert "mode === 'live'" in ticker_block
+    assert "setTickerOffset(nextTarget);" in ticker_block
 
 
 def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
@@ -90,8 +90,28 @@ def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
     assert "STREAMING_MOTION_NUDGE" not in html
     assert "function updateTickerOffset(targetWidth, mode)" in html
     assert "restartTextRefresh" not in html
-    assert "updateTickerOffset(width);" in streaming_block
+    assert "updateTickerOffset(width, 'live');" in streaming_block
     assert "if (nextTarget > _tickerCurrent)" in ticker_block
+
+
+def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
+    from overlay_webview import _LatestPreviewMailbox
+
+    mailbox = _LatestPreviewMailbox()
+    mailbox.put("old")
+    mailbox.put("new")
+
+    assert mailbox.take() == "new"
+    assert mailbox.take() is None
+
+
+def test_streaming_bridge_uses_coalesced_preview_channel():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "preview_js_requested = Signal(str)" in overlay
+    assert "self._bridge.preview_js_requested.emit" in overlay
+    assert "def _queue_preview_js" in overlay
+    assert "QTimer.singleShot(16, self._flush_preview_js)" in overlay
 
 
 def test_pause_correction_is_distinct_and_non_flashing():
@@ -130,6 +150,34 @@ def test_finalizing_and_final_text_are_session_guarded():
     assert "showFinalizing({int(session_id)})" in overlay
     assert "def show_final_text(self, text, session_id):" in overlay
     assert "showFinalText({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
+
+
+def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+
+    assert 'role="status"' in html
+    assert 'aria-live="polite"' in html
+    assert "@media (prefers-reduced-motion: reduce)" in html
+    assert "animation-duration: 1ms !important;" in html
+
+
+def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert 'for label in ("历史", "听写", "快捷键", "诊断")' in overlay
+    assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
+    assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
+    assert 'self.model_combo.setAccessibleName("识别模型")' in overlay
+    assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
+    assert 'self.microphone_combo.setAccessibleName("麦克风")' in overlay
+    assert 'self.doctor_text.setAccessibleName("诊断结果")' in overlay
+
+
+def test_history_does_not_expose_internal_output_status_codes():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert '"clipboard_copied_paste_sent": "已复制并发送粘贴"' in overlay
+    assert 'status = self._output_status_label' in overlay
 
 
 def test_recording_state_has_explicit_reset_entrypoints():
@@ -184,7 +232,7 @@ def test_recording_start_cancels_pending_hide_timer():
     assert "self._cancel_pending_hide()" in recording_block
 
 
-def test_app_launch_opens_settings_window_after_runtime_ready():
+def test_app_launch_opens_settings_before_background_model_load():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     ready_idx = main.index("def _on_overlay_ready")
     start_hotkeys_idx = main.index("def _start_hotkeys", ready_idx)
@@ -192,8 +240,9 @@ def test_app_launch_opens_settings_window_after_runtime_ready():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
     assert "self.overlay.show_settings_window()" in ready_block
+    assert "def _on_overlay_ready(self):\n        from qt_compat import QTimer\n\n        self.overlay.show_settings_window()" in ready_block
     assert "def show_settings_window(self):" in overlay
-    assert "settings_requested = pyqtSignal()" in overlay
+    assert "settings_requested = Signal()" in overlay
     assert "self._bridge.settings_requested.connect(self._show_settings)" in overlay
 
 
@@ -237,11 +286,11 @@ def test_settings_status_page_exposes_language_and_model_setup_action():
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
 
-    assert "self.language_status = QLabel()" in settings_block
-    assert "(\"语言\", self.language_status)" in settings_block
-    assert "self.language_status.setText(self._current_language_label())" in settings_block
-    assert "def _current_language_label(self):" in settings_block
-    assert "QPushButton(\"下载模型\")" in settings_block
+    assert "self.language_combo = QComboBox()" in settings_block
+    assert '("语言", self.language_combo)' in settings_block
+    assert "self.model_combo = QComboBox()" in settings_block
+    assert "def _save_settings(self):" in settings_block
+    assert "QPushButton(\"管理模型\")" in settings_block
     assert "download.clicked.connect(self._open_model_setup)" in settings_block
     assert "def _open_model_setup(self):" in settings_block
     assert "scripts\\\\download_models.py" in settings_block

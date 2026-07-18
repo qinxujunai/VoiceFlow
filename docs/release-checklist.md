@@ -7,7 +7,8 @@ build.
 
 ```bat
 git status --short
-venv\Scripts\python.exe scripts\verify.py
+venv\Scripts\python.exe scripts\verify.py --release
+venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```
 
 - Working tree is clean before merge.
@@ -31,9 +32,13 @@ venv\Scripts\python.exe scripts\verify.py
 ## Packaging Verification
 
 ```bat
-venv\Scripts\pyinstaller.exe VoiceFlow.spec
+venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\VoiceFlow.iss
 ```
 
-- The packaged app includes overlay, config, knowledge base, and icon.
-- Large model files remain external under `models/`.
-- Missing models produce a readable setup path instead of a silent failure.
+- The packaged app includes overlay, config, model manifest, knowledge base,
+  license notices, and icon.
+- The selected default model has a recorded redistribution-license decision.
+- The installer works per-user on a clean VM, upgrades the same AppId, rolls
+  back using the previous signed installer, and removes its files on uninstall.
+- The public installer and executable are Authenticode signed.

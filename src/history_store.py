@@ -23,6 +23,9 @@ class HistoryStore:
         segment_count=None,
         final_length=None,
         final_tail="",
+        trigger_to_feedback_ms=None,
+        stop_to_paste_ms=None,
+        transcription_ms=None,
     ):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
@@ -43,6 +46,12 @@ class HistoryStore:
             entry["final_length"] = int(final_length)
         if final_tail:
             entry["final_tail"] = final_tail
+        if trigger_to_feedback_ms is not None:
+            entry["trigger_to_feedback_ms"] = round(float(trigger_to_feedback_ms), 3)
+        if stop_to_paste_ms is not None:
+            entry["stop_to_paste_ms"] = round(float(stop_to_paste_ms), 3)
+        if transcription_ms is not None:
+            entry["transcription_ms"] = round(float(transcription_ms), 3)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry

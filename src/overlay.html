@@ -258,10 +258,19 @@ body {
     to { transform: rotate(360deg); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 </style>
 </head>
 <body>
-<div id="pill" class="pill idle">
+<div id="pill" class="pill idle" role="status" aria-live="polite" aria-atomic="true">
     <div class="mark" aria-hidden="true">
         <span></span><span></span><span></span>
     </div>
@@ -277,8 +286,7 @@ const txt = document.getElementById('txt');
 
 const MIN_WIDTH = 86;
 const MAX_WIDTH = 312;
-const MAX_DISPLAY_CHARS = 96;
-const DISPLAY_HEAD_CHARS = 18;
+const MAX_DISPLAY_CHARS = 72;
 const DISPLAY_TAIL_CHARS = 72;
 let activeSession = 0;
 let maxStreamingWidth = MIN_WIDTH;
@@ -313,7 +321,7 @@ function displayTextForPill(text) {
     if (text.length <= MAX_DISPLAY_CHARS) {
         return text;
     }
-    return text.slice(0, DISPLAY_HEAD_CHARS) + ' … ' + text.slice(-DISPLAY_TAIL_CHARS);
+    return '… ' + text.slice(-DISPLAY_TAIL_CHARS);
 }
 
 function setWidthForText(text, lockGrowth) {
@@ -366,7 +374,7 @@ function updateTickerOffset(targetWidth, mode) {
         } else {
             ticker.style.textAlign = 'center';
         }
-        if (mode === 'final' || mode === 'settled') {
+        if (mode === 'live' || mode === 'final' || mode === 'settled') {
             setTickerOffset(nextTarget);
             return;
         }
@@ -444,7 +452,7 @@ function updateStreaming(text, sessionId) {
     pill.className = 'pill streaming';
     lastStreamingText = text;
     var width = setWidthForText(text, true);
-    updateTickerOffset(width);
+    updateTickerOffset(width, 'live');
 }
 
 function updateCorrection(text, sessionId) {

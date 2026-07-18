@@ -10,6 +10,8 @@ from dataclasses import dataclass
 class RecordingResult:
     audio_data: object
     duration: float
+    start_sample: int = 0
+    total_samples: int = 0
 
 
 class RecordingSession:
@@ -33,7 +35,12 @@ class RecordingSession:
         audio_data = self.audio.stop_recording()
         duration = max(0.0, self.clock() - started_at)
         self.started_at = None
-        return RecordingResult(audio_data=audio_data, duration=duration)
+        return RecordingResult(
+            audio_data=audio_data,
+            duration=duration,
+            start_sample=getattr(self.audio, "last_buffer_start_sample", 0),
+            total_samples=getattr(self.audio, "last_total_samples", len(audio_data)),
+        )
 
     def cancel(self):
         if self.audio.is_recording:

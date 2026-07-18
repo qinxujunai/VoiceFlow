@@ -7,7 +7,7 @@
 
 [![平台](https://img.shields.io/badge/platform-Windows-0078D4)](#)
 [![本地优先](https://img.shields.io/badge/local--first-no%20cloud-2EA44F)](#)
-[![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20%2B%20SenseVoice-6F42C1)](#)
+[![ASR](https://img.shields.io/badge/ASR-sherpa--onnx%20offline-6F42C1)](#)
 [![测试](https://img.shields.io/badge/tests-pytest-0A7)](#)
 
 ![VoiceFlow 演示](docs/voiceflow-demo.svg)
@@ -26,13 +26,14 @@ VoiceFlow 默认离线运行。没有隐藏云 ASR 调用，也没有默认大�
 - **剪贴板优先**：先复制，再粘贴；即使光标不在输入框，文字也可恢复。
 - **长语音完整性**：录音中缓存稳定音频段，停止时补最后尾巴并去重拼接。
 - **本地可交付**：启动器能修复 venv、安装依赖、恢复快捷方式；模型下载是显式确认，不偷偷联网。
-- **质量门明确**：doctor、py_compile、pytest、benchmark、integration 统一由 `scripts\verify.py` 执行。
+- **质量门明确**：doctor、编译、测试、500 次状态循环、benchmark、integration 统一由 `scripts\verify.py` 执行。
 
 ## 技术栈
 
 - **运行时**：Python 3.12，Windows 本地运行。
-- **桌面 UI**：PyQt6 + PyQt6 WebEngine，负责主窗口、托盘和悬浮胶囊。
-- **语音识别**：`sherpa-onnx` + 本地 SenseVoice ONNX 模型。
+- **桌面 UI**：PySide6 + Qt WebEngine（LGPL 发布路径），负责设置、托盘和悬浮胶囊。
+- **语音识别**：统一 `EngineAdapter` 接入 SenseVoice、Qwen3-ASR 与 Fun-ASR Nano；默认模型只由本机 Model Lab 数据晋级。
+- **静音保护**：ASR 前置本地 Silero VAD；底噪、按键声和标点-only 幻听不会进入剪贴板，真实单字仍保留。
 - **音频与输入**：`sounddevice` 采集麦克风，`keyboard` / `pynput` 处理 F2、右 Ctrl 和鼠标侧键。
 - **输出链路**：`pyperclip.copy(text)` -> `Ctrl+V` -> `logs/history.jsonl`。
 - **交付**：`start.bat` + bootstrap 自检修复，PyInstaller 用于窗口化打包。
@@ -49,10 +50,12 @@ start.bat
 
 `start.bat` 会检查 `venv\Scripts\python.exe` 是否真的可运行；如果 venv 损坏，会重建环境并安装 `requirements.txt`。它也会创建 `logs\`，恢复桌面快捷方式。
 
-模型文件较大，不放进 Git。如果模型缺失，启动器会打开可见 setup 流程并询问是否下载默认 SenseVoice 模型；也可以手动运行：
+模型文件较大，不放进 Git。如果模型缺失，启动器会打开可见 setup 流程并询问是否下载基线模型；下载固定 revision，并在切换前校验大小与 SHA-256：
 
 ```bat
 venv\Scripts\python.exe scripts\download_models.py
+venv\Scripts\python.exe scripts\download_models.py --engine qwen3-asr
+venv\Scripts\python.exe scripts\download_models.py --engine fun-asr-nano
 ```
 
 环境健康后，桌面快捷方式会通过 `venv\Scripts\pythonw.exe + scripts\launch_voiceflow.pyw` 无控制台启动。重复点击桌面图标会唤起已有窗口，不会堆出多个主进程。
@@ -87,9 +90,11 @@ Hotkey
 
 - **启动自愈**：检测 venv 是否可执行，必要时重建并安装依赖。
 - **快速正常启动**：环境健康后走缓存 fast path，不每次完整 doctor。
-- **长文本不卡胶囊**：悬浮层只渲染有头有尾的轻量预览，不把十几分钟全文塞进 DOM。
+- **时长无关的实时链路**：预览只读取固定音频窗口，稳定段完成后立即释放旧 PCM；无论全局录音时间多长，每轮工作量都保持有界。
+- **长文本不卡胶囊**：悬浮层只渲染最新尾部，UI 更新采用 latest-only 队列，不把全文或过期帧塞进 DOM。
 - **转写串行保护**：preview 和 final 不同时抢同一个 recognizer。
-- **质量门**：`scripts\verify.py` 覆盖 doctor、编译、测试、benchmark 和 integration。
+- **质量门**：`scripts\verify.py` 覆盖 doctor、编译、测试、500 次状态循环、benchmark 和 integration；`--release` 额外执行真实历史 P95 门。
+- **响应性记录**：历史条目记录快捷键到反馈、转写和停止到粘贴耗时，用真实 P95 而非主观体感判断退化。
 
 ## 已知产品边界
 
@@ -114,17 +119,21 @@ src/
   hotkey_manager.py    # F2、右 Ctrl、鼠标侧键
   recording_session.py # 录音生命周期
   audio_capture.py     # 麦克风适配
-  transcriber.py       # sherpa-onnx ASR
+  transcriber.py       # 稳定转写门面
+  engine_adapter.py    # 模型能力与资产合同
+  model_lab.py         # CER、评分和硬淘汰门
   text_cleaner.py      # 确定性清理和修正
   vocabulary.py        # 本地词表
   output_handler.py    # 剪贴板优先，再 Ctrl+V
   history_store.py     # JSONL 历史
-  overlay_webview.py   # PyQt 主窗口、悬浮窗、托盘桥接
+  overlay_webview.py   # PySide6 设置、悬浮窗、托盘桥接
   overlay.html         # 小胶囊 UI
 scripts/
   bootstrap.py         # 启动前自检与修复
   launch_voiceflow.pyw # 无控制台桌面启动器
   benchmark_models.py  # 本地 ASR benchmark
+  evaluate_asr.py      # Model Lab JSONL 评测与晋级
+  ui_quality_gate.py   # 100%/125%/150%/200% UI 截图门
   download_models.py   # 显式模型下载
   create_shortcut.ps1  # 桌面快捷方式
 ```
@@ -141,6 +150,7 @@ VoiceFlow 不假装普通词表等于 ASR 热词注入。当前可控链路是�
 
 ```bat
 venv\Scripts\python.exe scripts\benchmark_models.py --manifest eval\private\local.jsonl
+venv\Scripts\python.exe scripts\evaluate_asr.py --manifest eval\private\local.jsonl
 venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
 ```
 
@@ -148,17 +158,19 @@ venv\Scripts\python.exe scripts\add_correction.py "科瑟" "Cursor"
 
 ```bat
 venv\Scripts\python.exe scripts\verify.py
+venv\Scripts\python.exe scripts\verify.py --release
 ```
 
-完整质量门会运行 doctor、py_compile、pytest、快速 ASR benchmark 和 integration。
+普通质量门运行 doctor、py_compile、pytest、500 次状态循环、快速 ASR benchmark 和 integration。公开构建还必须通过性能历史、DPI 截图、键盘/Narrator 人工任务、长录音和驻留测试。
 
 ## 打包
 
 ```bat
-venv\Scripts\pyinstaller.exe VoiceFlow.spec
+venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\VoiceFlow.iss
 ```
 
-`VoiceFlow.spec` 会包含 overlay、config、knowledge-base 和图标。大型模型文件继续外置在 `models/`。
+`VoiceFlow.spec` 生成启动更快、可替换 Qt 动态库的 onedir 目录。Inno Setup 负责按用户安装、同 AppId 升级、开机启动任务和卸载。模型是否进入公开安装包由 `model-manifest.json` 的许可证审查结果与 Model Lab 最终赢家共同决定。
 
 ## 维护文档
 
@@ -166,9 +178,12 @@ venv\Scripts\pyinstaller.exe VoiceFlow.spec
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
 - [发布检查清单](docs/release-checklist.md)
 
-## Roadmap
+## 隐私与联网
 
-- 更完整的中文/中英混合长语音评测集。
-- 更强的 overlay 视觉回归测试。
-- 保持模型外置的发布构建流程。
-- 只有本地 benchmark 证明收益时，才增加可选模型对比。
+录音、转写、词库和历史默认只保存在本机。运行时不会下载模型、检查更新或调用云 ASR；只有用户显式运行模型管理/下载命令时才联网。私有评测音频位于 Git 忽略目录，Model Lab 不上传音频。
+
+## 公开 Beta 尚需完成
+
+- 用完整公开集与本机私有校准集跑完盲测并生成最终晋级报告。
+- 完成 24 小时驻留、睡眠唤醒、设备切换、真实 500 次启停与跨应用粘贴矩阵。
+- 使用发布主体的代码签名证书签名安装器；若 SenseVoice 胜出，先完成其模型许可证重分发审查。

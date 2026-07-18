@@ -107,7 +107,7 @@ class TextCleaner:
             # 技术概念
             "a p i": "API", "api": "API",
             "rest api": "REST API",
-            "软": "RAG", "rag": "RAG",
+            "rag": "RAG",
             "微调": "微调", "fine tuning": "fine-tuning",
             "劳拉": "LoRA", "lora": "LoRA",
             "库达": "CUDA", "cuda": "CUDA",
@@ -219,10 +219,6 @@ class TextCleaner:
         stripped = text.strip()
         if not stripped:
             return ""
-        import unicodedata
-        meaningful = ''.join(c for c in stripped if not unicodedata.category(c).startswith("P") and not c.isspace())
-        if len(meaningful) <= 1:
-            return ""
         return stripped
 
 
@@ -238,8 +234,19 @@ class TextCleaner:
 
     def _fix_mistakes(self, text: str) -> str:
         for wrong, correct in sorted(self.corrections.items(), key=lambda item: len(item[0]), reverse=True):
-            if wrong in text:
-                text = text.replace(wrong, correct)
+            if not wrong or wrong not in text:
+                continue
+            if len(wrong) == 1:
+                if text == wrong:
+                    text = correct
+                continue
+            if wrong.isascii() and any(char.isalnum() for char in wrong):
+                pattern = re.compile(
+                    rf"(?<![A-Za-z0-9_]){re.escape(wrong)}(?![A-Za-z0-9_])"
+                )
+                text = pattern.sub(lambda _match: correct, text)
+                continue
+            text = text.replace(wrong, correct)
         return text
 
     def _add_punctuation(self, text: str) -> str:

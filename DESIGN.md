@@ -36,9 +36,11 @@ Short recordings run final recognition over the complete stopped audio buffer. L
 
 ## Recognition
 
-Default model is SenseVoice-Small int8 through sherpa-onnx. It is the current conservative default for local Chinese and mixed Chinese-English dictation on Windows CPU.
+Default model is currently SenseVoice-Small int8 through sherpa-onnx. It remains the conservative baseline until a complete Model Lab run promotes a challenger.
 
-Qwen3-ASR stays experimental until `scripts/benchmark_models.py` proves a better local tradeoff for load time, RTF, stability, and domain vocabulary.
+Before any engine receives audio, an energy floor and the bundled Silero VAD must confirm speech presence. Punctuation-only output is not user text; lexical one-character dictation remains valid.
+
+SenseVoice, Qwen3-ASR 0.6B int8, and Fun-ASR Nano int8 share the `EngineAdapter` contract. Model assets are pinned by revision, size, license, and SHA-256. `scripts/evaluate_asr.py` owns scoring, hard rejection, reports, and promotion; no model is selected by popularity.
 
 Vocabulary and corrections are deterministic post-processing. SenseVoice hotwords are not wired through sherpa transducer hotwords in this project.
 
@@ -65,7 +67,7 @@ The tray icon is generated at runtime for status. The application/shortcut icon 
 
 `start.bat` remains the development launcher. `scripts/create_shortcut.ps1` creates a desktop shortcut for daily use.
 
-`VoiceFlow.spec` is the release build configuration. It uses a windowed exe, includes overlay/config/knowledge-base/icon, and intentionally does not bundle large model files.
+`VoiceFlow.spec` produces a PySide6 onedir build so Qt libraries remain dynamically replaceable and startup avoids one-file extraction. `installer/VoiceFlow.iss` produces a per-user installer. Model inclusion is a separate release decision gated by Model Lab results and redistribution terms.
 
 ## Verification
 
