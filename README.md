@@ -8,7 +8,7 @@
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![产品网站](https://img.shields.io/badge/产品网站-打开-111111)](https://qinxujunai.github.io/VoiceFlow/)
-[![Windows Beta](https://img.shields.io/badge/Windows_Beta-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+[![Windows Beta](https://img.shields.io/badge/Windows_Beta-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#系统要求)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#隐私与联网)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
@@ -29,7 +29,7 @@ VoiceFlow 是 Windows 上的本地语音输入工具。按 `F2` 开始说话，�
 ## 快速开始
 
 普通用户请从[产品网站](https://qinxujunai.github.io/VoiceFlow/)选择平台，
-或直接打开 [GitHub Releases](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+或直接打开 [GitHub Releases](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
 下载 `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`。安装包已包含默认离线模型，
 不需要 Python。
 

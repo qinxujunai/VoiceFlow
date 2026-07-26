@@ -8,7 +8,7 @@
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![Product site](https://img.shields.io/badge/product_site-open-111111)](https://qinxujunai.github.io/VoiceFlow/?lang=en)
-[![Windows Beta](https://img.shields.io/badge/Windows_Beta-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+[![Windows Beta](https://img.shields.io/badge/Windows_Beta-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#privacy-and-networking)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
@@ -30,7 +30,7 @@ VoiceFlow is local-first dictation for Windows. Press `F2`, speak, and press it 
 
 For normal use, choose a platform on the
 [product site](https://qinxujunai.github.io/VoiceFlow/?lang=en) or open the
-[latest GitHub Release](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+[GitHub Release](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
 and download `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`. The installer includes the
 default offline model and needs no Python.
 
