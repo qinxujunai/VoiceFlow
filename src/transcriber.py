@@ -11,13 +11,14 @@ from engine_adapter import create_engine_adapter
 class Transcriber:
     """sherpa-onnx ASR 转写器"""
 
-    def __init__(self, config_path=None):
+    def __init__(self, config_path=None, *, asset_roots=None):
         if config_path is None:
             config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
         self.base_dir = os.path.dirname(os.path.abspath(config_path))
+        self.asset_roots = asset_roots
         self.recognizer = None
         self.adapter = None
         self.current_engine = None
@@ -31,7 +32,12 @@ class Transcriber:
         if not engine_cfg:
             raise ValueError(f"未找到引擎配置: {engine_name}")
 
-        self.adapter = create_engine_adapter(engine_name, engine_cfg, self.base_dir)
+        self.adapter = create_engine_adapter(
+            engine_name,
+            engine_cfg,
+            self.base_dir,
+            asset_roots=self.asset_roots,
+        )
         self.adapter.load()
         self.recognizer = self.adapter.recognizer
         self.current_engine = engine_name

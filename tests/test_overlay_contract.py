@@ -182,13 +182,17 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert 'for label in ("历史", "听写", "快捷键", "诊断")' in overlay
+    assert (
+        'for label in ("首页", "历史", "听写", "快捷键", "词典", "诊断", "关于")'
+        in overlay
+    )
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
     assert 'self.model_combo.setAccessibleName("识别模型")' in overlay
     assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
     assert 'self.microphone_combo.setAccessibleName("麦克风")' in overlay
-    assert 'self.doctor_text.setAccessibleName("诊断结果")' in overlay
+    assert 'self.doctor_list.setAccessibleName("诊断结果")' in overlay
+    assert 'self.practice_box.setAccessibleName("VoiceFlow 试说输入框")' in overlay
 
 
 def test_history_does_not_expose_internal_output_status_codes():
@@ -235,6 +239,26 @@ def test_recording_window_shows_after_js_state_preparation():
     assert "self.overlay.show_window()" not in start_block
     assert "js_then_show_requested.emit(f\"prepareRecording({int(session_id)})\")" in overlay
     assert "runJavaScript(code, lambda _: self.show_requested.emit())" in overlay
+    assert "self.overlay.show_recording(generation, triggered_at)" in start_block
+    assert start_block.index("self.overlay.show_recording") < start_block.index(
+        "self.session.start()"
+    )
+
+
+def test_trigger_feedback_is_recorded_after_the_real_qt_paint():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "class _PaintAwareWindow(QMainWindow):" in overlay
+    assert "first_paint_completed = Signal()" in overlay
+    assert "QTimer.singleShot(0, self.first_paint_completed.emit)" in overlay
+    assert "before_show=self._expect_recording_paint" in overlay
+    assert "self._on_recording_painted(session_id, elapsed_ms)" in overlay
+    assert "def _on_recording_painted(self, generation, elapsed_ms):" in main
+    assert "self._last_trigger_to_feedback_ms = float(elapsed_ms)" in main
+    assert "time.perf_counter() - triggered_at" not in main[
+        main.index("def _on_record_start"):main.index("def _on_record_stop")
+    ]
 
 
 def test_recording_start_cancels_pending_hide_timer():
@@ -242,7 +266,7 @@ def test_recording_start_cancels_pending_hide_timer():
     init_idx = overlay.index("def __init__(self):")
     run_idx = overlay.index("def _run(self):", init_idx)
     init_block = overlay[init_idx:run_idx]
-    recording_idx = overlay.index("def show_recording(self, session_id):")
+    recording_idx = overlay.index("def show_recording(self, session_id, triggered_at=None):")
     streaming_idx = overlay.index("def update_streaming", recording_idx)
     recording_block = overlay[recording_idx:streaming_idx]
 
@@ -250,18 +274,20 @@ def test_recording_start_cancels_pending_hide_timer():
     assert "self._cancel_pending_hide()" in recording_block
 
 
-def test_app_launch_opens_settings_before_background_model_load():
+def test_app_launch_only_opens_onboarding_before_background_model_load():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     ready_idx = main.index("def _on_overlay_ready")
     start_hotkeys_idx = main.index("def _start_hotkeys", ready_idx)
     ready_block = main[ready_idx:start_hotkeys_idx]
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert "self.overlay.show_settings_window()" in ready_block
-    assert "def _on_overlay_ready(self):\n        from qt_compat import QTimer\n\n        self.overlay.show_settings_window()" in ready_block
+    assert "self.overlay.show_startup_window()" in ready_block
     assert "def show_settings_window(self):" in overlay
+    assert "def show_startup_window(self):" in overlay
     assert "settings_requested = Signal()" in overlay
+    assert "startup_requested = Signal()" in overlay
     assert "self._bridge.settings_requested.connect(self._show_settings)" in overlay
+    assert "self._bridge.startup_requested.connect(self._show_startup)" in overlay
 
 
 def test_settings_window_has_recent_history_copy_controls():
@@ -274,7 +300,7 @@ def test_settings_window_has_recent_history_copy_controls():
     assert "setItemWidget(item, self._history_card" in settings_block
     assert "self.search_box.setPlaceholderText(\"搜索最近转录\")" in settings_block
     assert "QPushButton(\"复制\")" in settings_block
-    assert "QPushButton(\"重新粘贴\")" in settings_block
+    assert "QPushButton(\"再次粘贴\")" in settings_block
     assert "QPushButton(\"复制全部\")" in settings_block
     assert "copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))" in settings_block
     assert "meta_parts.append(f\"尾部 {tail}\")" in settings_block
@@ -308,10 +334,24 @@ def test_settings_status_page_exposes_language_and_model_setup_action():
     assert '("语言", self.language_combo)' in settings_block
     assert "self.model_combo = QComboBox()" in settings_block
     assert "def _save_settings(self):" in settings_block
-    assert "QPushButton(\"管理模型\")" in settings_block
+    assert '"验证模型"' in settings_block
+    assert '"管理模型"' in settings_block
+    assert "self.model_manager.selectable_engines(config)" in settings_block
     assert "download.clicked.connect(self._open_model_setup)" in settings_block
     assert "def _open_model_setup(self):" in settings_block
-    assert "scripts\\\\download_models.py" in settings_block
+    assert "self.model_manager.open_setup" in settings_block
+
+
+def test_settings_runtime_actions_do_not_depend_on_source_tree_tools():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert "venv" not in settings_block
+    assert "scripts\\\\download_models.py" not in settings_block
+    assert "scripts/doctor.py" not in settings_block
+    assert "run_runtime_diagnostics" in settings_block
 
 
 def test_tray_primary_click_opens_settings_not_raw_overlay():

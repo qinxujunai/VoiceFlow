@@ -11,6 +11,7 @@ import argparse
 import copy
 import io
 import json
+import re
 import tempfile
 import time
 import wave
@@ -193,11 +194,44 @@ def _char_error_rate(reference, hypothesis):
     return previous[-1] / len(reference)
 
 
-def benchmark(limit=None, manifest=None):
+def _pathological_output_reason(text, duration):
+    text = str(text or "")
+    compact = "".join(character.lower() for character in text if character.isalnum())
+    if not compact:
+        return None
+
+    repeated_character = re.search(r"(.)\1{11,}", compact)
+    if repeated_character:
+        return f"连续重复字符: {repeated_character.group(1)!r}"
+
+    if len(compact) >= 20:
+        dominant = max(compact.count(character) for character in set(compact))
+        if dominant / len(compact) >= 0.7:
+            return "单一字符占比异常"
+
+    words = re.findall(r"\w+", text.lower(), flags=re.UNICODE)
+    for width in range(1, min(6, len(words) // 5) + 1):
+        for start in range(len(words) - width * 5 + 1):
+            phrase = words[start:start + width]
+            if all(
+                words[start + repeat * width:start + (repeat + 1) * width] == phrase
+                for repeat in range(1, 5)
+            ):
+                return "连续重复词或短语"
+
+    if duration and duration > 0:
+        characters_per_second = len(compact) / duration
+        if len(compact) >= 20 and characters_per_second > 40:
+            return f"输出速率异常: {characters_per_second:.1f} 字符/秒"
+    return None
+
+
+def benchmark(limit=None, manifest=None, *, strict_output=False):
     config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     samples = _eval_samples(manifest, limit) if manifest else _wav_files(limit)
     terms = _domain_terms(config)
     cleaner = TextCleaner(config, base_dir=ROOT)
+    output_failures = []
     if not samples:
         raise SystemExit("No benchmark samples found")
 
@@ -237,8 +271,16 @@ def benchmark(limit=None, manifest=None):
                     print(f"{'':>12} | term hits: {', '.join(term_hits)}")
                 if explicit_terms and missed_terms:
                     print(f"{'':>12} | missed terms: {', '.join(missed_terms)}")
+                if strict_output:
+                    reason = _pathological_output_reason(clean_text, duration)
+                    if reason:
+                        output_failures.append(f"{name}/{sample['id']}: {reason}")
         finally:
             Path(cfg_path).unlink(missing_ok=True)
+    if output_failures:
+        raise SystemExit(
+            "Model output quality gate failed:\n- " + "\n- ".join(output_failures)
+        )
 
 
 def main():
@@ -246,8 +288,17 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark local VoiceFlow ASR models")
     parser.add_argument("--limit", type=int, default=None, help="limit number of wav files")
     parser.add_argument("--manifest", default=None, help="JSONL eval manifest with audio/reference fields")
+    parser.add_argument(
+        "--strict-output",
+        action="store_true",
+        help="fail on pathological repetition or impossible output rate",
+    )
     args = parser.parse_args()
-    benchmark(limit=args.limit, manifest=args.manifest)
+    benchmark(
+        limit=args.limit,
+        manifest=args.manifest,
+        strict_output=args.strict_output,
+    )
 
 
 if __name__ == "__main__":

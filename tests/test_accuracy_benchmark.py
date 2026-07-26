@@ -53,6 +53,36 @@ def test_clean_cer_can_improve_over_raw_cer():
     assert clean == 0
 
 
+def test_pathological_output_rejects_repetition_and_impossible_text_rate():
+    import benchmark_models
+
+    assert benchmark_models._pathological_output_reason(
+        "together. " + ("0" * 300),
+        duration=4.6,
+    )
+    assert benchmark_models._pathological_output_reason(
+        "hello " * 12,
+        duration=3.0,
+    )
+    assert benchmark_models._pathological_output_reason(
+        "这是正常语句但是长度与极短音频明显不匹配",
+        duration=0.1,
+    )
+
+
+def test_pathological_output_accepts_normal_multilingual_transcription():
+    import benchmark_models
+
+    assert benchmark_models._pathological_output_reason(
+        "开放时间早上九点至下午五点。",
+        duration=5.7,
+    ) is None
+    assert benchmark_models._pathological_output_reason(
+        "The tribal chieftain presented him with fifty pieces of gold.",
+        duration=7.2,
+    ) is None
+
+
 def test_transcriber_reads_provider_and_thread_settings_from_config():
     adapter = (ROOT / "src" / "engine_adapter.py").read_text(encoding="utf-8")
     config = (ROOT / "config.yaml").read_text(encoding="utf-8")

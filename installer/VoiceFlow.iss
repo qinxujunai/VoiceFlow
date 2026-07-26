@@ -1,6 +1,6 @@
 #define MyAppName "VoiceFlow"
 #define MyAppVersion "0.2.0-beta.1"
-#define MyAppPublisher "VoiceFlow contributors"
+#define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 
 [Setup]
@@ -15,7 +15,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist\installer
-OutputBaseFilename=VoiceFlow-{#MyAppVersion}-win-x64
+OutputBaseFilename=VoiceFlow-Setup-{#MyAppVersion}-x64
 SetupIconFile=..\assets\voiceflow.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 LicenseFile=..\LICENSE
@@ -39,22 +39,19 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式"; Flags: unchecked
-Name: "autostart"; Description: "登录 Windows 后自动启动"; GroupDescription: "启动"; Flags: unchecked
 
 [Files]
 Source: "..\dist\VoiceFlow\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; The offline default model is only included in an internal build after its
 ; distribution license review is recorded. CI sets INCLUDE_SENSEVOICE for that build.
 #ifdef INCLUDE_SENSEVOICE
-Source: "..\models\sensevoice\*"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\models\sensevoice\model.int8.onnx"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion
+Source: "..\models\sensevoice\tokens.txt"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion
 #endif
 
 [Icons]
 Name: "{group}\VoiceFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
 Name: "{autodesktop}\VoiceFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
-
-[Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "VoiceFlow"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 VoiceFlow"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
@@ -63,4 +60,6 @@ Filename: "{app}\{#MyAppExeName}"; Description: "启动 VoiceFlow"; WorkingDir: 
 Filename: "{cmd}"; Parameters: "/c taskkill /IM VoiceFlow.exe /F"; Flags: runhidden; RunOnceId: "StopVoiceFlow"
 
 [UninstallDelete]
+; User-owned config, history, vocabulary, logs, and downloaded models live
+; under {localappdata}\VoiceFlow and are intentionally retained.
 Type: filesandordirs; Name: "{app}"

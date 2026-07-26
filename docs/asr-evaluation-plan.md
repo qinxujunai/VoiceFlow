@@ -16,9 +16,9 @@ the contract.
 ## Candidate Engines
 
 - SenseVoice ONNX: current default, strong fit for low-latency Chinese local dictation.
-- faster-whisper: candidate for broader multilingual accuracy and Whisper ecosystem compatibility.
-- whisper.cpp: candidate for portable local packaging and quantized deployment.
-- qwen3-asr or other local ONNX engines: candidate only after they pass the same local tests.
+- Qwen3-ASR 0.6B int8: implemented accuracy challenger.
+- Fun-ASR Nano int8: implemented Chinese/hotword challenger.
+- Whisper large-v3-turbo int8: implemented multilingual control.
 
 No candidate should become the default until it beats the current engine on the
 same local manifest.
@@ -38,17 +38,8 @@ same local manifest.
 Store private samples outside Git if they contain personal speech. A checked-in
 example manifest can use public or synthetic audio only.
 
-```json
-[
-  {
-    "id": "zh-short-command-001",
-    "audio": "benchmarks/audio/zh-short-command-001.wav",
-    "language": "zh",
-    "duration_seconds": 5.2,
-    "expected": "把这个方案整理成三个重点。",
-    "terms": ["方案"]
-  }
-]
+```jsonl
+{"id":"zh-short-command-001","audio":"audio/zh-short-command-001.wav","reference":"把这个方案整理成三个重点。","terms":["方案"]}
 ```
 
 ## Acceptance Bar
@@ -71,3 +62,7 @@ per-sample JSONL plus a summary, applies the fixed weighted score and hard
 gates, and leaves the default unchanged when coverage is incomplete. Add
 `--promote` only for a controlled run; promotion still happens only when every
 gate passes.
+
+The weekly model smoke also runs `benchmark_models.py --strict-output`.
+Pathological repetition or an impossible output rate is a hard failure, even
+when the process itself exits normally.

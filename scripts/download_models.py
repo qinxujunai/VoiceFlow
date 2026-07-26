@@ -114,9 +114,14 @@ def main():
         default="sensevoice",
     )
     parser.add_argument("--all", action="store_true", help="下载全部模型")
+    parser.add_argument(
+        "--base-dir",
+        default=str(ROOT),
+        help="模型写入根目录；桌面运行时使用用户数据目录",
+    )
     args = parser.parse_args()
 
-    base_dir = os.path.dirname(os.path.dirname(__file__))
+    base_dir = os.path.abspath(args.base_dir)
 
     if args.all:
         download_sensevoice(base_dir)

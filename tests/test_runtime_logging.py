@@ -1,5 +1,4 @@
 import json
-import logging
 
 from runtime_logging import configure_runtime_logging
 

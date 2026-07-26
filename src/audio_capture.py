@@ -6,7 +6,6 @@
 import numpy as np
 import sounddevice as sd
 import threading
-import queue
 import time
 import yaml
 import os
@@ -68,7 +67,7 @@ class AudioCapture:
             self._recording_start_time = time.time()
             self._last_speech_time = time.time()
 
-        def audio_callback(indata, frames, time_info, status):
+        def audio_callback(indata, _frames, _time_info, status):
             if status:
                 pass
             if self._is_recording:

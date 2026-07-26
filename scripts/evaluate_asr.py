@@ -326,7 +326,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         getattr(args, "model_manifest", ROOT / "model-manifest.json")
     ).resolve()
     model_manifest = load_model_manifest(model_manifest_path)
-    config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     samples = _load_samples(args.manifest, args.limit)
     if not samples:
         raise SystemExit("evaluation manifest has no samples")

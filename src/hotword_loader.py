@@ -18,7 +18,7 @@ class HotwordLoader:
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
-        self.base_dir = os.path.dirname(os.path.dirname(__file__))
+        self.base_dir = os.path.dirname(os.path.abspath(config_path))
         self._hotwords = set()
         self._vocabulary = None
 

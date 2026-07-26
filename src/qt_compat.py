@@ -2,7 +2,7 @@
 
 try:
     QT_BINDING = "PySide6"
-    from PySide6.QtCore import Qt, QUrl, QSize, QObject, Signal, Slot, QTimer, QPointF, QEventLoop
+    from PySide6.QtCore import Qt, QUrl, QSize, QObject, Signal, Slot, QTimer, QPointF
     from PySide6.QtGui import (
         QAction,
         QColor,
@@ -10,7 +10,6 @@ try:
         QPainter,
         QPen,
         QPixmap,
-        QScreen,
     )
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -44,7 +43,6 @@ except ImportError:  # Development bridge for an existing pre-migration venv.
         pyqtSlot as Slot,
         QTimer,
         QPointF,
-        QEventLoop,
     )
     from PyQt6.QtGui import (
         QAction,
@@ -53,7 +51,6 @@ except ImportError:  # Development bridge for an existing pre-migration venv.
         QPainter,
         QPen,
         QPixmap,
-        QScreen,
     )
     from PyQt6.QtNetwork import QLocalServer, QLocalSocket
     from PyQt6.QtWebEngineWidgets import QWebEngineView

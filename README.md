@@ -7,6 +7,8 @@
 > 离线，即刻，不丢一个字。
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
+[![产品网站](https://img.shields.io/badge/产品网站-打开-111111)](https://qinxujunai.github.io/VoiceFlow/)
+[![Windows Beta](https://img.shields.io/badge/Windows_Beta-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#系统要求)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#隐私与联网)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
@@ -26,7 +28,15 @@ VoiceFlow 是 Windows 上的本地语音输入工具。按 `F2` 开始说话，�
 
 ## 快速开始
 
-VoiceFlow 目前以源码预览形式提供，尚未发布签名的 Windows 安装包。
+普通用户请从[产品网站](https://qinxujunai.github.io/VoiceFlow/)选择平台，
+或直接打开 [GitHub Releases](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+下载 `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`。安装包已包含默认离线模型，
+不需要 Python。
+
+> 当前公开 Beta 尚未完成 Authenticode 签名，Windows 可能显示信誉提示。
+> 请只从本仓库下载，并用 Release 中的 `SHA256SUMS.txt` 核对文件。
+
+开发者可从源码启动：
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -34,7 +44,8 @@ cd VoiceFlow
 start.bat
 ```
 
-首次启动会检查 Python 环境、安装依赖并引导准备本地模型。模型文件不进入 Git 仓库；任何下载都需要用户明确触发，并在启用前校验版本与文件完整性。
+源码模式首次启动会检查 Python 环境并准备本地模型。模型文件不进入 Git
+仓库；任何下载都需要用户明确触发，并在启用前校验版本与文件完整性。
 
 环境准备完成后，可通过桌面快捷方式安静启动。重复启动只会唤起现有窗口，不会产生多个主进程。
 
@@ -42,7 +53,7 @@ start.bat
 
 - Windows 10 或 Windows 11
 - 可用麦克风
-- 首次准备环境与模型时需要网络；日常识别可离线运行
+- 安装版无需网络；源码版首次准备环境与模型时需要网络
 
 ## 使用方式
 
@@ -67,13 +78,13 @@ start.bat
 - **完整尾部**：最终结果必须覆盖停止时的全部音频，流式预览不能替代最终转写。
 - **有界实时链路**：预览只读取最近的固定音频窗口；稳定片段完成后释放旧 PCM。
 - **最新帧优先**：悬浮层只渲染最新状态，过期识别结果和 UI 帧不会排队追赶。
-- **故障兜底**：即使自动粘贴失败，已识别文字仍保留在剪贴板与 `logs/history.jsonl`。
+- **故障兜底**：即使自动粘贴失败，已识别文字仍保留在剪贴板与 `%LOCALAPPDATA%\VoiceFlow\logs\history.jsonl`。
 
 ## 模型与语言
 
 当前默认引擎是离线 SenseVoice。VoiceFlow 也提供统一的模型适配与本机评测工具，用同一套准确率、延迟、尾部完整性和资源门槛比较 SenseVoice、Qwen3-ASR 与 Fun-ASR Nano；只有通过全部质量门的候选才会成为默认模型。
 
-识别语言在 `config.yaml` 中配置。当前支持的 `zh`、`en`、`auto` 等选项取决于所选模型的实际能力。
+首次运行会从项目或安装目录的 `config.yaml` 初始化用户配置，之后运行时设置保存在 `%LOCALAPPDATA%\VoiceFlow\config.yaml`。当前支持的 `zh`、`en`、`auto` 等语言选项取决于所选模型的实际能力。
 
 ## 开发与验证
 
@@ -86,6 +97,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 
 - [质量门](docs/quality-gate.md)
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
+- [运行时与用户数据边界](docs/runtime-boundary.md)
 - [发布检查清单](docs/release-checklist.md)
 
 ## 隐私与联网
@@ -94,8 +106,17 @@ venv\Scripts\python.exe scripts\verify.py --release
 
 ## 项目状态
 
-VoiceFlow 正处于公开 Beta 前的源码预览阶段。核心语音输入、长语音处理、剪贴板兜底和本地质量门已经可用；面向普通用户的签名安装包仍需完成最终模型授权审查、干净环境安装验证与代码签名。
+VoiceFlow 0.2.0-beta.1 是 Windows x64 公开测试版。安装态运行时边界、
+用户数据保留、SenseVoice 再分发记录和完整离线安装已完成本机验收。
+当前仍有两项明确限制：
+
+- 安装器尚未完成 Authenticode 代码签名，不是稳定版。
+- macOS 版尚未发布；全局输入、辅助功能权限、签名与 notarization
+  必须在真实 macOS 环境分别验收，不能由 Windows 构建代替。
 
 ## 许可证
 
 项目代码基于 [MIT License](LICENSE) 开源。模型及第三方组件遵循各自许可证，公开分发前会单独完成授权审查。
+
+- [SenseVoice 再分发记录](docs/sensevoice-redistribution-decision.md)
+- [Qt / PySide6 LGPL 合规记录](docs/qt-lgpl-compliance.md)

@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from overlay_webview import _SettingsWindow  # noqa: E402
+from runtime_services import run_runtime_diagnostics  # noqa: E402
 from qt_compat import (  # noqa: E402
     QApplication,
     QMainWindow,
@@ -66,9 +67,19 @@ def _capture_settings(app: QApplication, output_dir: Path) -> list[dict]:
     window.refresh()
     window.show()
     captures = []
-    names = ("history", "dictation", "hotkeys", "diagnostics")
+    names = (
+        "home",
+        "history",
+        "dictation",
+        "hotkeys",
+        "dictionary",
+        "diagnostics",
+        "about",
+    )
     for index, name in enumerate(names):
         window.sidebar.setCurrentRow(index)
+        if name == "diagnostics":
+            window._finish_doctor(run_runtime_diagnostics(window.paths))
         for _ in range(5):
             app.processEvents()
         captures.append(_save_widget(window, output_dir / f"settings-{name}.png"))

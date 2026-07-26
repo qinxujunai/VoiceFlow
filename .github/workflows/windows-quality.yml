@@ -11,20 +11,25 @@ on:
   schedule:
     - cron: "20 3 * * 0"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
         run: python -m pip install -r requirements.lock
       - name: Restore model cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: models/sensevoice
           key: sensevoice-${{ hashFiles('model-manifest.json') }}
@@ -45,12 +50,21 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install -r requirements.lock
+      - name: Restore model cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: models/sensevoice
+          key: sensevoice-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned baseline model
+        run: python scripts/download_models.py --engine sensevoice
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
       - name: Smoke packaged executable
@@ -58,12 +72,16 @@ jobs:
         run: |
           if (-not (Test-Path dist\VoiceFlow\VoiceFlow.exe)) { throw "VoiceFlow.exe missing" }
           Get-AuthenticodeSignature dist\VoiceFlow\VoiceFlow.exe | Format-List
+          ./scripts/smoke_packaged_runtime.ps1
       - name: Build unsigned installer smoke artifact
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' installer\VoiceFlow.iss
-      - uses: actions/upload-artifact@v7
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
+      - name: Smoke full offline installer
+        shell: pwsh
+        run: ./scripts/smoke_installer.ps1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: VoiceFlow-windows-unsigned
           path: dist/installer/*.exe
@@ -73,19 +91,22 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install -r requirements.lock
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: models
           key: model-lab-${{ hashFiles('model-manifest.json') }}
       - run: python scripts/download_models.py --all
-      - run: python scripts/benchmark_models.py --limit 5 | Tee-Object -FilePath model-smoke.txt
-      - uses: actions/upload-artifact@v7
+      - run: python scripts/benchmark_models.py --limit 5 --strict-output | Tee-Object -FilePath model-smoke.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
           name: weekly-model-smoke
           path: model-smoke.txt
