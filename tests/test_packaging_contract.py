@@ -75,6 +75,8 @@ def test_product_site_is_bilingual_and_truthful_about_platform_artifacts():
     assert 'data-language="zh"' in index
     assert 'data-language="en"' in index
     assert "VoiceFlow-Setup-0.2.0-beta.1-x64.exe" in index
+    assert "releases/latest/download" not in index
+    assert "releases/download/v0.2.0-beta.1/" in index
     assert "macOS" in index
     assert "尚未发布" in index
     assert "未签名" in index
