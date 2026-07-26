@@ -17,6 +17,7 @@ This gate runs:
 - pytest
 - deterministic 500-cycle recording state test
 - quick ASR benchmark
+- pathological output detection for strict scheduled model smoke
 - integration test
 
 For a release candidate, run:
@@ -26,10 +27,21 @@ venv\Scripts\python.exe scripts\verify.py --release
 venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```
 
-Release mode also requires at least 20 real samples in each responsiveness
-bucket and rejects trigger-to-feedback P95 >= 100 ms, short stop-to-paste P95
-> 700 ms, or two-minute P95 > 2.5 seconds. UI capture covers 100%, 125%, 150%,
-and 200% scale.
+Release mode also requires at least 20 reproducible measurements in each
+responsiveness bucket and rejects trigger-to-feedback P95 >= 100 ms, short
+stop-to-paste P95 > 700 ms, or two-minute P95 > 2.5 seconds. Generate the
+evidence on the release machine first:
+
+```bat
+venv\Scripts\python.exe scripts\measure_overlay_feedback.py --samples 20
+venv\Scripts\python.exe scripts\measure_pipeline_performance.py --samples 20
+```
+
+The first command measures the real Qt paint completion. The second runs the
+default ASR, text cleaner, progressive long-dictation tail, and output timing
+path with deterministic audio and suppressed keyboard side effects. Stable
+release approval still requires the separate real-device Windows matrix. UI
+capture covers 100%, 125%, 150%, and 200% scale.
 
 ## Product Invariants
 

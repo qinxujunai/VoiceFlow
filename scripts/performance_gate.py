@@ -18,8 +18,14 @@ def _p95(values: list[float]) -> float | None:
     return ordered[max(0, math.ceil(len(ordered) * 0.95) - 1)]
 
 
-def analyze_history(path: str | Path, minimum_samples: int = 20) -> dict:
+def analyze_history(
+    path: str | Path,
+    minimum_samples: int = 20,
+    evidence_path: str | Path | None = None,
+) -> dict:
     history_path = Path(path)
+    if evidence_path is not None and Path(evidence_path).exists():
+        history_path = Path(evidence_path)
     rows = []
     if history_path.exists():
         for line in history_path.read_text(encoding="utf-8").splitlines():
@@ -65,9 +71,17 @@ def analyze_history(path: str | Path, minimum_samples: int = 20) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="VoiceFlow release performance gate")
     parser.add_argument("--history", default=str(ROOT / "logs" / "history.jsonl"))
+    parser.add_argument(
+        "--evidence",
+        default=str(ROOT / "logs" / "performance-evidence.jsonl"),
+    )
     parser.add_argument("--minimum-samples", type=int, default=20)
     args = parser.parse_args()
-    result = analyze_history(args.history, args.minimum_samples)
+    result = analyze_history(
+        args.history,
+        args.minimum_samples,
+        evidence_path=args.evidence,
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["passed"] else 1
 

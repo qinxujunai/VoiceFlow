@@ -14,7 +14,7 @@ The product is intentionally small. Reliability, low latency, and "never lose te
 - Final output must cover the complete stopped audio, not only the streaming preview.
 - Streaming preview may be throttled for long recordings, but final transcription must remain complete.
 - Tray menu must expose a working Exit action.
-- Default triggers are F2 plus xbutton1/xbutton2. Do not add more default keys unless there is a strong reason.
+- Default triggers are F2, Right Ctrl, xbutton1, and xbutton2. Do not add more default keys unless there is a strong reason.
 
 ## Current Flow
 
@@ -48,7 +48,9 @@ Vocabulary and corrections are deterministic post-processing. SenseVoice hotword
 
 `OutputHandler` copies text to clipboard before attempting `Ctrl+V`. This guarantees that a user can manually paste even when focus is not in a text field.
 
-`HistoryStore` writes JSONL entries to `logs/history.jsonl`. Each successful text output should have raw text, cleaned text, output status, and timestamp.
+`HistoryStore` writes JSONL entries to
+`%LOCALAPPDATA%\VoiceFlow\logs\history.jsonl`. Each successful text output
+should have raw text, cleaned text, output status, and timestamp.
 
 ## UI
 
@@ -65,9 +67,15 @@ The tray icon is generated at runtime for status. The application/shortcut icon 
 
 ## Packaging
 
-`start.bat` remains the development launcher. `scripts/create_shortcut.ps1` creates a desktop shortcut for daily use.
+`start.bat` remains the development launcher.
+`scripts/create_shortcut.ps1` creates a source-mode desktop shortcut for
+maintainers. Installed builds use the Start menu shortcut created by Inno.
 
 `VoiceFlow.spec` produces a PySide6 onedir build so Qt libraries remain dynamically replaceable and startup avoids one-file extraction. `installer/VoiceFlow.iss` produces a per-user installer. Model inclusion is a separate release decision gated by Model Lab results and redistribution terms.
+
+The public installer candidate includes only the pinned SenseVoice int8 model
+and tokens. User configuration, history, vocabulary, logs, and downloaded
+models live outside the install directory under `%LOCALAPPDATA%\VoiceFlow`.
 
 ## Verification
 
