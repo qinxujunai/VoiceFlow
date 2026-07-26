@@ -78,14 +78,64 @@ def update_runtime_settings(
     os.replace(temporary, path)
 
 
-def autostart_command(root: str | Path) -> str:
-    root_path = Path(root)
-    pythonw = root_path / "venv" / "Scripts" / "pythonw.exe"
+def onboarding_completed(config_path: str | Path) -> bool:
+    import yaml
+
+    try:
+        config = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
+    except Exception:
+        return False
+    return bool(config.get("ui", {}).get("onboarding_completed", False))
+
+
+def set_onboarding_completed(config_path: str | Path, completed: bool = True) -> None:
+    path = Path(config_path)
+    text = path.read_text(encoding="utf-8")
+    ui_match = re.search(r"(?m)^ui:\s*$", text)
+    replacement = f"  onboarding_completed: {_yaml_scalar(completed)}"
+    if ui_match:
+        next_top = re.search(r"(?m)^\S[^:]*:\s*$", text[ui_match.end():])
+        end = ui_match.end() + next_top.start() if next_top else len(text)
+        block = text[ui_match.end():end]
+        block, count = re.subn(
+            r"(?m)^  onboarding_completed:\s*[^#\r\n]*"
+            r"(?P<comment>\s+#.*)?$",
+            lambda match: replacement + (match.group("comment") or ""),
+            block,
+            count=1,
+        )
+        if not count:
+            block = f"\n{replacement}" + block
+        text = text[:ui_match.end()] + block + text[end:]
+    else:
+        separator = "" if text.endswith(("\n", "\r")) else "\n"
+        text = f"{text}{separator}\nui:\n{replacement}\n"
+
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def autostart_command(root) -> str:
+    mode = getattr(getattr(root, "mode", None), "value", None)
+    if mode == "frozen":
+        return f'"{Path(root.executable).resolve()}"'
+
+    root_path = Path(getattr(root, "install_dir", root))
+    runtime_executable = getattr(root, "executable", None)
+    if runtime_executable:
+        pythonw = Path(runtime_executable)
+        if pythonw.name.lower() == "python.exe":
+            windowed = pythonw.with_name("pythonw.exe")
+            if windowed.exists():
+                pythonw = windowed
+    else:
+        pythonw = root_path / "venv" / "Scripts" / "pythonw.exe"
     launcher = root_path / "scripts" / "launch_voiceflow.pyw"
     return f'"{pythonw}" "{launcher}"'
 
 
-def is_autostart_enabled(root: str | Path) -> bool:
+def is_autostart_enabled(root) -> bool:
     if sys.platform != "win32":
         return False
     import winreg
@@ -101,7 +151,7 @@ def is_autostart_enabled(root: str | Path) -> bool:
         return False
 
 
-def set_autostart(root: str | Path, enabled: bool) -> None:
+def set_autostart(root, enabled: bool) -> None:
     if sys.platform != "win32":
         return
     import winreg

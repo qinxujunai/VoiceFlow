@@ -22,6 +22,15 @@ a = Analysis(
         (str(PROJECT_ROOT / "model-manifest.json"), "."),
         (str(PROJECT_ROOT / "LICENSE"), "."),
         (str(PROJECT_ROOT / "THIRD_PARTY_NOTICES.md"), "."),
+        (str(PROJECT_ROOT / "licenses"), "licenses"),
+        (
+            str(PROJECT_ROOT / "docs" / "sensevoice-redistribution-decision.md"),
+            "docs",
+        ),
+        (
+            str(PROJECT_ROOT / "docs" / "qt-lgpl-compliance.md"),
+            "docs",
+        ),
         # Vocabulary files.
         (str(PROJECT_ROOT / "knowledge-base"), "knowledge-base"),
         (str(PROJECT_ROOT / "assets" / "voiceflow.ico"), "assets"),
@@ -82,6 +91,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(PROJECT_ROOT / "assets" / "voiceflow.ico"),
+    version=str(PROJECT_ROOT / "assets" / "version_info.txt"),
     contents_directory=".",
 )
 

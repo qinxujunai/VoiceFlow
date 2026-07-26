@@ -1,5 +1,5 @@
-# Local STT Toolkit 配置文件
-# 位置: 项目根目录/config.yaml
+# VoiceFlow 默认配置模板
+# 首次运行会复制到 %LOCALAPPDATA%\VoiceFlow\config.yaml
 
 # ============================================================
 # 引擎配置

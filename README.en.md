@@ -7,6 +7,8 @@
 > Offline. Immediate. Never lose a word.
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
+[![Product site](https://img.shields.io/badge/product_site-open-111111)](https://qinxujunai.github.io/VoiceFlow/?lang=en)
+[![Windows Beta](https://img.shields.io/badge/Windows_Beta-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#privacy-and-networking)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
@@ -26,7 +28,17 @@ VoiceFlow is local-first dictation for Windows. Press `F2`, speak, and press it 
 
 ## Quick Start
 
-VoiceFlow is currently distributed as a source preview. A signed Windows installer is not available yet.
+For normal use, choose a platform on the
+[product site](https://qinxujunai.github.io/VoiceFlow/?lang=en) or open the
+[latest GitHub Release](https://github.com/qinxujunai/VoiceFlow/releases/latest)
+and download `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`. The installer includes the
+default offline model and needs no Python.
+
+> This public Beta is not yet Authenticode-signed, so Windows may display a
+> reputation warning. Download only from this repository and verify the file
+> against `SHA256SUMS.txt` in the Release.
+
+Developers can run from source:
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -34,7 +46,9 @@ cd VoiceFlow
 start.bat
 ```
 
-The first run validates the Python environment, installs dependencies, and guides you through preparing a local model. Model files are not stored in Git; downloads are always explicit and assets are verified before activation.
+Source mode validates the Python environment and prepares a local model on first
+run. Model files are not stored in Git; downloads are always explicit and
+assets are verified before activation.
 
 Once setup is complete, the desktop shortcut starts VoiceFlow without a console window. Starting it again brings the existing instance forward instead of creating another process.
 
@@ -42,7 +56,7 @@ Once setup is complete, the desktop shortcut starts VoiceFlow without a console 
 
 - Windows 10 or Windows 11
 - A working microphone
-- Network access for initial environment and model setup; everyday recognition runs offline
+- The installed build needs no network; source setup needs network once
 
 ## Controls
 
@@ -67,13 +81,13 @@ Text shown while recording is a live preview. After you stop, VoiceFlow finishes
 - **Complete tail coverage**: final output must include all stopped audio; preview is never treated as the final transcript.
 - **Bounded live work**: preview reads a fixed recent audio window, and old PCM is released after stable segments settle.
 - **Latest state wins**: the overlay renders the newest state instead of queueing stale recognition results or animation frames.
-- **Failure recovery**: recognized text remains in the clipboard and `logs/history.jsonl` even when automatic paste fails.
+- **Failure recovery**: recognized text remains in the clipboard and `%LOCALAPPDATA%\VoiceFlow\logs\history.jsonl` even when automatic paste fails.
 
 ## Models and Languages
 
 The current default engine is offline SenseVoice. VoiceFlow also provides a common model adapter and local evaluation tooling for SenseVoice, Qwen3-ASR, and Fun-ASR Nano. Candidates are compared on accuracy, latency, tail completeness, and resource use; only an engine that passes every product gate can become the default.
 
-Recognition language is configured in `config.yaml`. Options such as `zh`, `en`, and `auto` depend on the selected model's actual capabilities.
+On first run, VoiceFlow seeds user configuration from the project or installed `config.yaml`. Runtime settings then live at `%LOCALAPPDATA%\VoiceFlow\config.yaml`. Options such as `zh`, `en`, and `auto` depend on the selected model's actual capabilities.
 
 ## Development and Verification
 
@@ -86,6 +100,7 @@ The standard gate covers environment diagnostics, compile checks, automated test
 
 - [Quality gate](docs/quality-gate.md)
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
+- [Runtime and user-data boundary](docs/runtime-boundary.md)
 - [Release checklist](docs/release-checklist.md)
 
 ## Privacy and Networking
@@ -94,8 +109,18 @@ Recordings, transcripts, vocabulary, and history stay on the local machine by de
 
 ## Project Status
 
-VoiceFlow is a source preview approaching public beta. Core dictation, long-recording handling, clipboard recovery, and local quality gates are available. A signed end-user installer still requires final model redistribution review, clean-machine installation validation, and code signing.
+VoiceFlow 0.2.0-beta.1 is a public Windows x64 test build. The installed-runtime
+boundary, user-data retention, SenseVoice redistribution record, and full
+offline installer have passed local validation. Two limitations remain explicit:
+
+- The installer is not yet Authenticode-signed and is not a stable release.
+- macOS is not released. Global input, Accessibility permissions, signing, and
+  notarization must be validated on real macOS hardware and cannot be replaced
+  by a Windows build.
 
 ## License
 
 VoiceFlow source code is available under the [MIT License](LICENSE). Models and third-party components remain subject to their respective licenses and are reviewed separately before public redistribution.
+
+- [SenseVoice redistribution record](docs/sensevoice-redistribution-decision.md)
+- [Qt / PySide6 LGPL compliance record](docs/qt-lgpl-compliance.md)

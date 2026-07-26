@@ -25,6 +25,7 @@ from recording_session import RecordingSession
 from recording_state import RecordingState, RecordingStateMachine
 from runtime_logging import configure_runtime_logging
 from audio_activity import SileroSpeechDetector, has_lexical_content, has_speech_activity
+from runtime_paths import AppPaths, prepare_runtime_layout
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -47,6 +48,7 @@ class _InitWorker(threading.Thread):
 
 class VoiceInputSystem:
     STREAM_PREVIEW_WINDOW_SECONDS = 18.0
+    STREAM_PREVIEW_INTERVAL_SECONDS = 0.8
     STREAM_FULL_PREVIEW_MAX_SECONDS = 45.0
     STREAM_PREVIEW_MAX_LAG_SECONDS = 2.0
     FINAL_SEGMENT_SECONDS = 18.0
@@ -57,11 +59,12 @@ class VoiceInputSystem:
     FINAL_TEXT_HOLD_SHORT_MS = 700
     FINAL_TEXT_HOLD_LONG_MS = 1400
 
-    def __init__(self, config_path=None):
-        self.base_dir = self._resolve_base_dir(config_path)
-        configure_runtime_logging(os.path.join(self.base_dir, "logs", "runtime.jsonl"))
-        if config_path is None:
-            config_path = os.path.join(self.base_dir, "config.yaml")
+    def __init__(self, config_path=None, *, paths=None):
+        self.paths = paths or AppPaths.discover(config_path=config_path)
+        self.migration = prepare_runtime_layout(self.paths)
+        self.base_dir = str(self.paths.data_dir)
+        configure_runtime_logging(str(self.paths.logs_dir / "runtime.jsonl"))
+        config_path = str(self.paths.config_file)
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
@@ -82,8 +85,7 @@ class VoiceInputSystem:
         self._speech_min_active_ms = int(vad_config.get("min_speech_ms", 90))
         self._speech_detector = None
         if self._speech_gate_enabled:
-            vad_model = os.path.join(
-                self.base_dir,
+            vad_model = self.paths.resolve_asset(
                 vad_config.get("model_path", "assets/silero_vad.onnx"),
             )
             try:
@@ -95,26 +97,8 @@ class VoiceInputSystem:
                 )
             except Exception:
                 logger.exception("Silero VAD unavailable; using the energy safety gate")
-        self.overlay = OverlayWindow()
-        self.history = HistoryStore(os.path.join(self.base_dir, "logs", "history.jsonl"))
-
-    def _resolve_base_dir(self, config_path=None):
-        if config_path:
-            return os.path.dirname(os.path.abspath(config_path))
-
-        dev_root = os.path.dirname(os.path.dirname(__file__))
-        if not getattr(sys, "frozen", False):
-            return dev_root
-
-        candidates = [
-            os.getcwd(),
-            os.path.dirname(sys.executable),
-            getattr(sys, "_MEIPASS", ""),
-        ]
-        for candidate in candidates:
-            if candidate and os.path.exists(os.path.join(candidate, "config.yaml")):
-                return candidate
-        return os.path.dirname(sys.executable)
+        self.overlay = OverlayWindow(self.paths)
+        self.history = HistoryStore(self.paths.history_file)
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
@@ -124,7 +108,10 @@ class VoiceInputSystem:
 
         print("[启动] ASR...", flush=True)
         self.overlay.show_processing()
-        self.transcriber = Transcriber(self.config_path)
+        self.transcriber = Transcriber(
+            self.config_path,
+            asset_roots=self.paths.asset_roots,
+        )
         engine = self.config.get("engine", {}).get("active", "sensevoice")
         self.transcriber.load_engine(engine)
         print(f"[启动] {engine}", flush=True)
@@ -138,6 +125,7 @@ class VoiceInputSystem:
             on_output_text=self._output_text,
             on_open_dictionary=self._open_dictionary,
             on_quit=self.shutdown,
+            on_recording_painted=self._on_recording_painted,
         )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
@@ -148,6 +136,11 @@ class VoiceInputSystem:
         if self._recording_state.current is not RecordingState.RECORDING:
             return
         self.overlay.update_audio_level(levels, self._stream_generation)
+
+    def _on_recording_painted(self, generation, elapsed_ms):
+        if generation != self._stream_generation:
+            return
+        self._last_trigger_to_feedback_ms = float(elapsed_ms)
 
     def _on_record_toggle(self, triggered_at=None):
         state = self._recording_state.current
@@ -160,14 +153,11 @@ class VoiceInputSystem:
         if not self._recording_state.claim_start():
             return
         try:
-            self.session.start()
             self._stream_generation += 1
             generation = self._stream_generation
-            self.overlay.show_recording(generation)
-            if triggered_at is not None:
-                self._last_trigger_to_feedback_ms = (
-                    time.perf_counter() - triggered_at
-                ) * 1000
+            self._last_trigger_to_feedback_ms = None
+            self.overlay.show_recording(generation, triggered_at)
+            self.session.start()
             self._latest_text = ""
             self._reset_final_cache()
             self._start_streaming(generation)
@@ -232,6 +222,7 @@ class VoiceInputSystem:
                     stop_to_paste_ms=stop_to_paste_ms,
                     transcription_ms=transcription_ms,
                 )
+                self.overlay.complete_onboarding()
                 self.overlay.show_final_text(text, final_generation)
                 self.overlay.hide_after(self._final_text_hold_ms(duration))
             else:
@@ -245,9 +236,6 @@ class VoiceInputSystem:
             traceback.print_exc()
         finally:
             self._recording_state.complete_processing()
-
-    def _stream_preview_interval(self, elapsed_seconds):
-        return 0.8
 
     def _audio_sample_count(self):
         sample_count = getattr(self.audio, "sample_count", None)
@@ -499,8 +487,7 @@ class VoiceInputSystem:
                             continue
 
                         new_samples = total_samples - last_sample_count
-                        elapsed = total_samples / self.audio.sample_rate
-                        min_new_seconds = self._stream_preview_interval(elapsed)
+                        min_new_seconds = self.STREAM_PREVIEW_INTERVAL_SECONDS
 
                         if new_samples > self.audio.sample_rate * min_new_seconds or last_sample_count == 0:
                             # A pause is a correction point: refresh the visible text instead of skipping it.
@@ -611,7 +598,7 @@ class VoiceInputSystem:
             self.output_handler.output(text)
 
     def _open_dictionary(self):
-        os.startfile(os.path.join(self.base_dir, "knowledge-base"))
+        os.startfile(str(self.paths.knowledge_dir))
 
     # ---- 生命周期 ----
 
@@ -636,7 +623,7 @@ class VoiceInputSystem:
 
             handler_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
 
-            def handler(ctrl_type):
+            def handler(_ctrl_type):
                 self.shutdown()
                 return False
 
@@ -648,7 +635,7 @@ class VoiceInputSystem:
     def _on_overlay_ready(self):
         from qt_compat import QTimer
 
-        self.overlay.show_settings_window()
+        self.overlay.show_startup_window()
 
         def on_done():
             try:
@@ -695,9 +682,12 @@ class VoiceInputSystem:
 # ---- 测试 ----
 
 def test_mode(config_path):
+    paths = AppPaths.discover(config_path=config_path)
+    prepare_runtime_layout(paths)
+    config_path = str(paths.config_file)
     print("\n=== 测试模式 ===")
     audio = AudioCapture(config_path)
-    transcriber = Transcriber(config_path)
+    transcriber = Transcriber(config_path, asset_roots=paths.asset_roots)
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     engine = config.get("engine", {}).get("active", "sensevoice")
@@ -728,16 +718,14 @@ def main():
     p.add_argument("--config", default=None)
     args = p.parse_args()
 
-    config_path = args.config
-    if config_path is None:
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config.yaml"
-        )
-
     if args.test:
+        config_path = args.config or os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "config.yaml",
+        )
         test_mode(config_path)
     else:
-        VoiceInputSystem(config_path).start()
+        VoiceInputSystem(args.config).start()
 
 
 if __name__ == "__main__":

@@ -379,14 +379,10 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertIn("corrected_text=text", main)
         self.assertNotIn("_correct_final_text", main)
 
-    def test_stream_preview_cadence_does_not_degrade_with_duration(self):
+    def test_stream_preview_cadence_stays_responsive(self):
         from main import VoiceInputSystem
 
-        system = object.__new__(VoiceInputSystem)
-
-        self.assertEqual(VoiceInputSystem._stream_preview_interval(system, 10), 0.8)
-        self.assertEqual(VoiceInputSystem._stream_preview_interval(system, 600), 0.8)
-        self.assertEqual(VoiceInputSystem._stream_preview_interval(system, 24 * 60 * 60), 0.8)
+        self.assertEqual(VoiceInputSystem.STREAM_PREVIEW_INTERVAL_SECONDS, 0.8)
 
     def test_preview_result_older_than_two_seconds_is_dropped(self):
         from main import VoiceInputSystem

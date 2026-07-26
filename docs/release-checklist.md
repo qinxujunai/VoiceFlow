@@ -13,12 +13,16 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 
 - Working tree is clean before merge.
 - Verify passes on the branch being released.
-- Desktop shortcut starts the no-console launcher.
+- Installed Start menu shortcut starts `VoiceFlow.exe` without a console.
+- A maintainer source shortcut, if present, is not treated as installation
+  evidence.
 - Launching twice focuses the existing app instead of opening another main
   process.
 - Short dictation stops quickly and shows the final checkmark.
 - Long dictation keeps the overlay responsive and writes final text to clipboard
   and history.
+- `logs\performance-evidence.jsonl` was regenerated on the release machine; it
+  is evidence, not a repository fixture.
 
 ## GitHub Verification
 
@@ -33,12 +37,18 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
-"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\VoiceFlow.iss
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
-  license notices, and icon.
+  license notices, the exact reviewed model license, redistribution decision,
+  and icon.
+- Qt LGPL, GPL, Chromium license texts and `docs/qt-lgpl-compliance.md` are
+  present in the installed application.
 - The selected default model has a recorded redistribution-license decision.
 - The installer works per-user on a clean VM, upgrades the same AppId, rolls
   back using the previous signed installer, and removes its files on uninstall.
-- The public installer and executable are Authenticode signed.
+- A stable public installer and executable are Authenticode signed.
+- An unsigned prerelease is labeled `Beta` in the filename, website, README,
+  and Release notes, and includes a SHA-256 file. It is never described as a
+  stable or trusted-signed build.

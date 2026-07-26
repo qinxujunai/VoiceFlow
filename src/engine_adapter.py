@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,22 +23,38 @@ class EngineAdapter(ABC):
     name: str
     capabilities: EngineCapabilities
 
-    def __init__(self, config: dict[str, Any], base_dir: str | Path):
+    def __init__(
+        self,
+        config: dict[str, Any],
+        base_dir: str | Path,
+        *,
+        asset_roots: Iterable[str | Path] | None = None,
+    ):
         self.config = config
         self.base_dir = Path(base_dir)
+        roots = tuple(Path(root) for root in (asset_roots or (self.base_dir,)))
+        self.asset_roots = roots or (self.base_dir,)
         self.recognizer = None
 
     def _asset(self, key: str, label: str, *, directory: bool = False) -> str:
         raw_path = str(self.config.get(key, "")).strip()
-        path = self.base_dir / raw_path
-        exists = path.is_dir() if directory else path.is_file()
-        if not raw_path or not exists:
-            kind = "目录" if directory else "文件"
-            raise FileNotFoundError(
-                f"{label} {kind}不存在: {path}\n"
-                "请先运行: python scripts/download_models.py"
+        if raw_path:
+            configured = Path(raw_path)
+            candidates = (
+                (configured,)
+                if configured.is_absolute()
+                else tuple(root / configured for root in self.asset_roots)
             )
-        return str(path)
+            for path in candidates:
+                exists = path.is_dir() if directory else path.is_file()
+                if exists:
+                    return str(path)
+        kind = "目录" if directory else "文件"
+        fallback = self.asset_roots[0] / raw_path
+        raise FileNotFoundError(
+            f"{label} {kind}不存在: {fallback}\n"
+            "请在 VoiceFlow 设置中检查或修复本地模型"
+        )
 
     @abstractmethod
     def load(self) -> None:
@@ -205,9 +222,11 @@ def create_engine_adapter(
     engine_name: str,
     config: dict[str, Any],
     base_dir: str | Path,
+    *,
+    asset_roots: Iterable[str | Path] | None = None,
 ) -> EngineAdapter:
     try:
         adapter_type = _ADAPTERS[engine_name]
     except KeyError as exc:
         raise ValueError(f"不支持的引擎: {engine_name}") from exc
-    return adapter_type(config, base_dir)
+    return adapter_type(config, base_dir, asset_roots=asset_roots)

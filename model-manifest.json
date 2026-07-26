@@ -23,7 +23,11 @@
       "license": {
         "spdx": "LicenseRef-Model-License",
         "name": "FunAudioLLM model license",
-        "distribution_review_required": true
+        "version": "1.1",
+        "license_file": "licenses/FunASR-MODEL-LICENSE.txt",
+        "distribution_review_required": false,
+        "distribution_decision": "docs/sensevoice-redistribution-decision.md",
+        "reviewed_at": "2026-07-27"
       },
       "download_bytes": 240500355,
       "files": [
