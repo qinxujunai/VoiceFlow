@@ -212,6 +212,11 @@ def test_model_manifest_contains_all_fixed_lab_candidates():
     }
     assert models["qwen3-asr-1.7b-conditional"]["eligible"] is False
     assert models["whisper-large-v3-turbo-int8"]["license"]["spdx"] == "MIT"
+    assert models["sensevoice-small-int8"]["product_status"] == "default"
+    assert models["qwen3-asr-0.6b-int8"]["product_status"] == "experiment"
+    assert models["fun-asr-nano-0.8b-int8"]["product_status"] == "rejected"
+    assert models["qwen3-asr-1.7b-conditional"]["product_status"] == "ineligible"
+    assert models["whisper-large-v3-turbo-int8"]["product_status"] == "experiment"
 
 
 def test_whisper_adapter_uses_int8_encoder_decoder_and_tokens(tmp_path, monkeypatch):

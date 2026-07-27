@@ -13,6 +13,7 @@
     "sensevoice-small-int8": {
       "runtime_engine": "sensevoice",
       "role": "baseline",
+      "product_status": "default",
       "target_dir": "models/sensevoice",
       "source": {
         "provider": "huggingface",
@@ -51,6 +52,7 @@
     "qwen3-asr-0.6b-int8": {
       "runtime_engine": "qwen3-asr",
       "role": "accuracy_challenger",
+      "product_status": "experiment",
       "target_dir": "models/qwen3-asr",
       "source": {
         "provider": "huggingface",
@@ -76,6 +78,8 @@
     "fun-asr-nano-0.8b-int8": {
       "runtime_engine": "fun-asr-nano",
       "role": "chinese_hotword_challenger",
+      "product_status": "rejected",
+      "product_status_reason": "Pathological output on the pinned public Chinese reference sample.",
       "target_dir": "models/fun-asr-nano",
       "source": {
         "provider": "huggingface",
@@ -101,6 +105,7 @@
     "qwen3-asr-1.7b-conditional": {
       "runtime_engine": "qwen3-asr-1.7b",
       "role": "conditional_accuracy_challenger",
+      "product_status": "ineligible",
       "eligible": false,
       "ineligibility_reason": "No pinned sherpa-onnx int8 export is available and upstream weights exceed the 2.5 GB product memory gate.",
       "target_dir": "models/qwen3-asr-1.7b",
@@ -124,6 +129,7 @@
     "whisper-large-v3-turbo-int8": {
       "runtime_engine": "whisper-turbo",
       "role": "multilingual_control",
+      "product_status": "experiment",
       "eligible": true,
       "target_dir": "models/whisper-turbo",
       "source": {

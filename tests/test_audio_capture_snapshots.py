@@ -1,5 +1,6 @@
 import sys
 import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -47,3 +48,49 @@ def test_discard_before_releases_old_blocks_without_changing_global_clock():
     assert capture.sample_count == 20
     assert len(capture._audio_buffer) == 2
     assert capture.snapshot_audio(12, 20).tolist() == list(range(12, 20))
+
+
+def test_level_and_vad_analysis_runs_outside_the_audio_callback():
+    from audio_capture import AudioCapture
+
+    capture = object.__new__(AudioCapture)
+    capture._on_level_callback = None
+    capture.vad_enabled = True
+    capture.vad_energy_threshold = 0.02
+    capture._last_speech_time = 0
+    received = []
+    capture._on_level_callback = received.append
+    block = np.full((1600, 1), 4096, dtype=np.int16)
+
+    before = time.time()
+    capture._process_analysis_block(block)
+
+    assert len(received) == 1
+    assert len(received[0]) == 3
+    assert all(level > 0 for level in received[0])
+    assert capture._last_speech_time >= before
+
+
+def test_audio_callback_keeps_signal_processing_in_latest_only_worker():
+    source = (ROOT / "src" / "audio_capture.py").read_text(encoding="utf-8")
+    callback_start = source.index("def audio_callback")
+    stream_start = source.index("self._stream = sd.InputStream", callback_start)
+    callback = source[callback_start:stream_start]
+
+    assert "indata.copy()" in callback
+    assert "self._enqueue_analysis(block)" in callback
+    assert "astype(" not in callback
+    assert "array_split(" not in callback
+    assert "np.sqrt(" not in callback
+
+
+def test_analysis_worker_owns_generation_specific_queue_and_stop_event():
+    source = (ROOT / "src" / "audio_capture.py").read_text(encoding="utf-8")
+    worker_start = source.index("def _start_analysis_worker")
+    worker_stop = source.index("def _stop_analysis_worker", worker_start)
+    worker = source[worker_start:worker_stop]
+
+    assert "analysis_queue = queue.Queue(maxsize=1)" in worker
+    assert "stop_event = threading.Event()" in worker
+    assert "while not stop_event.is_set() or not analysis_queue.empty()" in worker
+    assert "block = analysis_queue.get(timeout=0.1)" in worker

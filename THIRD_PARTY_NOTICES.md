@@ -40,7 +40,7 @@ upstream terms and pinned source information in `model-manifest.json`.
 
 - Qwen3-ASR-0.6B and Fun-ASR-Nano use Apache-2.0 upstream models.
 - SenseVoiceSmall is marked `LicenseRef-Model-License` and remains under the
-  FunASR Model Open Source License Agreement 1.1. The pinned prerelease
+  FunASR Model Open Source License Agreement 1.1. The pinned VoiceFlow 0.2
   redistribution decision is recorded in
   `docs/sensevoice-redistribution-decision.md`; the exact reviewed terms are
   retained in `licenses/FunASR-MODEL-LICENSE.txt`.
