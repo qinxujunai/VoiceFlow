@@ -1,6 +1,6 @@
 # Qt / PySide6 LGPL Compliance Record
 
-VoiceFlow 0.2.0-beta.1 uses the dynamically linked PySide6 and Qt 6.11.1
+VoiceFlow 0.2.0 uses the dynamically linked PySide6 and Qt 6.11.1
 runtime under the LGPL-3.0-only option. This record describes the exact source,
 license texts, and replacement path used by the Windows onedir build. It is an
 engineering compliance record, not legal advice.

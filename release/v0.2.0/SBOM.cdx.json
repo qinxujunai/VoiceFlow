@@ -1,0 +1,675 @@
+{
+  "$schema": "https://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:0e0677e4-fcd4-54fa-846b-8608ceffb968",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-07-27T19:13:12.497437Z",
+    "component": {
+      "type": "application",
+      "name": "VoiceFlow",
+      "version": "0.2.0",
+      "purl": "pkg:github/qinxujunai/VoiceFlow@v0.2.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "altgraph",
+      "version": "0.17.5",
+      "purl": "pkg:pypi/altgraph@0.17.5",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "annotated-doc",
+      "version": "0.0.4",
+      "purl": "pkg:pypi/annotated-doc@0.0.4",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "anyio",
+      "version": "4.14.1",
+      "purl": "pkg:pypi/anyio@4.14.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "certifi",
+      "version": "2026.6.17",
+      "purl": "pkg:pypi/certifi@2026.6.17",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "cffi",
+      "version": "2.0.0",
+      "purl": "pkg:pypi/cffi@2.0.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "click",
+      "version": "8.4.2",
+      "purl": "pkg:pypi/click@8.4.2",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "colorama",
+      "version": "0.4.6",
+      "purl": "pkg:pypi/colorama@0.4.6",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "filelock",
+      "version": "3.29.4",
+      "purl": "pkg:pypi/filelock@3.29.4",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fsspec",
+      "version": "2026.6.0",
+      "purl": "pkg:pypi/fsspec@2026.6.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "h11",
+      "version": "0.16.0",
+      "purl": "pkg:pypi/h11@0.16.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "hf-xet",
+      "version": "1.5.1",
+      "purl": "pkg:pypi/hf-xet@1.5.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "httpcore",
+      "version": "1.0.9",
+      "purl": "pkg:pypi/httpcore@1.0.9",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "httpx",
+      "version": "0.28.1",
+      "purl": "pkg:pypi/httpx@0.28.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "huggingface_hub",
+      "version": "1.21.0",
+      "purl": "pkg:pypi/huggingface-hub@1.21.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "idna",
+      "version": "3.18",
+      "purl": "pkg:pypi/idna@3.18",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "purl": "pkg:pypi/iniconfig@2.3.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "keyboard",
+      "version": "0.13.5",
+      "purl": "pkg:pypi/keyboard@0.13.5",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "markdown-it-py",
+      "version": "4.2.0",
+      "purl": "pkg:pypi/markdown-it-py@4.2.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "mdurl",
+      "version": "0.1.2",
+      "purl": "pkg:pypi/mdurl@0.1.2",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "MouseInfo",
+      "version": "0.1.3",
+      "purl": "pkg:pypi/mouseinfo@0.1.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "numpy",
+      "version": "2.5.0",
+      "purl": "pkg:pypi/numpy@2.5.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "packaging",
+      "version": "26.2",
+      "purl": "pkg:pypi/packaging@26.2",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pefile",
+      "version": "2024.8.26",
+      "purl": "pkg:pypi/pefile@2024.8.26",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pluggy",
+      "version": "1.6.0",
+      "purl": "pkg:pypi/pluggy@1.6.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyAutoGUI",
+      "version": "0.9.54",
+      "purl": "pkg:pypi/pyautogui@0.9.54",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pycparser",
+      "version": "3.0",
+      "purl": "pkg:pypi/pycparser@3.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyGetWindow",
+      "version": "0.0.9",
+      "purl": "pkg:pypi/pygetwindow@0.0.9",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "Pygments",
+      "version": "2.20.0",
+      "purl": "pkg:pypi/pygments@2.20.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller",
+      "version": "6.21.0",
+      "purl": "pkg:pypi/pyinstaller@6.21.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyinstaller-hooks-contrib",
+      "version": "2026.6",
+      "purl": "pkg:pypi/pyinstaller-hooks-contrib@2026.6",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyMsgBox",
+      "version": "2.0.1",
+      "purl": "pkg:pypi/pymsgbox@2.0.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pynput",
+      "version": "1.8.2",
+      "purl": "pkg:pypi/pynput@1.8.2",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyperclip",
+      "version": "1.11.0",
+      "purl": "pkg:pypi/pyperclip@1.11.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyRect",
+      "version": "0.2.0",
+      "purl": "pkg:pypi/pyrect@0.2.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyScreeze",
+      "version": "1.0.1",
+      "purl": "pkg:pypi/pyscreeze@1.0.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PySide6",
+      "version": "6.11.1",
+      "purl": "pkg:pypi/pyside6@6.11.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PySide6_Addons",
+      "version": "6.11.1",
+      "purl": "pkg:pypi/pyside6-addons@6.11.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PySide6_Essentials",
+      "version": "6.11.1",
+      "purl": "pkg:pypi/pyside6-essentials@6.11.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pytest",
+      "version": "9.1.1",
+      "purl": "pkg:pypi/pytest@9.1.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pytweening",
+      "version": "1.2.0",
+      "purl": "pkg:pypi/pytweening@1.2.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pywin32-ctypes",
+      "version": "0.2.3",
+      "purl": "pkg:pypi/pywin32-ctypes@0.2.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "PyYAML",
+      "version": "6.0.3",
+      "purl": "pkg:pypi/pyyaml@6.0.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "rich",
+      "version": "15.0.0",
+      "purl": "pkg:pypi/rich@15.0.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "shellingham",
+      "version": "1.5.4",
+      "purl": "pkg:pypi/shellingham@1.5.4",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "sherpa-onnx-core",
+      "version": "1.13.3",
+      "purl": "pkg:pypi/sherpa-onnx-core@1.13.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "sherpa_onnx",
+      "version": "1.13.3",
+      "purl": "pkg:pypi/sherpa-onnx@1.13.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "shiboken6",
+      "version": "6.11.1",
+      "purl": "pkg:pypi/shiboken6@6.11.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "six",
+      "version": "1.17.0",
+      "purl": "pkg:pypi/six@1.17.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "sounddevice",
+      "version": "0.5.5",
+      "purl": "pkg:pypi/sounddevice@0.5.5",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "soundfile",
+      "version": "0.14.0",
+      "purl": "pkg:pypi/soundfile@0.14.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tqdm",
+      "version": "4.68.3",
+      "purl": "pkg:pypi/tqdm@4.68.3",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typer",
+      "version": "0.25.1",
+      "purl": "pkg:pypi/typer@0.25.1",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typing_extensions",
+      "version": "4.15.0",
+      "purl": "pkg:pypi/typing-extensions@4.15.0",
+      "properties": [
+        {
+          "name": "voiceflow:source",
+          "value": "requirements.lock"
+        }
+      ]
+    },
+    {
+      "type": "machine-learning-model",
+      "name": "sensevoice-small-int8",
+      "version": "unknown",
+      "properties": [
+        {
+          "name": "voiceflow:distribution-status",
+          "value": "default"
+        },
+        {
+          "name": "voiceflow:engine",
+          "value": "unknown"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+        }
+      ]
+    }
+  ]
+}

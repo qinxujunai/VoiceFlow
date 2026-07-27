@@ -4,23 +4,38 @@
   <strong>简体中文</strong> · <a href="README.en.md">English</a>
 </p>
 
-> 离线，即刻，不丢一个字。
+> 开口，文字就位。
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![产品网站](https://img.shields.io/badge/产品网站-打开-111111)](https://qinxujunai.github.io/VoiceFlow/)
-[![Windows Beta](https://img.shields.io/badge/Windows_Beta-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
+[![Windows](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#系统要求)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#隐私与联网)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
 
-![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
+![VoiceFlow 应用首页：麦克风、离线模型和快捷键均已就绪](site/assets/voiceflow-app-home-v2.png)
 
-VoiceFlow 是 Windows 上的本地语音输入工具。按 `F2` 开始说话，再按一次，文字就会回到当前光标处。识别、词库与历史默认留在本机；即使目标应用没有接住粘贴，结果仍可从剪贴板和本地历史中找回。
+VoiceFlow 是 Windows 上的离线语音输入层。按 `F2` 开始说话，再按一次，
+文字就会回到当前光标处。不用切换应用，不用登录账户，也不依赖云端额度。
+即使目标应用没有接住粘贴，结果仍可从剪贴板和本地历史中找回。
 
-## 核心能力
+## VoiceFlow 解决什么
+
+在线语音工具可以提供更强的云端模型，但也把输入体验交给了网络、账号、配额
+和服务器状态。传统转写工具则要求先录音、再打开工作台、最后复制结果。
+
+VoiceFlow 选择了更窄也更明确的产品边界：
+
+- **不离开当前工作**：在正在使用的记事本、浏览器、文档或聊天框里直接说。
+- **核心链路完全离线**：录音、识别、词库与历史默认留在本机。
+- **输出有恢复路径**：先写剪贴板，再发送粘贴，同时保存本地历史。
+- **长语音以最终完整性为准**：实时预览只负责反馈；停止后补齐剩余尾部。
+- **一个经过验证的默认模型**：不把更多模型或更大参数量包装成更好的产品。
+
+## 体验
 
 - **在任何输入框里说话**：通过 `F2`、右 `Ctrl` 或鼠标侧键，在当前应用直接输入。
-- **离线识别**：默认不调用云端 ASR，也不把录音交给在线大模型处理。
+- **离线识别**：核心流程不调用云端 ASR，也不把录音交给在线大模型处理。
 - **结果可恢复**：先写入剪贴板，再尝试粘贴，并同步保存到本地历史。
 - **长语音持续流畅**：预览、音频缓存与 UI 更新都有固定上限，不随录音时长持续堆积。
 - **反馈真实而克制**：录音波形来自麦克风实际音量；预览只表达进度，最终转写才会输出。
@@ -28,12 +43,11 @@ VoiceFlow 是 Windows 上的本地语音输入工具。按 `F2` 开始说话，�
 
 ## 快速开始
 
-普通用户请从[产品网站](https://qinxujunai.github.io/VoiceFlow/)选择平台，
-或直接打开 [GitHub Releases](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
-下载 `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`。安装包已包含默认离线模型，
-不需要 Python。
+普通用户请从[产品网站](https://qinxujunai.github.io/VoiceFlow/)下载，或直接
+获取 [VoiceFlow-0.2.0-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe)。
+安装包已包含默认离线模型，不需要 Python。
 
-> 当前公开 Beta 尚未完成 Authenticode 签名，Windows 可能显示信誉提示。
+> 当前 Windows 安装包尚未完成 Authenticode 签名，系统可能显示信誉提示。
 > 请只从本仓库下载，并用 Release 中的 `SHA256SUMS.txt` 核对文件。
 
 开发者可从源码启动：
@@ -82,7 +96,10 @@ start.bat
 
 ## 模型与语言
 
-当前默认引擎是离线 SenseVoice。VoiceFlow 也提供统一的模型适配与本机评测工具，用同一套准确率、延迟、尾部完整性和资源门槛比较 SenseVoice、Qwen3-ASR 与 Fun-ASR Nano；只有通过全部质量门的候选才会成为默认模型。
+当前默认引擎是离线 SenseVoice。它不是因为名字或参数量被选中，而是在当前
+同机公开中英样本里同时取得最低错误率和最低延迟。Qwen3-ASR、Fun-ASR Nano
+与 Whisper 仍属于实验候选；在真实授权语料、延迟、内存、异常输出和许可门
+全部通过前，不会进入普通用户的下载中心。
 
 首次运行会从项目或安装目录的 `config.yaml` 初始化用户配置，之后运行时设置保存在 `%LOCALAPPDATA%\VoiceFlow\config.yaml`。当前支持的 `zh`、`en`、`auto` 等语言选项取决于所选模型的实际能力。
 
@@ -97,6 +114,9 @@ venv\Scripts\python.exe scripts\verify.py --release
 
 - [质量门](docs/quality-gate.md)
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
+- [模型策略与准入结论](docs/model-strategy.md)
+- [产品质量标准](docs/product-quality-standard.md)
+- [用户反馈闭环](docs/feedback-review-2026-07-28.md)
 - [运行时与用户数据边界](docs/runtime-boundary.md)
 - [发布检查清单](docs/release-checklist.md)
 
@@ -106,11 +126,11 @@ venv\Scripts\python.exe scripts\verify.py --release
 
 ## 项目状态
 
-VoiceFlow 0.2.0-beta.1 是 Windows x64 公开测试版。安装态运行时边界、
+VoiceFlow 0.2.0 是面向 Windows x64 的首个完整离线版本。安装态运行时边界、
 用户数据保留、SenseVoice 再分发记录和完整离线安装已完成本机验收。
 当前仍有两项明确限制：
 
-- 安装器尚未完成 Authenticode 代码签名，不是稳定版。
+- 安装器尚未完成 Authenticode 代码签名；在签名完成前请只从本仓库下载并核对哈希。
 - macOS 版尚未发布；全局输入、辅助功能权限、签名与 notarization
   必须在真实 macOS 环境分别验收，不能由 Windows 构建代替。
 

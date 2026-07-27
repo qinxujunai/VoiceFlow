@@ -4,20 +4,43 @@
   <a href="README.md">简体中文</a> · <strong>English</strong>
 </p>
 
-> Offline. Immediate. Never lose a word.
+> Speak. Words land.
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![Product site](https://img.shields.io/badge/product_site-open-111111)](https://qinxujunai.github.io/VoiceFlow/?lang=en)
-[![Windows Beta](https://img.shields.io/badge/Windows_Beta-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
+[![Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![Local first](https://img.shields.io/badge/local--first-offline-2EA44F)](#privacy-and-networking)
 [![License](https://img.shields.io/github/license/qinxujunai/VoiceFlow)](LICENSE)
 
-![VoiceFlow animated demo](docs/voiceflow-demo.svg)
+![VoiceFlow home screen with microphone, offline model, and shortcuts ready](site/assets/voiceflow-app-home-v2.png)
 
-VoiceFlow is local-first dictation for Windows. Press `F2`, speak, and press it again—the text returns to your current cursor. Recognition, vocabulary, and history stay on your device by default. If the target app does not accept the paste, the result remains recoverable from the clipboard and local history.
+VoiceFlow is an offline dictation layer for Windows. Press `F2`, speak, and
+press it again—the text returns to your current cursor. There is no app detour,
+account, or cloud quota in the core path. If the target app does not accept the
+paste, the result remains recoverable from the clipboard and local history.
 
-## Core Capabilities
+## The problem VoiceFlow solves
+
+Cloud dictation can use larger remote models, but it also makes input depend on
+network quality, accounts, quotas, and server availability. Traditional
+transcription tools add another workflow: record, open a workspace, then copy
+the result back.
+
+VoiceFlow takes a narrower, explicit position:
+
+- **Stay in the work already in front of you**: dictate into notes, browsers,
+  documents, and chat fields.
+- **Keep the core path offline**: audio, recognition, vocabulary, and history
+  remain on the device by default.
+- **Make output recoverable**: write the clipboard first, send paste second,
+  and preserve local history.
+- **Prioritize complete final text**: live preview provides feedback; the stop
+  path finishes the remaining tail.
+- **Ship one tested default**: more models and more parameters are not treated
+  as proof of a better product.
+
+## Experience
 
 - **Dictate wherever you type**: use `F2`, Right Ctrl, or a mouse side button in the app already in front of you.
 - **Offline recognition**: no cloud ASR calls or online LLM processing in the default path.
@@ -28,13 +51,12 @@ VoiceFlow is local-first dictation for Windows. Press `F2`, speak, and press it 
 
 ## Quick Start
 
-For normal use, choose a platform on the
-[product site](https://qinxujunai.github.io/VoiceFlow/?lang=en) or open the
-[GitHub Release](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0-beta.1)
-and download `VoiceFlow-Setup-0.2.0-beta.1-x64.exe`. The installer includes the
-default offline model and needs no Python.
+For normal use, download from the
+[product site](https://qinxujunai.github.io/VoiceFlow/?lang=en) or get
+[VoiceFlow-0.2.0-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe)
+directly. The installer includes the default offline model and needs no Python.
 
-> This public Beta is not yet Authenticode-signed, so Windows may display a
+> The current Windows installer is not yet Authenticode-signed, so Windows may display a
 > reputation warning. Download only from this repository and verify the file
 > against `SHA256SUMS.txt` in the Release.
 
@@ -85,7 +107,12 @@ Text shown while recording is a live preview. After you stop, VoiceFlow finishes
 
 ## Models and Languages
 
-The current default engine is offline SenseVoice. VoiceFlow also provides a common model adapter and local evaluation tooling for SenseVoice, Qwen3-ASR, and Fun-ASR Nano. Candidates are compared on accuracy, latency, tail completeness, and resource use; only an engine that passes every product gate can become the default.
+The current default engine is offline SenseVoice. It was selected because it
+had both the lowest error rate and the lowest latency on the current same-machine
+public Chinese and English samples—not because of its name or parameter count.
+Qwen3-ASR, Fun-ASR Nano, and Whisper remain experimental candidates until they
+pass licensed real-speech, latency, memory, pathological-output, and licensing
+gates.
 
 On first run, VoiceFlow seeds user configuration from the project or installed `config.yaml`. Runtime settings then live at `%LOCALAPPDATA%\VoiceFlow\config.yaml`. Options such as `zh`, `en`, and `auto` depend on the selected model's actual capabilities.
 
@@ -100,6 +127,9 @@ The standard gate covers environment diagnostics, compile checks, automated test
 
 - [Quality gate](docs/quality-gate.md)
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
+- [Model strategy and admission decision](docs/model-strategy.md)
+- [Product quality standard](docs/product-quality-standard.md)
+- [User feedback closure](docs/feedback-review-2026-07-28.md)
 - [Runtime and user-data boundary](docs/runtime-boundary.md)
 - [Release checklist](docs/release-checklist.md)
 
@@ -109,11 +139,12 @@ Recordings, transcripts, vocabulary, and history stay on the local machine by de
 
 ## Project Status
 
-VoiceFlow 0.2.0-beta.1 is a public Windows x64 test build. The installed-runtime
+VoiceFlow 0.2.0 is the first complete offline release for Windows x64. The installed-runtime
 boundary, user-data retention, SenseVoice redistribution record, and full
 offline installer have passed local validation. Two limitations remain explicit:
 
-- The installer is not yet Authenticode-signed and is not a stable release.
+- The installer is not yet Authenticode-signed. Until signing is complete,
+  download only from this repository and verify its hash.
 - macOS is not released. Global input, Accessibility permissions, signing, and
   notarization must be validated on real macOS hardware and cannot be replaced
   by a Windows build.

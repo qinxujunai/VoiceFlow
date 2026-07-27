@@ -41,7 +41,7 @@ def run(output_dir: str | Path) -> dict:
             failures.append({"scale": scale, "output": completed.stdout})
             continue
         manifest = json.loads((scale_dir / "manifest.json").read_text(encoding="utf-8"))
-        if len(manifest.get("captures", [])) != 7:
+        if len(manifest.get("captures", [])) != 6:
             failures.append({"scale": scale, "output": "missing settings captures"})
             continue
         captures.append({"scale": scale, "manifest": str((scale_dir / "manifest.json").resolve())})

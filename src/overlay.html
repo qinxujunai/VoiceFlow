@@ -272,10 +272,16 @@ const MIN_WIDTH = 86;
 const MAX_WIDTH = 312;
 const MAX_DISPLAY_CHARS = 72;
 const DISPLAY_TAIL_CHARS = 72;
+const STREAM_REVEAL_INTERVAL_MS = 24;
+const STREAM_REVEAL_MAX_CATCHUP_MS = 420;
 let activeSession = 0;
 let maxStreamingWidth = MIN_WIDTH;
 let lastStreamingText = '';
 let correctionTimer = 0;
+let streamingRevealTimer = 0;
+let streamingRevealToken = 0;
+let displayedStreamingText = '';
+let targetStreamingText = '';
 
 function meterScale(level) {
     // Compress real microphone RMS into a calm but legible 18 px meter.
@@ -393,14 +399,75 @@ function updateTickerOffset(targetWidth, mode) {
     });
 }
 
+function cancelStreamingReveal() {
+    clearTimeout(streamingRevealTimer);
+    streamingRevealTimer = 0;
+    streamingRevealToken += 1;
+}
+
+function renderStreamingText(text, mode) {
+    var width = setWidthForText(text, true);
+    updateTickerOffset(width, mode);
+}
+
+function commonPrefixLength(left, right) {
+    var limit = Math.min(left.length, right.length);
+    var index = 0;
+    while (index < limit && left[index] === right[index]) index += 1;
+    return index;
+}
+
+function scheduleStreamingReveal(text, sessionId, mode) {
+    if (!text || sessionId !== activeSession) return;
+    cancelStreamingReveal();
+    targetStreamingText = text;
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        displayedStreamingText = targetStreamingText;
+        renderStreamingText(displayedStreamingText, mode);
+        return;
+    }
+
+    if (!targetStreamingText.startsWith(displayedStreamingText)) {
+        var stableLength = commonPrefixLength(displayedStreamingText, targetStreamingText);
+        displayedStreamingText = targetStreamingText.slice(0, stableLength);
+        renderStreamingText(displayedStreamingText, mode);
+    }
+
+    var token = streamingRevealToken;
+    function revealNext() {
+        if (token !== streamingRevealToken || sessionId !== activeSession) return;
+        var remaining = targetStreamingText.length - displayedStreamingText.length;
+        if (remaining <= 0) return;
+        var maxTicks = Math.max(
+            1,
+            Math.floor(STREAM_REVEAL_MAX_CATCHUP_MS / STREAM_REVEAL_INTERVAL_MS)
+        );
+        var step = Math.max(1, Math.ceil(remaining / maxTicks));
+        displayedStreamingText = targetStreamingText.slice(
+            0,
+            displayedStreamingText.length + step
+        );
+        renderStreamingText(displayedStreamingText, mode);
+        if (displayedStreamingText.length < targetStreamingText.length) {
+            streamingRevealTimer = setTimeout(revealNext, STREAM_REVEAL_INTERVAL_MS);
+        }
+    }
+
+    revealNext();
+}
+
 function resetTextMotion() {
     cancelAnimationFrame(_tickerRaf);
     clearTimeout(correctionTimer);
+    cancelStreamingReveal();
     setTickerOffset(0);
     ticker.classList.remove('overflowing');
     ticker.style.textAlign = '';
     maxStreamingWidth = MIN_WIDTH;
     lastStreamingText = '';
+    displayedStreamingText = '';
+    targetStreamingText = '';
     resetAudioLevel();
 }
 
@@ -459,8 +526,7 @@ function updateStreaming(text, sessionId) {
     clearTimeout(correctionTimer);
     pill.className = 'pill streaming';
     lastStreamingText = text;
-    var width = setWidthForText(text, true);
-    updateTickerOffset(width, 'live');
+    scheduleStreamingReveal(text, sessionId, 'live');
 }
 
 function updateCorrection(text, sessionId) {
@@ -469,8 +535,7 @@ function updateCorrection(text, sessionId) {
     clearTimeout(correctionTimer);
     pill.className = 'pill streaming corrected';
     lastStreamingText = text;
-    var width = setWidthForText(text, true);
-    updateTickerOffset(width, 'settled');
+    scheduleStreamingReveal(text, sessionId, 'settled');
     correctionTimer = setTimeout(() => {
         if (sessionId === activeSession && pill.classList.contains('corrected')) {
             pill.className = 'pill streaming';
@@ -479,12 +544,14 @@ function updateCorrection(text, sessionId) {
 }
 
 function showProcessing() {
+    cancelStreamingReveal();
     activeSession += 1;
     pill.className = 'pill processing';
 }
 
 function showFinalizing(sessionId) {
     if (sessionId < activeSession) return;
+    cancelStreamingReveal();
     activeSession = sessionId;
     pill.className = 'pill finalizing';
     if (!txt.textContent) {
@@ -499,6 +566,7 @@ function showDone() {
 
 function showFinalText(text, sessionId) {
     if (sessionId < activeSession) return;
+    cancelStreamingReveal();
     activeSession = sessionId;
     resetTextMotion();
     pill.className = 'pill final_ready success';
