@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -16,6 +18,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from overlay_webview import _SettingsWindow  # noqa: E402
+from runtime_paths import AppPaths, RuntimeMode  # noqa: E402
 from runtime_services import run_runtime_diagnostics  # noqa: E402
 from qt_compat import (  # noqa: E402
     QApplication,
@@ -62,8 +65,12 @@ def _save_widget(widget, path: Path) -> dict:
     }
 
 
-def _capture_settings(app: QApplication, output_dir: Path) -> list[dict]:
-    window = _SettingsWindow()
+def _capture_settings(
+    app: QApplication,
+    output_dir: Path,
+    paths: AppPaths | None = None,
+) -> list[dict]:
+    window = _SettingsWindow(paths=paths)
     window.refresh()
     window.show()
     captures = []
@@ -71,7 +78,6 @@ def _capture_settings(app: QApplication, output_dir: Path) -> list[dict]:
         "home",
         "history",
         "dictation",
-        "hotkeys",
         "dictionary",
         "diagnostics",
         "about",
@@ -85,6 +91,47 @@ def _capture_settings(app: QApplication, output_dir: Path) -> list[dict]:
         captures.append(_save_widget(window, output_dir / f"settings-{name}.png"))
     window.close()
     return captures
+
+
+def _sanitized_paths(data_dir: Path) -> AppPaths:
+    """Use product fixtures so UI evidence never publishes local user history."""
+    paths = AppPaths(
+        mode=RuntimeMode.FROZEN,
+        install_dir=ROOT,
+        data_dir=data_dir,
+        executable=Path(sys.executable),
+    )
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "config.yaml", paths.config_file)
+    shutil.copytree(
+        ROOT / "knowledge-base",
+        paths.knowledge_dir,
+        dirs_exist_ok=True,
+    )
+    paths.logs_dir.mkdir(parents=True, exist_ok=True)
+    entries = (
+        {
+            "timestamp": "2026-07-28T09:41:00",
+            "clean_text": "开口说话，文字就会回到当前光标。",
+            "corrected_text": "开口说话，文字就会回到当前光标。",
+            "output_status": "clipboard_copied_paste_sent",
+            "duration": 4.2,
+            "final_tail": "回到当前光标。",
+        },
+        {
+            "timestamp": "2026-07-28T09:38:00",
+            "clean_text": "核心听写离线完成，结果保留在剪贴板和本地历史。",
+            "corrected_text": "核心听写离线完成，结果保留在剪贴板和本地历史。",
+            "output_status": "clipboard_copied_paste_sent",
+            "duration": 8.6,
+            "final_tail": "剪贴板和本地历史。",
+        },
+    )
+    paths.history_file.write_text(
+        "".join(json.dumps(entry, ensure_ascii=False) + "\n" for entry in entries),
+        encoding="utf-8",
+    )
+    return paths
 
 
 def _capture_overlay(app: QApplication, output_dir: Path) -> list[dict]:
@@ -122,12 +169,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Capture VoiceFlow UI states")
     parser.add_argument("--output-dir", default=str(ROOT / "logs" / "ui-review"))
     parser.add_argument("--settings-only", action="store_true")
+    parser.add_argument(
+        "--live-data",
+        action="store_true",
+        help="Capture the current user data. Default output uses sanitized fixtures.",
+    )
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
     app = QApplication.instance() or QApplication([])
-    captures = _capture_settings(app, output_dir)
-    if not args.settings_only:
-        captures.extend(_capture_overlay(app, output_dir))
+    if args.live_data:
+        captures = _capture_settings(app, output_dir)
+        if not args.settings_only:
+            captures.extend(_capture_overlay(app, output_dir))
+    else:
+        with tempfile.TemporaryDirectory(prefix="voiceflow-ui-") as temporary:
+            captures = _capture_settings(
+                app,
+                output_dir,
+                _sanitized_paths(Path(temporary) / "VoiceFlow"),
+            )
+            if not args.settings_only:
+                captures.extend(_capture_overlay(app, output_dir))
     manifest = {"schema_version": 1, "captures": captures}
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

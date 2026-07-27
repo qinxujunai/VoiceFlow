@@ -38,6 +38,7 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
+venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.0-Windows-x64.exe --output-dir release\v0.2.0 --version 0.2.0
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
@@ -49,6 +50,11 @@ venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 - The installer works per-user on a clean VM, upgrades the same AppId, rolls
   back using the previous signed installer, and removes its files on uninstall.
 - A stable public installer and executable are Authenticode signed.
-- An unsigned prerelease is labeled `Beta` in the filename, website, README,
-  and Release notes, and includes a SHA-256 file. It is never described as a
-  stable or trusted-signed build.
+- Any unsigned release states that limitation in the website package details,
+  README, and Release notes; it includes a SHA-256 file and is never described
+  as trusted-signed.
+- Public filenames follow `VoiceFlow-{version}-Windows-x64.exe`; channel labels
+  such as `beta` do not appear in the customer-facing filename.
+- `SBOM.cdx.json` parses as CycloneDX 1.6 and includes the bundled model.
+- The tag-driven Release workflow publishes the installer, checksums, SBOM,
+  notices, and GitHub build-provenance attestation from the same commit.

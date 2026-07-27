@@ -1,5 +1,5 @@
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "0.2.0-beta.1"
+#define MyAppVersion "0.2.0"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 
@@ -15,7 +15,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist\installer
-OutputBaseFilename=VoiceFlow-Setup-{#MyAppVersion}-x64
+OutputBaseFilename=VoiceFlow-{#MyAppVersion}-Windows-x64
 SetupIconFile=..\assets\voiceflow.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 LicenseFile=..\LICENSE

@@ -1,0 +1,94 @@
+name: Release
+
+env:
+  PYTHONUTF8: "1"
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Verify tag and release metadata
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          $inno = Get-Content -Raw installer\VoiceFlow.iss
+          if ($inno -notmatch "#define MyAppVersion `"$([regex]::Escape($version))`"") {
+            throw "Tag $env:GITHUB_REF_NAME does not match installer version"
+          }
+          $notes = "release\$env:GITHUB_REF_NAME\RELEASE_NOTES.md"
+          if (-not (Test-Path -LiteralPath $notes)) {
+            throw "Release notes missing: $notes"
+          }
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements.lock
+      - name: Restore default model cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: models/sensevoice
+          key: sensevoice-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned default model
+        run: python scripts/download_models.py --engine sensevoice
+      - name: Test core contracts
+        run: |
+          python -m pytest tests -q
+          python scripts/stability_gate.py --cycles 500
+          python scripts/doctor.py
+          python test_integration.py
+      - name: Build onedir application
+        run: python -m PyInstaller VoiceFlow.spec --noconfirm
+      - name: Smoke packaged runtime
+        shell: pwsh
+        run: ./scripts/smoke_packaged_runtime.ps1
+      - name: Build full offline installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
+      - name: Smoke installer lifecycle
+        shell: pwsh
+        run: ./scripts/smoke_installer.ps1
+      - name: Generate checksums, SBOM, and notices
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          python scripts/generate_release_assets.py `
+            --installer "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
+            --output-dir "release\$env:GITHUB_REF_NAME" `
+            --version $version
+      - name: Attest installer provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/installer/VoiceFlow-*-Windows-x64.exe
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          gh release create $env:GITHUB_REF_NAME `
+            "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
+            "release\$env:GITHUB_REF_NAME\SHA256SUMS.txt" `
+            "release\$env:GITHUB_REF_NAME\SBOM.cdx.json" `
+            "release\$env:GITHUB_REF_NAME\THIRD_PARTY_NOTICES.md" `
+            --repo $env:GITHUB_REPOSITORY `
+            --verify-tag `
+            --title "VoiceFlow $version — Windows offline dictation" `
+            --notes-file "release\$env:GITHUB_REF_NAME\RELEASE_NOTES.md"
