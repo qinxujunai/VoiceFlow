@@ -1,6 +1,6 @@
 # SenseVoiceSmall Redistribution Decision
 
-Status: **approved for VoiceFlow prerelease redistribution with attribution**
+Status: **approved for VoiceFlow 0.2 redistribution with attribution**
 
 Decision date: 2026-07-27
 
@@ -8,7 +8,7 @@ Decision owner: VoiceFlow release maintainers
 License reviewed: FunASR Model Open Source License Agreement, version 1.1
 
 This is an engineering release-compliance decision, not legal advice. It
-records why the pinned model may be included in a VoiceFlow prerelease and the
+records why the pinned model may be included in VoiceFlow 0.2 and the
 conditions every build must satisfy.
 
 ## Pinned artifact

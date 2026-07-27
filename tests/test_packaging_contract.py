@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import struct
 
 
@@ -74,14 +75,42 @@ def test_product_site_is_bilingual_and_truthful_about_platform_artifacts():
     assert '<html lang="zh-CN">' in index
     assert 'data-language="zh"' in index
     assert 'data-language="en"' in index
-    assert "VoiceFlow-Setup-0.2.0-beta.1-x64.exe" in index
+    assert "VoiceFlow-0.2.0-Windows-x64.exe" in index
     assert "releases/latest/download" not in index
-    assert "releases/download/v0.2.0-beta.1/" in index
+    assert "releases/download/v0.2.0/" in index
     assert "macOS" in index
-    assert "尚未发布" in index
-    assert "未签名" in index
-    assert "Not released" in copy
-    assert "currently unsigned" in copy
+    assert "尚未提供" in index
+    assert "尚未代码签名" in index
+    assert "Not available yet" in copy
+    assert "not code-signed yet" in copy
+    assert "Beta" not in index
+    assert "Beta" not in copy
+
+
+def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
+    index = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
+    copy = (ROOT / "site" / "app.js").read_text(encoding="utf-8")
+
+    html_keys = set(re.findall(r'data-i18n(?:-alt)?="([^"]+)"', index))
+    zh_block, en_block = copy.split("  en: {", 1)
+    zh_keys = set(re.findall(r"^\s{4}([A-Za-z]\w*):", zh_block, re.MULTILINE))
+    en_keys = set(re.findall(r"^\s{4}([A-Za-z]\w*):", en_block, re.MULTILINE))
+
+    assert html_keys <= zh_keys
+    assert html_keys <= en_keys
+    assert 'property="og:image" content="assets/voiceflow-app-home-v2.png"' in index
+    assert "voiceflow-app-home-v2.png" in index
+    assert "voiceflow-ambient-v2.png" in index
+
+
+def test_ui_capture_uses_sanitized_product_fixtures_by_default():
+    capture = (ROOT / "scripts" / "capture_ui_states.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def _sanitized_paths" in capture
+    assert "--live-data" in capture
+    assert "Default output uses sanitized fixtures." in capture
 
 
 def test_release_spec_bundles_runtime_assets():
@@ -101,7 +130,7 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 
     assert "PrivilegesRequired=lowest" in installer
     assert "DefaultDirName={localappdata}\\Programs\\VoiceFlow" in installer
-    assert "OutputBaseFilename=VoiceFlow-Setup-{#MyAppVersion}-x64" in installer
+    assert "OutputBaseFilename=VoiceFlow-{#MyAppVersion}-Windows-x64" in installer
     assert (
         'Source: "..\\models\\sensevoice\\model.int8.onnx"; '
         'DestDir: "{app}\\models\\sensevoice"'
@@ -119,16 +148,16 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
     assert r"%LOCALAPPDATA%\VoiceFlow" not in installer
 
 
-def test_windows_executable_has_public_beta_version_metadata():
+def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 2, 0, 1)" in version
-    assert "StringStruct('FileVersion', '0.2.0-beta.1')" in version
-    assert "StringStruct('ProductVersion', '0.2.0-beta.1')" in version
+    assert "filevers=(0, 2, 0, 0)" in version
+    assert "StringStruct('FileVersion', '0.2.0')" in version
+    assert "StringStruct('ProductVersion', '0.2.0')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
-def test_public_beta_has_project_and_third_party_license_notices():
+def test_public_release_has_project_and_third_party_license_notices():
     assert (ROOT / "LICENSE").is_file()
     notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
 

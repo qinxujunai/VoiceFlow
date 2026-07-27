@@ -23,6 +23,7 @@ dist/
 
 # 日志
 logs/
+.planning/
 
 # IDE
 .vscode/

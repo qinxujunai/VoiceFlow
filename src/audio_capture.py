@@ -3,13 +3,15 @@
 使用 sounddevice 以 16kHz 采样率采集 PCM 音频
 """
 
-import numpy as np
-import sounddevice as sd
+import os
+import queue
 import threading
 import time
-import yaml
-import os
 from bisect import bisect_left, bisect_right
+
+import numpy as np
+import sounddevice as sd
+import yaml
 
 
 class AudioCapture:
@@ -45,6 +47,10 @@ class AudioCapture:
         self._lock = threading.Lock()
         self._stream = None
         self._recording_start_time = None
+        self._analysis_queue = None
+        self._analysis_stop = None
+        self._analysis_thread = None
+        self._callback_status_count = 0
 
         # VAD 状态
         self._last_speech_time = None
@@ -66,10 +72,13 @@ class AudioCapture:
             self._is_recording = True
             self._recording_start_time = time.time()
             self._last_speech_time = time.time()
+            self._callback_status_count = 0
+
+        self._start_analysis_worker()
 
         def audio_callback(indata, _frames, _time_info, status):
             if status:
-                pass
+                self._callback_status_count += 1
             if self._is_recording:
                 block = indata.copy()
                 with self._lock:
@@ -78,22 +87,7 @@ class AudioCapture:
                     self._audio_buffer.append(block)
                     self._total_samples += len(block)
                     self._audio_buffer_ends.append(self._total_samples)
-                if self._on_level_callback is not None:
-                    mono = block.reshape(-1).astype(np.float32) / 32768.0
-                    windows = np.array_split(mono, 3)
-                    levels = [
-                        float(np.sqrt(np.mean(window * window))) if len(window) else 0.0
-                        for window in windows
-                    ]
-                    try:
-                        self._on_level_callback(levels)
-                    except Exception:
-                        pass
-                # VAD：检查当前帧是否有语音活动
-                if self.vad_enabled:
-                    energy = np.abs(indata).mean() / 32768.0
-                    if energy > self.vad_energy_threshold:
-                        self._last_speech_time = time.time()
+                self._enqueue_analysis(block)
 
         try:
             self._stream = sd.InputStream(
@@ -107,6 +101,7 @@ class AudioCapture:
             self._stream.start()
         except Exception as e:
             self._is_recording = False
+            self._stop_analysis_worker()
             raise RuntimeError(f"麦克风打开失败: {e}")
 
     def stop_recording(self):
@@ -124,6 +119,7 @@ class AudioCapture:
             except Exception:
                 pass
             self._stream = None
+        self._stop_analysis_worker()
 
         with self._lock:
             blocks = self._audio_buffer
@@ -150,6 +146,7 @@ class AudioCapture:
             except Exception:
                 pass
             self._stream = None
+        self._stop_analysis_worker()
         with self._lock:
             self._audio_buffer = []
             self._audio_buffer_ends = []
@@ -164,6 +161,65 @@ class AudioCapture:
     def set_level_callback(self, callback):
         """Receive three real RMS samples for the compact recording meter."""
         self._on_level_callback = callback
+
+    def _start_analysis_worker(self):
+        analysis_queue = queue.Queue(maxsize=1)
+        stop_event = threading.Event()
+        self._analysis_queue = analysis_queue
+        self._analysis_stop = stop_event
+
+        def run():
+            while not stop_event.is_set() or not analysis_queue.empty():
+                try:
+                    block = analysis_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                self._process_analysis_block(block)
+
+        self._analysis_thread = threading.Thread(target=run, daemon=True)
+        self._analysis_thread.start()
+
+    def _stop_analysis_worker(self):
+        stop_event = self._analysis_stop
+        if stop_event is not None:
+            stop_event.set()
+        thread = self._analysis_thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=0.5)
+        self._analysis_thread = None
+        self._analysis_stop = None
+        self._analysis_queue = None
+
+    def _enqueue_analysis(self, block):
+        analysis_queue = self._analysis_queue
+        if analysis_queue is None:
+            return
+        try:
+            analysis_queue.put_nowait(block)
+        except queue.Full:
+            try:
+                analysis_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                analysis_queue.put_nowait(block)
+            except queue.Full:
+                pass
+
+    def _process_analysis_block(self, block):
+        mono = block.reshape(-1).astype(np.float32) / 32768.0
+        if self._on_level_callback is not None:
+            windows = np.array_split(mono, 3)
+            levels = [
+                float(np.sqrt(np.mean(window * window))) if len(window) else 0.0
+                for window in windows
+            ]
+            try:
+                self._on_level_callback(levels)
+            except Exception:
+                pass
+        if self.vad_enabled and float(np.abs(mono).mean()) > self.vad_energy_threshold:
+            self._last_speech_time = time.time()
 
     def check_silence(self):
         """
@@ -201,6 +257,10 @@ class AudioCapture:
     def last_total_samples(self):
         with self._lock:
             return self._last_total_samples
+
+    @property
+    def callback_status_count(self):
+        return self._callback_status_count
 
     def snapshot_audio(self, start_sample=0, end_sample=None):
         """Copy only the requested mono PCM range from the growing recording."""

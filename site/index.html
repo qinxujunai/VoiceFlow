@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="VoiceFlow 是完全离线的 Windows 语音输入工具。按 F2 说话，文字回到当前光标，结果始终保留在剪贴板和本地历史。">
-  <meta name="theme-color" content="#f6f7f9">
+  <meta name="description" content="VoiceFlow 是 Windows 上的离线语音输入层。无需账户，不上传录音，文字回到当前光标并保留恢复路径。">
+  <meta name="theme-color" content="#f7f8fa">
   <meta property="og:title" content="VoiceFlow — 离线语音输入">
-  <meta property="og:description" content="说完，文字就在光标处。完全离线，不需要账户。">
+  <meta property="og:description" content="开口，文字就位。完全离线，任意输入框，结果永远可找回。">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="assets/voiceflow-app-home.png">
+  <meta property="og:image" content="assets/voiceflow-app-home-v2.png">
   <title>VoiceFlow — 离线语音输入</title>
   <link rel="icon" href="assets/voiceflow.ico">
+  <link rel="preload" href="assets/voiceflow-app-home-v2.png" as="image" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
   {
@@ -19,22 +20,24 @@
     "name": "VoiceFlow",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Windows 10, Windows 11",
-    "softwareVersion": "0.2.0-beta.1",
+    "softwareVersion": "0.2.0",
     "license": "https://github.com/qinxujunai/VoiceFlow/blob/master/LICENSE",
-    "downloadUrl": "https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0-beta.1/VoiceFlow-Setup-0.2.0-beta.1-x64.exe"
+    "downloadUrl": "https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe"
   }
   </script>
 </head>
 <body>
   <a class="skip-link" href="#main" data-i18n="skip">跳到主要内容</a>
+
   <header class="site-header">
     <a class="brand" href="#top" aria-label="VoiceFlow 首页">
       <img src="assets/voiceflow.ico" width="28" height="28" alt="">
       <span>VoiceFlow</span>
     </a>
     <nav aria-label="主要导航">
-      <a href="#why" data-i18n="navWhy">为什么是 VoiceFlow</a>
-      <a href="#how" data-i18n="navHow">使用方式</a>
+      <a href="#experience" data-i18n="navExperience">能力</a>
+      <a href="#privacy" data-i18n="navPrivacy">隐私</a>
+      <a href="#quality" data-i18n="navQuality">可靠性</a>
       <a href="#download" data-i18n="navDownload">下载</a>
       <a href="https://github.com/qinxujunai/VoiceFlow" data-i18n="navGithub">GitHub</a>
     </nav>
@@ -47,147 +50,197 @@
   <main id="main">
     <section class="hero" id="top">
       <div class="hero-copy">
-        <p class="eyebrow" data-i18n="heroEyebrow">完全离线 · Windows</p>
-        <h1 data-i18n="heroTitle">说完，文字就在光标处。</h1>
+        <p class="eyebrow" data-i18n="heroEyebrow">Windows 上的离线语音输入</p>
+        <h1 data-i18n="heroTitle">开口。文字就位。</h1>
         <p class="hero-lede" data-i18n="heroLede">
-          按 F2 开始说话，再按一次停止。VoiceFlow 在本机完成识别，
-          把文字送回你正在使用的输入框。
+          按一次说话，再按一次完成。无需账户，不上传录音；即使目标窗口没有接住，文字也还在。
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0-beta.1/VoiceFlow-Setup-0.2.0-beta.1-x64.exe" data-i18n="downloadWindows">
-            下载 Windows Beta
+          <a class="button primary" href="https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe" data-download data-i18n="downloadVoiceFlow">
+            下载 Windows 版
           </a>
-          <a class="button secondary" href="https://github.com/qinxujunai/VoiceFlow" data-i18n="viewSource">
-            查看源代码
+          <a class="text-link" href="https://github.com/qinxujunai/VoiceFlow" data-i18n="viewGithub">
+            查看 GitHub
           </a>
         </div>
-        <p class="compatibility" data-i18n="compatibility">
-          Windows 10 / 11 · x64 · 无需 Python · 安装后可离线使用
-        </p>
-        <p class="beta-note" data-i18n="betaNote">
-          公开 Beta 当前未签名；Windows 可能显示信誉提示。请只从本页或 GitHub Releases 下载并核对 SHA256。
-        </p>
+        <p class="compatibility" data-i18n="compatibility">Windows 10 / 11 · x64 · v0.2.0</p>
       </div>
-      <div class="hero-product" aria-label="VoiceFlow 产品界面">
-        <img class="app-shot" src="assets/voiceflow-app-home.png" alt="VoiceFlow 首页显示麦克风、离线模型和快捷键均已就绪">
-        <img class="overlay-shot" src="assets/voiceflow-overlay.png" alt="VoiceFlow 听写胶囊正在显示转写预览">
+      <figure class="hero-product">
+        <img class="hero-ambient" src="assets/voiceflow-ambient-v2.png" alt="">
+        <div class="hero-app-window">
+          <img src="assets/voiceflow-app-home-v2.png" alt="VoiceFlow 首页显示麦克风、离线模型和快捷键均已就绪" data-i18n-alt="heroImageAlt">
+        </div>
+        <div class="hero-pill" aria-hidden="true">
+          <img src="assets/voiceflow-overlay.png" alt="">
+        </div>
+      </figure>
+    </section>
+
+    <section class="proof-bar" aria-label="VoiceFlow 核心承诺">
+      <div>
+        <strong data-i18n="proofBarOffline">无需网络</strong>
+        <span data-i18n="proofBarOfflineBody">核心听写全程本地完成</span>
+      </div>
+      <div>
+        <strong data-i18n="proofBarEverywhere">任意输入框</strong>
+        <span data-i18n="proofBarEverywhereBody">不切换应用，不打断思路</span>
+      </div>
+      <div>
+        <strong data-i18n="proofBarRecovery">文字双保险</strong>
+        <span data-i18n="proofBarRecoveryBody">剪贴板与本地历史始终可恢复</span>
       </div>
     </section>
 
-    <section class="statement" id="why">
-      <p class="eyebrow" data-i18n="problemEyebrow">一个更安静的输入方式</p>
-      <h2 data-i18n="problemTitle">语音输入不该要求你上传声音、切换窗口，或担心文字消失。</h2>
-      <p data-i18n="problemBody">
-        VoiceFlow 把语音识别变成系统里的一层输入能力。它不接管你的工作，
-        只在你需要时出现，完成后立即退回托盘。
-      </p>
-    </section>
-
-    <section class="principles" aria-label="VoiceFlow 核心能力">
-      <article>
-        <span class="index">01</span>
-        <h3 data-i18n="featureOfflineTitle">全程在本机</h3>
-        <p data-i18n="featureOfflineBody">录音、识别、词典和历史默认不离开这台电脑，也不需要账户。</p>
-      </article>
-      <article>
-        <span class="index">02</span>
-        <h3 data-i18n="featureAnywhereTitle">在当前输入框说话</h3>
-        <p data-i18n="featureAnywhereBody">记事本、浏览器、文档或聊天窗口，不必把内容搬到另一个应用。</p>
-      </article>
-      <article>
-        <span class="index">03</span>
-        <h3 data-i18n="featureRecoveryTitle">文字总能找回</h3>
-        <p data-i18n="featureRecoveryBody">先写入剪贴板，再发送粘贴，同时保存在本地历史。</p>
-      </article>
-      <article>
-        <span class="index">04</span>
-        <h3 data-i18n="featureLongTitle">长语音不丢尾</h3>
-        <p data-i18n="featureLongBody">预览只负责反馈，停止后仍会补齐完整音频并输出最终结果。</p>
-      </article>
-    </section>
-
-    <section class="how" id="how">
+    <section class="experience" id="experience">
       <div class="section-heading">
-        <p class="eyebrow" data-i18n="howEyebrow">三步完成一次听写</p>
-        <h2 data-i18n="howTitle">不需要学习新的工作流。</h2>
+        <p class="eyebrow" data-i18n="experienceEyebrow">少一步，快很多</p>
+        <h2 data-i18n="experienceTitle">你的思路，不必先绕进另一个应用。</h2>
+        <p data-i18n="experienceBody">VoiceFlow 不是录音转写工作台。它只在你开口时出现，把结果放回原来的工作里。</p>
       </div>
-      <ol>
+      <ol class="steps">
         <li>
-          <span>1</span>
+          <span class="step-index">1</span>
           <div>
-            <h3 data-i18n="stepOneTitle">按下快捷键</h3>
-            <p data-i18n="stepOneBody">F2、右 Ctrl 或鼠标侧键都可以开始。</p>
+            <h3 data-i18n="stepOneTitle">按下</h3>
+            <p data-i18n="stepOneBody">按 F2 开始</p>
           </div>
         </li>
         <li>
-          <span>2</span>
+          <span class="step-index">2</span>
           <div>
-            <h3 data-i18n="stepTwoTitle">自然说话</h3>
-            <p data-i18n="stepTwoBody">小胶囊只显示必要状态，不抢走当前焦点。</p>
+            <h3 data-i18n="stepTwoTitle">说话</h3>
+            <p data-i18n="stepTwoBody">在本机完成识别</p>
           </div>
         </li>
         <li>
-          <span>3</span>
+          <span class="step-index">3</span>
           <div>
-            <h3 data-i18n="stepThreeTitle">再按一次停止</h3>
-            <p data-i18n="stepThreeBody">文字回到光标处，并保留在剪贴板和历史中。</p>
+            <h3 data-i18n="stepThreeTitle">出现</h3>
+            <p data-i18n="stepThreeBody">文字回到当前光标</p>
           </div>
         </li>
       </ol>
     </section>
 
-    <section class="trust">
-      <div>
-        <p class="eyebrow" data-i18n="trustEyebrow">隐私不是一个开关</p>
-        <h2 data-i18n="trustTitle">断开网络，核心功能仍然可用。</h2>
-      </div>
-      <div class="trust-copy">
-        <p data-i18n="trustBody">
-          默认 SenseVoice 模型随离线安装包提供。日常听写不会自动下载模型、
-          检查更新或调用云端服务。
+    <section class="privacy" id="privacy">
+      <div class="privacy-copy">
+        <p class="eyebrow" data-i18n="privacyEyebrow">离线，是产品边界</p>
+        <h2 data-i18n="privacyTitle">在线模型能力更大。离线输入更确定。</h2>
+        <p data-i18n="privacyBody">
+          VoiceFlow 不需要账户、额度或服务器状态。录音、识别、词典和历史留在本机；
+          断网时，核心能力与平时完全一样。
         </p>
-        <a href="https://github.com/qinxujunai/VoiceFlow/blob/master/README.md#隐私与联网" data-i18n="privacyLink">阅读隐私与联网说明</a>
+        <a class="text-link" href="https://github.com/qinxujunai/VoiceFlow/blob/master/README.md#隐私与联网" data-i18n="privacyLink">
+          了解隐私与联网
+        </a>
+      </div>
+      <div class="privacy-proof" aria-label="VoiceFlow 隐私与可靠性">
+        <div>
+          <strong data-i18n="proofOffline">离线识别</strong>
+          <span data-i18n="proofOfflineBody">日常听写不调用云端服务</span>
+        </div>
+        <div>
+          <strong data-i18n="proofClipboard">剪贴板兜底</strong>
+          <span data-i18n="proofClipboardBody">先保存文字，再发送粘贴</span>
+        </div>
+        <div>
+          <strong data-i18n="proofHistory">本地历史</strong>
+          <span data-i18n="proofHistoryBody">每次结果都有恢复路径</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="quality" id="quality">
+      <div class="section-heading compact">
+        <p class="eyebrow" data-i18n="qualityEyebrow">先过门禁，再写进介绍</p>
+        <h2 data-i18n="qualityTitle">可靠，不靠一句“很快”。</h2>
+        <p data-i18n="qualityBody">每次发布都要经过同一套性能、生命周期、模型输出和安装态检查。没有通过，就不发布。</p>
+      </div>
+      <div class="quality-metrics">
+        <article>
+          <strong>23 ms</strong>
+          <span data-i18n="metricFeedback">录音胶囊首帧 P95</span>
+          <small data-i18n="metricFeedbackNote">20 次发布门禁样本</small>
+        </article>
+        <article>
+          <strong>455 ms</strong>
+          <span data-i18n="metricPaste">短听写停止到粘贴 P95</span>
+          <small data-i18n="metricPasteNote">同机、20 次可复现测试</small>
+        </article>
+        <article>
+          <strong>500×</strong>
+          <span data-i18n="metricLifecycle">连续录音生命周期</span>
+          <small data-i18n="metricLifecycleNote">开始、停止、取消与恢复</small>
+        </article>
+      </div>
+      <p class="quality-disclosure" data-i18n="qualityDisclosure">数据来自项目发布门禁机器，不代表所有电脑；安装前请查看系统要求与完整测试说明。</p>
+    </section>
+
+    <section class="model-standard">
+      <div>
+        <p class="eyebrow" data-i18n="modelEyebrow">一个可靠默认，而不是模型菜单</p>
+        <h2 data-i18n="modelTitle">不把“模型更多”伪装成产品更好。</h2>
+      </div>
+      <p data-i18n="modelBody">当前安装包只内置同机中英基准里速度与准确率同时领先的 SenseVoice。Qwen3-ASR、Fun-ASR Nano 与 Whisper 继续留在实验室；只有通过真实语料、延迟、内存和许可门禁，才会进入下载中心。</p>
+    </section>
+
+    <section class="product-detail">
+      <div class="section-heading compact">
+        <p class="eyebrow" data-i18n="productEyebrow">安静驻留，随时可用</p>
+        <h2 data-i18n="productTitle">准备状态，一眼就够。</h2>
+        <p data-i18n="productBody">麦克风、离线模型和快捷键是否可用，都在首页清楚呈现。</p>
+      </div>
+      <div class="app-frame">
+        <img src="assets/voiceflow-app-home-v2.png" alt="VoiceFlow 首页显示麦克风、离线模型和快捷键均已就绪" data-i18n-alt="appImageAlt">
       </div>
     </section>
 
     <section class="download" id="download">
-      <div class="section-heading">
-        <p class="eyebrow" data-i18n="downloadEyebrow">选择你的平台</p>
-        <h2 data-i18n="downloadTitle">只提供真正经过验收的版本。</h2>
-        <p data-i18n="downloadBody">当前公开目标是 Windows x64。macOS 需要独立完成权限、签名和公证，不会用未验证的包占位。</p>
+      <div class="download-copy">
+        <p class="eyebrow" data-i18n="downloadEyebrow">VoiceFlow 0.2</p>
+        <h2 data-i18n="downloadTitle">下载，然后开口。</h2>
+        <p data-i18n="downloadBody">一个安装包，包含默认离线模型。无需 Python，安装后即可断网听写。</p>
+        <div class="download-actions">
+          <a class="button primary" href="https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe" data-download data-i18n="downloadWindows">
+            下载 Windows 版
+          </a>
+          <a class="text-link" href="https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.2.0" data-i18n="releaseNotes">查看版本说明</a>
+        </div>
       </div>
-      <div class="platform-list">
-        <article class="platform available">
+      <div class="release-panel">
+        <div class="release-row">
           <div>
-            <p class="platform-name">Windows</p>
-            <h3 data-i18n="windowsTitle">Windows 10 / 11 · x64</h3>
-            <p data-i18n="windowsBody">包含离线模型，安装后无需 Python。Beta 安装器约 314 MB；当前未签名。</p>
+            <span class="platform-name">Windows</span>
+            <strong>Windows 10 / 11 · x64</strong>
           </div>
-          <a class="button primary" href="https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0-beta.1/VoiceFlow-Setup-0.2.0-beta.1-x64.exe" data-i18n="windowsAction">下载安装包</a>
-        </article>
-        <article class="platform unavailable">
+          <span class="release-status" data-i18n="available">可下载</span>
+        </div>
+        <div class="release-row muted">
           <div>
-            <p class="platform-name">macOS</p>
-            <h3 data-i18n="macTitle">正在进行原生权限与发布验证</h3>
-            <p data-i18n="macBody">全局输入、辅助功能权限、签名和 notarization 全部通过后才会开放。</p>
+            <span class="platform-name">macOS</span>
+            <strong data-i18n="macStatus">尚未提供</strong>
           </div>
-          <span class="availability" data-i18n="macAction">尚未发布</span>
-        </article>
+          <span data-i18n="macReason">等待原生权限与签名验证</span>
+        </div>
+        <details>
+          <summary data-i18n="packageDetails">安装包详情</summary>
+          <p data-i18n="unsignedNote">
+            当前 Windows 安装包尚未代码签名，系统可能显示信誉提示。请仅从本页或 GitHub Releases 下载。
+          </p>
+          <code>VoiceFlow-0.2.0-Windows-x64.exe</code>
+        </details>
       </div>
-    </section>
-
-    <section class="open-source">
-      <div>
-        <p class="eyebrow" data-i18n="sourceEyebrow">开放源码，发布可验证</p>
-        <h2 data-i18n="sourceTitle">每个安装包都应有版本、哈希、许可和构建来源。</h2>
-      </div>
-      <a class="button secondary" href="https://github.com/qinxujunai/VoiceFlow/releases" data-i18n="releaseNotes">查看 Releases</a>
     </section>
   </main>
 
   <footer>
-    <p>VoiceFlow · MIT</p>
+    <a class="brand footer-brand" href="#top" aria-label="VoiceFlow 首页">
+      <img src="assets/voiceflow.ico" width="24" height="24" alt="">
+      <span>VoiceFlow</span>
+    </a>
+    <p data-i18n="footerTagline">离线语音输入，回到当前光标。</p>
     <div>
+      <a href="https://github.com/qinxujunai/VoiceFlow" data-i18n="footerSource">源代码</a>
       <a href="https://github.com/qinxujunai/VoiceFlow/blob/master/THIRD_PARTY_NOTICES.md" data-i18n="footerLicenses">第三方许可</a>
       <a href="https://github.com/qinxujunai/VoiceFlow/issues" data-i18n="footerIssues">问题反馈</a>
     </div>

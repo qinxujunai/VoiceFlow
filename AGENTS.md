@@ -120,7 +120,33 @@ Use `wrong=correct` only in correction files.
 
 - `scripts\generate_icon.py` creates the multi-size `assets\voiceflow.ico`.
 - `scripts\create_shortcut.ps1` creates a desktop shortcut.
-- `VoiceFlow.spec` is the windowed release build. It includes overlay/config/knowledge-base/icon, but not large model files.
+- `VoiceFlow.spec` is the windowed onedir application build. The Inno installer adds the
+  reviewed default model and its license assets.
+- Windows installers belong in GitHub Releases, not GitHub Packages. Never publish an
+  installer link before the matching versioned Release asset exists.
+- Never publish a macOS download, badge, or compatibility claim until a separately built,
+  signed, notarized, and tested macOS artifact exists.
+
+## Product Quality Gates
+
+- Do not expose a model to ordinary users merely because it loads. It must pass pinned-asset
+  verification, pathological-output checks, fixed Chinese CER, fixed English WER, latency,
+  memory, license, and clean-install gates.
+- Model names are implementation details. User-facing choices describe the outcome first,
+  such as `日常听写` or `多语言`, and show size, readiness, privacy, and expected speed.
+- Keep one reliable bundled default. Optional models are explicit downloads with visible size,
+  progress, cancel, integrity verification, failure recovery, and removal.
+- Never call a model `更准确`, `高准确` or `最佳` without same-machine, same-corpus evidence.
+- Synthetic speech is useful for reproducible regression but cannot replace authorized,
+  natural user speech in release accuracy claims.
+- Local or cloud polishing is a second stage. Preserve raw transcription, enforce a timeout,
+  and fall back to raw text on every failure. No hidden network requests.
+- Streaming preview may reveal only confirmed text. Smooth visual presentation must have a
+  bounded catch-up time and must be canceled before processing or final output.
+- Product and website claims must map to a reproducible test, release artifact, or documented
+  limitation. Remove aspirational claims that are not true in the shipped build.
+- A public release requires the full verification suite, model quality evidence, packaged
+  smoke, clean-machine install/upgrade/uninstall checks, license review, and exact SHA256.
 
 ## Troubleshooting
 

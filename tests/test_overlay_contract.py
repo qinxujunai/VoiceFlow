@@ -15,7 +15,9 @@ def test_streaming_update_writes_text_before_measuring_width():
     measure_idx = html.index("var est = measureTextWidth(displayText);", set_width_idx)
 
     assert text_write_idx < measure_idx
-    assert "setWidthForText(text, true)" in html[html.index("function updateStreaming(text, sessionId)"):]
+    reveal_idx = html.index("function renderStreamingText(text, mode)")
+    reveal_block = html[reveal_idx:html.index("function commonPrefixLength", reveal_idx)]
+    assert "setWidthForText(text, true)" in reveal_block
 
 
 def test_streaming_pill_width_animates_and_keeps_content_driven_growth():
@@ -29,7 +31,7 @@ def test_streaming_pill_width_animates_and_keeps_content_driven_growth():
     assert "var est = measureTextWidth(displayText);" in set_width_block
     assert "Math.max(maxStreamingWidth, width)" in set_width_block
     assert "maxStreamingWidth = width;" in set_width_block
-    assert "setWidthForText(text, true)" in streaming_block
+    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
     assert "ticker.style.textAlign = 'center';" not in streaming_block
 
 
@@ -85,6 +87,43 @@ def test_streaming_ticker_jumps_to_latest_tail_without_visual_backlog():
     assert "setTickerOffset(nextTarget);" in ticker_block
 
 
+def test_streaming_text_reveals_confirmed_increment_at_a_bounded_uniform_cadence():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    reveal_idx = html.index("function scheduleStreamingReveal")
+    reveal_block = html[reveal_idx:html.index("function resetTextMotion", reveal_idx)]
+    streaming_block = html[
+        html.index("function updateStreaming(text, sessionId)"):
+        html.index("function updateCorrection(text, sessionId)")
+    ]
+
+    assert "const STREAM_REVEAL_INTERVAL_MS = 24;" in html
+    assert "const STREAM_REVEAL_MAX_CATCHUP_MS = 420;" in html
+    assert "prefers-reduced-motion: reduce" in reveal_block
+    assert "Math.ceil(remaining / maxTicks)" in reveal_block
+    assert "renderStreamingText(displayedStreamingText, mode);" in reveal_block
+    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
+    assert "setWidthForText(text, true)" not in streaming_block
+
+
+def test_streaming_reveal_is_canceled_before_processing_or_final_text():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    cancel_idx = html.index("function cancelStreamingReveal")
+    cancel_block = html[cancel_idx:html.index("function renderStreamingText", cancel_idx)]
+    processing_block = html[
+        html.index("function showProcessing()"):
+        html.index("function showFinalizing(")
+    ]
+    final_block = html[
+        html.index("function showFinalText("):
+        html.index("function showResult(")
+    ]
+
+    assert "clearTimeout(streamingRevealTimer);" in cancel_block
+    assert "streamingRevealToken += 1;" in cancel_block
+    assert "cancelStreamingReveal();" in processing_block
+    assert "cancelStreamingReveal();" in final_block
+
+
 def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     ticker_idx = html.index("function updateTickerOffset")
@@ -94,7 +133,7 @@ def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
     assert "STREAMING_MOTION_NUDGE" not in html
     assert "function updateTickerOffset(targetWidth, mode)" in html
     assert "restartTextRefresh" not in html
-    assert "updateTickerOffset(width, 'live');" in streaming_block
+    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
     assert "if (nextTarget > _tickerCurrent)" in ticker_block
 
 
@@ -144,7 +183,7 @@ def test_pause_correction_is_distinct_and_non_flashing():
     assert ".pill.streaming.corrected" in html
     assert "text-replace" not in html
     assert "pill.className = 'pill streaming corrected';" in correction_block
-    assert "updateTickerOffset(width, 'settled');" in correction_block
+    assert "scheduleStreamingReveal(text, sessionId, 'settled');" in correction_block
     assert "correctionTimer = setTimeout" in correction_block
     assert "def update_correction(self, text, session_id):" in overlay
     assert "updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
@@ -183,7 +222,7 @@ def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
     assert (
-        'for label in ("首页", "历史", "听写", "快捷键", "词典", "诊断", "关于")'
+        'for label in ("首页", "历史", "听写", "词典", "诊断", "关于")'
         in overlay
     )
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
@@ -307,7 +346,7 @@ def test_settings_window_has_recent_history_copy_controls():
     assert "pyperclip.copy(text)" in settings_block
     assert "pyperclip.copy(\"\\n\\n\".join(texts))" in settings_block
     assert "self._on_repaste_text(text)" in settings_block
-    assert "self.status_badge.setText(\"无可复制\")" in settings_block
+    assert "self._set_status_badge(\"无可复制\")" in settings_block
 
 
 def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
@@ -334,12 +373,35 @@ def test_settings_status_page_exposes_language_and_model_setup_action():
     assert '("语言", self.language_combo)' in settings_block
     assert "self.model_combo = QComboBox()" in settings_block
     assert "def _save_settings(self):" in settings_block
-    assert '"验证模型"' in settings_block
-    assert '"管理模型"' in settings_block
+    assert '"验证完整性"' in settings_block
+    assert '"模型实验"' in settings_block
     assert "self.model_manager.selectable_engines(config)" in settings_block
     assert "download.clicked.connect(self._open_model_setup)" in settings_block
     assert "def _open_model_setup(self):" in settings_block
     assert "self.model_manager.open_setup" in settings_block
+
+
+def test_settings_merges_static_hotkey_help_into_dictation():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert "def _hotkeys_page" not in settings_block
+    assert "F2 · 右 Ctrl · 鼠标侧键 1 / 2" in settings_block
+    assert 'trial.clicked.connect(self._start_trial)' in settings_block
+
+
+def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    settings_idx = overlay.index("class _SettingsWindow")
+    overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
+    settings_block = overlay[settings_idx:overlay_window_idx]
+
+    assert 'self.dictionary_section.addItem("专有词", "user-dictionary.txt")' in settings_block
+    assert 'self.dictionary_section.addItem("常用短语", "phrases.txt")' in settings_block
+    assert 'self.dictionary_section.addItem("确定性纠错", "corrections.txt")' in settings_block
+    assert "不会调用生成模型改写意思" in settings_block
 
 
 def test_settings_runtime_actions_do_not_depend_on_source_tree_tools():
@@ -510,13 +572,15 @@ def test_readme_defaults_to_chinese_with_english_switch():
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
 
     assert '<strong>简体中文</strong> · <a href="README.en.md">English</a>' in readme
-    assert "Windows 上的本地语音输入工具" in readme
-    assert "## 核心能力" in readme
+    assert "Windows 上的离线语音输入层" in readme
+    assert "## VoiceFlow 解决什么" in readme
+    assert "## 体验" in readme
     assert "## 快速开始" in readme
     assert "面试" not in readme
     assert "Codex" not in readme
     assert "GitHub 右侧的语言统计" not in readme
     assert '<a href="README.md">简体中文</a> · <strong>English</strong>' in english
-    assert "local-first dictation for Windows" in english
-    assert "## Core Capabilities" in english
+    assert "offline dictation layer for Windows" in english
+    assert "## The problem VoiceFlow solves" in english
+    assert "## Experience" in english
     assert "## Quick Start" in english

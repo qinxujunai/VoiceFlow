@@ -1,5 +1,5 @@
 param(
-    [string]$InstallerPath = "dist\installer\VoiceFlow-Setup-0.2.0-beta.1-x64.exe",
+    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.0-Windows-x64.exe",
     [int]$StartupSeconds = 8
 )
 
