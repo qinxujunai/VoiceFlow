@@ -90,5 +90,5 @@ jobs:
             "release\$env:GITHUB_REF_NAME\THIRD_PARTY_NOTICES.md" `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
-            --title "VoiceFlow $version — Windows offline dictation" `
+            --title "VoiceFlow $version — Windows 离线语音输入" `
             --notes-file "release\$env:GITHUB_REF_NAME\RELEASE_NOTES.md"
