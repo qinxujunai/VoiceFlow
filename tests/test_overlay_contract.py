@@ -561,7 +561,9 @@ def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
     assert 'width="86" height="34" rx="17"' in svg
-    assert 'values="86;86;170;236;236;86;86"' in svg
+    assert "@keyframes pillState" in svg
+    assert "34%, 88% { width: 236px; }" in svg
+    assert "prefers-reduced-motion: reduce" in svg
     assert "明早十点，把方案同步给团队。" in svg
     assert "把声音收束成文字，把文字送回光标。" in svg
     assert "真实胶囊状态：录音预览 → 最终确认 → 剪贴板兜底" in svg
@@ -572,15 +574,17 @@ def test_readme_defaults_to_chinese_with_english_switch():
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
 
     assert '<strong>简体中文</strong> · <a href="README.en.md">English</a>' in readme
-    assert "Windows 上的离线语音输入层" in readme
-    assert "## VoiceFlow 解决什么" in readme
-    assert "## 体验" in readme
-    assert "## 快速开始" in readme
+    assert "Windows 上的离线语音输入工具" in readme
+    assert "## 为什么是 VoiceFlow" in readme
+    assert "## 下载" in readme
+    assert "## 使用" in readme
+    assert "docs/voiceflow-demo.svg" in readme
     assert "面试" not in readme
     assert "Codex" not in readme
     assert "GitHub 右侧的语言统计" not in readme
     assert '<a href="README.md">简体中文</a> · <strong>English</strong>' in english
-    assert "offline dictation layer for Windows" in english
-    assert "## The problem VoiceFlow solves" in english
-    assert "## Experience" in english
-    assert "## Quick Start" in english
+    assert "offline dictation for Windows" in english
+    assert "## Why VoiceFlow" in english
+    assert "## Download" in english
+    assert "## Controls" in english
+    assert "docs/voiceflow-demo.svg" in english

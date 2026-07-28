@@ -68,7 +68,7 @@ def test_product_site_deploy_is_pinned_and_uses_only_site_assets():
         assert commit in workflow
 
 
-def test_product_site_is_bilingual_and_truthful_about_platform_artifacts():
+def test_product_site_is_bilingual_and_truthful_about_windows_download():
     index = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
     copy = (ROOT / "site" / "app.js").read_text(encoding="utf-8")
 
@@ -78,10 +78,9 @@ def test_product_site_is_bilingual_and_truthful_about_platform_artifacts():
     assert "VoiceFlow-0.2.0-Windows-x64.exe" in index
     assert "releases/latest/download" not in index
     assert "releases/download/v0.2.0/" in index
-    assert "macOS" in index
-    assert "尚未提供" in index
+    assert "macOS" not in index
+    assert "Not available yet" not in copy
     assert "尚未代码签名" in index
-    assert "Not available yet" in copy
     assert "not code-signed yet" in copy
     assert "Beta" not in index
     assert "Beta" not in copy
@@ -98,9 +97,10 @@ def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
 
     assert html_keys <= zh_keys
     assert html_keys <= en_keys
-    assert 'property="og:image" content="assets/voiceflow-app-home-v2.png"' in index
-    assert "voiceflow-app-home-v2.png" in index
-    assert "voiceflow-ambient-v2.png" in index
+    assert 'property="og:image" content="assets/voiceflow-demo.svg"' in index
+    assert "voiceflow-demo.svg" in index
+    assert "voiceflow-app-home" not in index
+    assert "voiceflow-ambient" not in index
 
 
 def test_ui_capture_uses_sanitized_product_fixtures_by_default():

@@ -73,6 +73,15 @@ jobs:
             --installer "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
             --output-dir "release\$env:GITHUB_REF_NAME" `
             --version $version
+      - name: Preserve compliance bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: VoiceFlow-${{ github.ref_name }}-compliance
+          path: |
+            release/${{ github.ref_name }}/SHA256SUMS.txt
+            release/${{ github.ref_name }}/SBOM.cdx.json
+            release/${{ github.ref_name }}/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
       - name: Attest installer provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
@@ -85,9 +94,6 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
           gh release create $env:GITHUB_REF_NAME `
             "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
-            "release\$env:GITHUB_REF_NAME\SHA256SUMS.txt" `
-            "release\$env:GITHUB_REF_NAME\SBOM.cdx.json" `
-            "release\$env:GITHUB_REF_NAME\THIRD_PARTY_NOTICES.md" `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --title "VoiceFlow $version — Windows 离线语音输入" `
