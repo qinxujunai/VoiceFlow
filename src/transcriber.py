@@ -6,6 +6,7 @@ ASR 转写模块
 import os
 import yaml
 from engine_adapter import create_engine_adapter
+from performance_profile import final_thread_count
 
 
 class Transcriber:
@@ -28,10 +29,19 @@ class Transcriber:
         if engine_name is None:
             engine_name = self.config.get("engine", {}).get("active", "sensevoice")
 
-        engine_cfg = self.config.get("engine", {}).get(engine_name, {})
+        engine_cfg = dict(self.config.get("engine", {}).get(engine_name, {}))
         if not engine_cfg:
             raise ValueError(f"未找到引擎配置: {engine_name}")
 
+        thread_mode = str(
+            self.config.get("performance", {}).get("thread_mode", "auto")
+        ).lower()
+        requested_threads = (
+            engine_cfg.get("num_threads", "auto")
+            if thread_mode == "manual"
+            else "auto"
+        )
+        engine_cfg["num_threads"] = final_thread_count(requested_threads)
         self.adapter = create_engine_adapter(
             engine_name,
             engine_cfg,
