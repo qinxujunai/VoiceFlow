@@ -1782,6 +1782,14 @@ class OverlayWindow:
             f"appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})"
         )
 
+    def update_streaming(self, confirmed, provisional, session_id):
+        self._js(
+            "updateStreaming("
+            f"{json.dumps(confirmed, ensure_ascii=False)}, "
+            f"{json.dumps(provisional, ensure_ascii=False)}, "
+            f"{int(session_id)})"
+        )
+
     def update_audio_level(self, levels, session_id):
         if self._bridge:
             safe_levels = [max(0.0, min(float(level), 1.0)) for level in levels[:3]]

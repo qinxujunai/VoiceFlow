@@ -198,6 +198,15 @@ body {
     text-overflow: clip;
 }
 
+.ticker-confirmed,
+.ticker-provisional {
+    transition: color 120ms ease, opacity 120ms ease;
+}
+
+.ticker-provisional {
+    color: rgba(245, 245, 247, 0.48);
+}
+
 .listening .ticker,
 .idle .ticker {
     color: transparent;
@@ -273,8 +282,9 @@ const STREAM_BASE_WIDTH = 96;
 const STREAM_GROWTH_PER_GRAPHEME = 10;
 const STREAM_APPEND_INTERVAL_MS = 80;
 let activeSession = 0;
-let streamingQueue = [];
-let visibleStreamingText = [];
+let streamingTargetConfirmed = [];
+let streamingTargetProvisional = [];
+let displayedStreamingText = [];
 let streamingAppendTimer = 0;
 let streamingCharacterCount = 0;
 let streamingTargetWidth = MIN_WIDTH;
@@ -339,21 +349,43 @@ function splitGraphemes(value) {
     return Array.from(value);
 }
 
-function renderStreamingTail() {
-    txt.textContent = visibleStreamingText.join('');
-}
-
-function trimVisibleStreamingText() {
-    if (visibleStreamingText.length > STREAM_VISIBLE_GRAPHEMES) {
-        visibleStreamingText.splice(
-            0,
-            visibleStreamingText.length - STREAM_VISIBLE_GRAPHEMES
-        );
+function commonGraphemePrefix(left, right) {
+    let size = 0;
+    while (size < left.length && size < right.length && left[size] === right[size]) {
+        size += 1;
     }
+    return size;
 }
 
-function growStreamingWidth(addedCount) {
-    streamingCharacterCount += Math.max(0, Number(addedCount) || 0);
+function currentStreamingTarget() {
+    return streamingTargetConfirmed.concat(streamingTargetProvisional);
+}
+
+function renderStreamingTail() {
+    const start = Math.max(
+        0,
+        displayedStreamingText.length - STREAM_VISIBLE_GRAPHEMES
+    );
+    const tail = displayedStreamingText.slice(start);
+    const confirmedCount = clamp(
+        streamingTargetConfirmed.length - start,
+        0,
+        tail.length
+    );
+    const confirmedNode = document.createElement('span');
+    confirmedNode.className = 'ticker-confirmed';
+    confirmedNode.textContent = tail.slice(0, confirmedCount).join('');
+    const provisionalNode = document.createElement('span');
+    provisionalNode.className = 'ticker-provisional';
+    provisionalNode.textContent = tail.slice(confirmedCount).join('');
+    txt.replaceChildren(confirmedNode, provisionalNode);
+}
+
+function growStreamingWidthTo(characterCount) {
+    streamingCharacterCount = Math.max(
+        streamingCharacterCount,
+        Math.max(0, Number(characterCount) || 0)
+    );
     const target = clamp(
         STREAM_BASE_WIDTH + streamingCharacterCount * STREAM_GROWTH_PER_GRAPHEME,
         MIN_WIDTH,
@@ -365,11 +397,11 @@ function growStreamingWidth(addedCount) {
 
 function drainStreamingQueue() {
     streamingAppendTimer = 0;
-    if (!streamingQueue.length) return;
-    visibleStreamingText.push(streamingQueue.shift());
-    trimVisibleStreamingText();
+    const target = currentStreamingTarget();
+    if (displayedStreamingText.length >= target.length) return;
+    displayedStreamingText.push(target[displayedStreamingText.length]);
     renderStreamingTail();
-    growStreamingWidth(1);
+    growStreamingWidthTo(displayedStreamingText.length);
     const paintedSession = activeSession;
     if (previewPaintReportedSession !== paintedSession) {
         previewPaintReportedSession = paintedSession;
@@ -381,7 +413,7 @@ function drainStreamingQueue() {
             });
         });
     }
-    if (streamingQueue.length) {
+    if (displayedStreamingText.length < currentStreamingTarget().length) {
         streamingAppendTimer = setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS);
     }
 }
@@ -389,12 +421,13 @@ function drainStreamingQueue() {
 function cancelStreamingQueue() {
     clearTimeout(streamingAppendTimer);
     streamingAppendTimer = 0;
-    streamingQueue = [];
+    streamingTargetConfirmed = [];
+    streamingTargetProvisional = [];
 }
 
 function resetTextMotion() {
     cancelStreamingQueue();
-    visibleStreamingText = [];
+    displayedStreamingText = [];
     streamingCharacterCount = 0;
     streamingTargetWidth = MIN_WIDTH;
     resetAudioLevel();
@@ -440,22 +473,34 @@ function showRecording(sessionId) {
     prepareRecording(sessionId);
 }
 
-function appendStreaming(delta, sessionId) {
-    if (!delta) return;
+function updateStreaming(confirmedText, provisionalText, sessionId) {
     if (sessionId !== activeSession) return;
     pill.className = 'pill streaming';
-    const additions = splitGraphemes(delta);
+    const nextConfirmed = splitGraphemes(confirmedText || '');
+    const nextProvisional = splitGraphemes(provisionalText || '');
+    const nextTarget = nextConfirmed.concat(nextProvisional);
+    const commonLength = commonGraphemePrefix(displayedStreamingText, nextTarget);
+    if (commonLength < displayedStreamingText.length) {
+        displayedStreamingText.splice(commonLength);
+    }
+    streamingTargetConfirmed = nextConfirmed;
+    streamingTargetProvisional = nextProvisional;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        visibleStreamingText.push(...additions);
-        trimVisibleStreamingText();
+        displayedStreamingText = nextTarget.slice();
         renderStreamingTail();
-        growStreamingWidth(additions.length);
+        growStreamingWidthTo(displayedStreamingText.length);
         return;
     }
-    streamingQueue.push(...additions);
+    renderStreamingTail();
     if (!streamingAppendTimer) {
         drainStreamingQueue();
     }
+}
+
+function appendStreaming(delta, sessionId) {
+    if (!delta) return;
+    const confirmed = streamingTargetConfirmed.join('') + delta;
+    updateStreaming(confirmed, '', sessionId);
 }
 
 function showProcessing() {
@@ -500,8 +545,13 @@ function showError(message) {
 function getStreamingDebugState() {
     return {
         activeSession,
-        queueLength: streamingQueue.length,
-        visibleText: visibleStreamingText.join(''),
+        queueLength: Math.max(
+            0,
+            currentStreamingTarget().length - displayedStreamingText.length
+        ),
+        visibleText: displayedStreamingText.join(''),
+        confirmedText: streamingTargetConfirmed.join(''),
+        provisionalText: streamingTargetProvisional.join(''),
         horizontalOffset: 0,
         expanded: streamingCharacterCount > 0,
         characterCount: streamingCharacterCount,
