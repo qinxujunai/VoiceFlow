@@ -12,6 +12,7 @@ try:
         QPixmap,
     )
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
+    from PySide6.QtWebChannel import QWebChannel
     from PySide6.QtWebEngineWidgets import QWebEngineView
     from PySide6.QtWidgets import (
         QApplication,
@@ -53,6 +54,7 @@ except ImportError:  # Development bridge for an existing pre-migration venv.
         QPixmap,
     )
     from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+    from PyQt6.QtWebChannel import QWebChannel
     from PyQt6.QtWebEngineWidgets import QWebEngineView
     from PyQt6.QtWidgets import (
         QApplication,

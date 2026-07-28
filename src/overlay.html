@@ -13,7 +13,6 @@
     --gold: #ffb340;
     --green: #32d74b;
     --target-width: 92px;
-    --ticker-offset: 0px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -83,10 +82,6 @@ body {
 
 .pill.streaming {
     border-color: rgba(255, 69, 58, 0.16);
-}
-
-.pill.streaming.corrected {
-    border-color: rgba(50, 215, 75, 0.24);
 }
 
 .pill.processing,
@@ -197,14 +192,10 @@ body {
     text-align: center;
 }
 
-.ticker.overflowing {
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 18px, black 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 18px, black 100%);
-}
-
 .ticker-text {
-    display: inline-block;
-    transform: translateX(var(--ticker-offset));
+    display: block;
+    overflow: hidden;
+    text-overflow: clip;
 }
 
 .listening .ticker,
@@ -252,6 +243,7 @@ body {
 }
 
 </style>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
 <div id="pill" class="pill idle" role="status" aria-live="polite" aria-atomic="true">
@@ -267,24 +259,28 @@ body {
 const pill = document.getElementById('pill');
 const ticker = document.getElementById('ticker');
 const txt = document.getElementById('txt');
+let nativeBridge = null;
+if (window.qt && window.qt.webChannelTransport && window.QWebChannel) {
+    new QWebChannel(window.qt.webChannelTransport, channel => {
+        nativeBridge = channel.objects.voiceflowBridge;
+    });
+}
 
 const MIN_WIDTH = 86;
 const MAX_WIDTH = 312;
-const MAX_DISPLAY_CHARS = 72;
-const DISPLAY_TAIL_CHARS = 72;
-const STREAM_REVEAL_INTERVAL_MS = 24;
-const STREAM_REVEAL_MAX_CATCHUP_MS = 420;
+const STREAM_VISIBLE_GRAPHEMES = 20;
+const STREAM_BASE_WIDTH = 96;
+const STREAM_GROWTH_PER_GRAPHEME = 10;
+const STREAM_APPEND_INTERVAL_MS = 80;
 let activeSession = 0;
-let maxStreamingWidth = MIN_WIDTH;
-let lastStreamingText = '';
-let correctionTimer = 0;
-let streamingRevealTimer = 0;
-let streamingRevealToken = 0;
-let displayedStreamingText = '';
-let targetStreamingText = '';
+let streamingQueue = [];
+let visibleStreamingText = [];
+let streamingAppendTimer = 0;
+let streamingCharacterCount = 0;
+let streamingTargetWidth = MIN_WIDTH;
+let previewPaintReportedSession = -1;
 
 function meterScale(level) {
-    // Compress real microphone RMS into a calm but legible 18 px meter.
     return clamp(0.36 + Math.sqrt(clamp(level, 0, 0.16) / 0.16) * 0.92, 0.36, 1.28);
 }
 
@@ -314,160 +310,93 @@ function measureTextWidth(text) {
     var w = 0;
     for (var i = 0; i < text.length; i++) {
         var c = text.charCodeAt(i);
-        // CJK + fullwidth: ~12px
         if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
             (c >= 0x3000 && c <= 0x303f) || (c >= 0xff00 && c <= 0xffef) ||
             (c >= 0x2e80 && c <= 0x2eff) || (c >= 0x3300 && c <= 0x33bf) ||
             (c >= 0xfe30 && c <= 0xfe4f) || (c >= 0xf900 && c <= 0xfaff)) {
             w += 12;
         } else if (c <= 0x7f) {
-            w += 6.8;  // ASCII
+            w += 6.8;
         } else {
-            w += 8;    // other
+            w += 8;
         }
     }
     return w;
 }
 
-function displayTextForPill(text) {
-    text = text || '';
-    if (text.length <= MAX_DISPLAY_CHARS) {
-        return text;
-    }
-    return '… ' + text.slice(-DISPLAY_TAIL_CHARS);
-}
-
-function setWidthForText(text, lockGrowth) {
-    var displayText = displayTextForPill(text);
-    txt.textContent = displayText;
-    if (!displayText) {
-        pill.style.removeProperty('--target-width');
-        return MIN_WIDTH;
-    }
-    var est = measureTextWidth(displayText);
-    var width = clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH);
-    if (lockGrowth) {
-        width = Math.max(maxStreamingWidth, width);
-        maxStreamingWidth = width;
-    }
+function setWidthForLabel(text) {
+    txt.textContent = text || '';
+    var width = text ? clamp(50 + measureTextWidth(text) + 36, MIN_WIDTH, MAX_WIDTH) : MIN_WIDTH;
     pill.style.setProperty('--target-width', width + 'px');
     return width;
 }
 
-let _tickerTarget = 0;
-let _tickerCurrent = 0;
-let _tickerRaf = 0;
-
-function setTickerOffset(offset) {
-    _tickerCurrent = offset;
-    _tickerTarget = offset;
-    pill.style.setProperty('--ticker-offset', `${offset}px`);
-}
-
-function smoothTicker() {
-    _tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;
-    pill.style.setProperty('--ticker-offset', `${_tickerCurrent}px`);
-    if (Math.abs(_tickerTarget - _tickerCurrent) > 0.4) {
-        _tickerRaf = requestAnimationFrame(smoothTicker);
-    } else {
-        setTickerOffset(_tickerTarget);
+function splitGraphemes(value) {
+    if (window.Intl && Intl.Segmenter) {
+        const segmenter = new Intl.Segmenter('zh', {granularity: 'grapheme'});
+        return Array.from(segmenter.segment(value), item => item.segment);
     }
+    return Array.from(value);
 }
 
-function updateTickerOffset(targetWidth, mode) {
-    cancelAnimationFrame(_tickerRaf);
-    requestAnimationFrame(() => {
-        var targetW = targetWidth || parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH;
-        var tickerW = Math.max(0, targetW - 50);
-        const overflow = Math.max(0, txt.scrollWidth - tickerW);
-        ticker.classList.toggle('overflowing', overflow > 0);
-        var nextTarget = overflow > 0 ? -overflow : 0;
-        if (overflow > 0) {
-            ticker.style.textAlign = 'left';
-        } else {
-            ticker.style.textAlign = 'center';
-        }
-        if (mode === 'live' || mode === 'final' || mode === 'settled') {
-            setTickerOffset(nextTarget);
-            return;
-        }
-        if (nextTarget > _tickerCurrent) {
-            setTickerOffset(nextTarget);
-        }
-        _tickerTarget = nextTarget;
-        _tickerRaf = requestAnimationFrame(smoothTicker);
-    });
+function renderStreamingTail() {
+    txt.textContent = visibleStreamingText.join('');
 }
 
-function cancelStreamingReveal() {
-    clearTimeout(streamingRevealTimer);
-    streamingRevealTimer = 0;
-    streamingRevealToken += 1;
-}
-
-function renderStreamingText(text, mode) {
-    var width = setWidthForText(text, true);
-    updateTickerOffset(width, mode);
-}
-
-function commonPrefixLength(left, right) {
-    var limit = Math.min(left.length, right.length);
-    var index = 0;
-    while (index < limit && left[index] === right[index]) index += 1;
-    return index;
-}
-
-function scheduleStreamingReveal(text, sessionId, mode) {
-    if (!text || sessionId !== activeSession) return;
-    cancelStreamingReveal();
-    targetStreamingText = text;
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        displayedStreamingText = targetStreamingText;
-        renderStreamingText(displayedStreamingText, mode);
-        return;
-    }
-
-    if (!targetStreamingText.startsWith(displayedStreamingText)) {
-        var stableLength = commonPrefixLength(displayedStreamingText, targetStreamingText);
-        displayedStreamingText = targetStreamingText.slice(0, stableLength);
-        renderStreamingText(displayedStreamingText, mode);
-    }
-
-    var token = streamingRevealToken;
-    function revealNext() {
-        if (token !== streamingRevealToken || sessionId !== activeSession) return;
-        var remaining = targetStreamingText.length - displayedStreamingText.length;
-        if (remaining <= 0) return;
-        var maxTicks = Math.max(
-            1,
-            Math.floor(STREAM_REVEAL_MAX_CATCHUP_MS / STREAM_REVEAL_INTERVAL_MS)
-        );
-        var step = Math.max(1, Math.ceil(remaining / maxTicks));
-        displayedStreamingText = targetStreamingText.slice(
+function trimVisibleStreamingText() {
+    if (visibleStreamingText.length > STREAM_VISIBLE_GRAPHEMES) {
+        visibleStreamingText.splice(
             0,
-            displayedStreamingText.length + step
+            visibleStreamingText.length - STREAM_VISIBLE_GRAPHEMES
         );
-        renderStreamingText(displayedStreamingText, mode);
-        if (displayedStreamingText.length < targetStreamingText.length) {
-            streamingRevealTimer = setTimeout(revealNext, STREAM_REVEAL_INTERVAL_MS);
-        }
     }
+}
 
-    revealNext();
+function growStreamingWidth(addedCount) {
+    streamingCharacterCount += Math.max(0, Number(addedCount) || 0);
+    const target = clamp(
+        STREAM_BASE_WIDTH + streamingCharacterCount * STREAM_GROWTH_PER_GRAPHEME,
+        MIN_WIDTH,
+        MAX_WIDTH
+    );
+    streamingTargetWidth = Math.max(streamingTargetWidth, target);
+    pill.style.setProperty('--target-width', streamingTargetWidth + 'px');
+}
+
+function drainStreamingQueue() {
+    streamingAppendTimer = 0;
+    if (!streamingQueue.length) return;
+    visibleStreamingText.push(streamingQueue.shift());
+    trimVisibleStreamingText();
+    renderStreamingTail();
+    growStreamingWidth(1);
+    const paintedSession = activeSession;
+    if (previewPaintReportedSession !== paintedSession) {
+        previewPaintReportedSession = paintedSession;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (nativeBridge && activeSession === paintedSession) {
+                    nativeBridge.previewPainted(paintedSession);
+                }
+            });
+        });
+    }
+    if (streamingQueue.length) {
+        streamingAppendTimer = setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS);
+    }
+}
+
+function cancelStreamingQueue() {
+    clearTimeout(streamingAppendTimer);
+    streamingAppendTimer = 0;
+    streamingQueue = [];
 }
 
 function resetTextMotion() {
-    cancelAnimationFrame(_tickerRaf);
-    clearTimeout(correctionTimer);
-    cancelStreamingReveal();
-    setTickerOffset(0);
-    ticker.classList.remove('overflowing');
-    ticker.style.textAlign = '';
-    maxStreamingWidth = MIN_WIDTH;
-    lastStreamingText = '';
-    displayedStreamingText = '';
-    targetStreamingText = '';
+    cancelStreamingQueue();
+    visibleStreamingText = [];
+    streamingCharacterCount = 0;
+    streamingTargetWidth = MIN_WIDTH;
     resetAudioLevel();
 }
 
@@ -504,92 +433,80 @@ function showState(state, label) {
     resetTextMotion();
     pill.className = 'pill ' + state;
     pill.style.width = '';
-    txt.textContent = label || '';
-    if (state === 'listening' || state === 'idle') {
-        setWidthForText('', false);
-    } else {
-        var width = setWidthForText(label || '', false);
-        if (state === 'processing' || state === 'finalizing' || state === 'done' || state === 'final_ready') {
-            ticker.style.textAlign = 'center';
-        }
-        updateTickerOffset(width);
-    }
+    setWidthForLabel(label || '');
 }
 
 function showRecording(sessionId) {
     prepareRecording(sessionId);
 }
 
-function updateStreaming(text, sessionId) {
-    if (!text) return;
+function appendStreaming(delta, sessionId) {
+    if (!delta) return;
     if (sessionId !== activeSession) return;
-    clearTimeout(correctionTimer);
     pill.className = 'pill streaming';
-    lastStreamingText = text;
-    scheduleStreamingReveal(text, sessionId, 'live');
-}
-
-function updateCorrection(text, sessionId) {
-    if (!text) return;
-    if (sessionId !== activeSession) return;
-    clearTimeout(correctionTimer);
-    pill.className = 'pill streaming corrected';
-    lastStreamingText = text;
-    scheduleStreamingReveal(text, sessionId, 'settled');
-    correctionTimer = setTimeout(() => {
-        if (sessionId === activeSession && pill.classList.contains('corrected')) {
-            pill.className = 'pill streaming';
-        }
-    }, 520);
+    const additions = splitGraphemes(delta);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        visibleStreamingText.push(...additions);
+        trimVisibleStreamingText();
+        renderStreamingTail();
+        growStreamingWidth(additions.length);
+        return;
+    }
+    streamingQueue.push(...additions);
+    if (!streamingAppendTimer) {
+        drainStreamingQueue();
+    }
 }
 
 function showProcessing() {
-    cancelStreamingReveal();
+    cancelStreamingQueue();
     activeSession += 1;
     pill.className = 'pill processing';
+    setWidthForLabel('处理中');
 }
 
 function showFinalizing(sessionId) {
     if (sessionId < activeSession) return;
-    cancelStreamingReveal();
+    cancelStreamingQueue();
     activeSession = sessionId;
     pill.className = 'pill finalizing';
-    if (!txt.textContent) {
-        setWidthForText('整理中', false);
-    }
-    updateTickerOffset(parseFloat(pill.style.getPropertyValue('--target-width')) || MIN_WIDTH);
+    setWidthForLabel('整理中');
 }
 
 function showDone() {
     showState('done', '已完成');
 }
 
-function showFinalText(text, sessionId) {
+function showFinalSummary(characterCount, sessionId) {
     if (sessionId < activeSession) return;
-    cancelStreamingReveal();
     activeSession = sessionId;
     resetTextMotion();
     pill.className = 'pill final_ready success';
-    var width = setWidthForText(text || '已完成', false);
-    updateTickerOffset(width, 'final');
+    const count = Math.max(0, Number(characterCount) || 0);
+    setWidthForLabel(`已复制 · ${count}字`);
 }
 
 function showResult(msg) {
     activeSession += 1;
-    ticker.style.textAlign = '';
+    resetTextMotion();
     pill.className = 'pill success';
-    if (msg) {
-        var width = setWidthForText(msg, false);
-        updateTickerOffset(width);
-    } else {
-        txt.textContent = '';
-        setTickerOffset(0);
-        setWidthForText('', false);
-    }
+    setWidthForLabel(msg || '');
 }
 
 function showError(message) {
     showState('error', message || '出错了');
+}
+
+function getStreamingDebugState() {
+    return {
+        activeSession,
+        queueLength: streamingQueue.length,
+        visibleText: visibleStreamingText.join(''),
+        horizontalOffset: 0,
+        expanded: streamingCharacterCount > 0,
+        characterCount: streamingCharacterCount,
+        targetWidth: streamingTargetWidth
+    };
 }
 </script>
 </body>
