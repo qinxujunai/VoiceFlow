@@ -88,7 +88,13 @@ def main():
     print("\n[5/5] 输出模块加载...")
     from output_handler import OutputHandler
     oh = OutputHandler(config_path)
-    print(f"  输出模式: {oh.mode}")
+    if config.get("output", {}).get("mode") != "clipboard":
+        raise RuntimeError("输出契约必须保持 clipboard")
+    if not callable(getattr(oh, "copy_only", None)):
+        raise RuntimeError("剪贴板完整性兜底不可用")
+    if hasattr(oh, "_type"):
+        raise RuntimeError("已删除的模拟逐字键盘输入路径被重新引入")
+    print("  输出契约: 剪贴板 → Ctrl+V → 本地历史兜底")
     print(f"  （不实际输出，避免干扰）")
 
     print("\n" + "=" * 50)
