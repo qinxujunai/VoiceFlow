@@ -43,19 +43,51 @@ def analyze_history(
         for row in rows
         if "stop_to_paste_ms" in row and 110 <= float(row.get("duration", 0)) <= 150
     ]
+    preview_model = [
+        float(row["preview_first_model_delta_ms"])
+        for row in rows
+        if "preview_first_model_delta_ms" in row
+    ]
+    preview_paint = [
+        float(row["preview_first_paint_ms"])
+        for row in rows
+        if "preview_first_paint_ms" in row
+    ]
+    preview_gap = [
+        float(row["preview_update_gap_ms"])
+        for row in rows
+        if "preview_update_gap_ms" in row
+    ]
+    preview_queue = [
+        float(row["preview_queue_delay_ms"])
+        for row in rows
+        if "preview_queue_delay_ms" in row
+    ]
+    preview_chunks = [
+        float(row["preview_max_chunk_chars"])
+        for row in rows
+        if "preview_max_chunk_chars" in row
+    ]
     metrics = {
         "trigger_to_feedback_p95_ms": _p95(feedback),
         "short_stop_to_paste_p95_ms": _p95(short),
         "two_minute_stop_to_paste_p95_ms": _p95(two_minute),
+        "preview_first_model_delta_p95_ms": _p95(preview_model),
+        "preview_first_paint_p95_ms": _p95(preview_paint),
+        "preview_update_gap_p95_ms": _p95(preview_gap),
+        "preview_queue_delay_p95_ms": _p95(preview_queue),
+        "preview_chunk_chars_p95": _p95(preview_chunks),
         "feedback_samples": len(feedback),
         "short_samples": len(short),
         "two_minute_samples": len(two_minute),
+        "preview_samples": len(preview_paint),
     }
     failures = []
     for key, count in (
         ("feedback", len(feedback)),
         ("short", len(short)),
         ("two_minute", len(two_minute)),
+        ("preview", len(preview_paint)),
     ):
         if count < minimum_samples:
             failures.append(f"{key}: requires {minimum_samples} samples, found {count}")
@@ -65,6 +97,18 @@ def analyze_history(
         failures.append("short stop-to-paste P95 exceeds 700 ms")
     if metrics["two_minute_stop_to_paste_p95_ms"] is not None and metrics["two_minute_stop_to_paste_p95_ms"] > 2500:
         failures.append("two-minute stop-to-paste P95 exceeds 2.5 seconds")
+    if metrics["preview_first_model_delta_p95_ms"] is not None and metrics["preview_first_model_delta_p95_ms"] > 900:
+        failures.append("preview first model delta P95 exceeds 900 ms")
+    if metrics["preview_first_paint_p95_ms"] is not None and metrics["preview_first_paint_p95_ms"] > 900:
+        failures.append("preview first paint P95 exceeds 900 ms")
+    if metrics["preview_update_gap_p95_ms"] is not None and metrics["preview_update_gap_p95_ms"] > 450:
+        failures.append("preview update gap P95 exceeds 450 ms")
+    if metrics["preview_queue_delay_p95_ms"] is not None and metrics["preview_queue_delay_p95_ms"] > 250:
+        failures.append("preview queue delay P95 exceeds 250 ms")
+    if metrics["preview_chunk_chars_p95"] is not None and metrics["preview_chunk_chars_p95"] > 2:
+        failures.append("preview chunk-size P95 exceeds 2 characters")
+    if preview_chunks and max(preview_chunks) > 4:
+        failures.append("preview chunk hard limit exceeds 4 characters")
     return {"passed": not failures, "metrics": metrics, "failures": failures}
 
 
