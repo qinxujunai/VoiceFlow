@@ -25,7 +25,7 @@ Individual checks:
 
 ```bat
 venv\Scripts\python.exe scripts\doctor.py
-venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py src\transcriber.py src\audio_capture.py src\recording_session.py src\vocabulary.py
+venv\Scripts\python.exe -m py_compile src\main.py src\overlay_webview.py src\hotkey_manager.py src\output_handler.py src\text_cleaner.py src\transcriber.py src\streaming_transcriber.py src\audio_capture.py src\recording_session.py src\vocabulary.py
 venv\Scripts\python.exe -m pytest tests -q
 venv\Scripts\python.exe test_integration.py
 ```
@@ -39,6 +39,7 @@ src/
   recording_session.py # recording lifecycle
   audio_capture.py     # sounddevice microphone adapter
   transcriber.py       # sherpa-onnx ASR
+  streaming_transcriber.py # small online ASR for capsule preview
   vocabulary.py        # layered dictionary/corrections
   text_cleaner.py      # deterministic cleanup
   output_handler.py    # clipboard first, then Ctrl+V
@@ -54,7 +55,9 @@ src/
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
 - Final output must cover the complete stopped audio; streaming preview is only preview.
-- Streaming preview may use a recent audio window and be throttled for long recordings.
+- Streaming preview feeds each new PCM sample once to its own online recognizer.
+- Never restore rolling-window preview through the final SenseVoice recognizer:
+  overlapping retranscription causes delayed chunks and hypothesis rollback.
 - Long recordings may progressively cache stable final segments during recording, but stop-time output must still include the remaining tail and cover the complete audio.
 - Default triggers are `f2`, `right_ctrl`, `xbutton1`, and `xbutton2`. Do not add combo keys as defaults — suppress=True blocks the individual keys from normal use.
 - Tray right-click menu must keep a working `退出` action.
@@ -108,11 +111,12 @@ Primary files:
 - `knowledge-base/user-dictionary.txt`
 - `knowledge-base/phrases.txt`
 
-Legacy files still load for compatibility:
+Legacy migration contract:
 
-- `knowledge-base/ai-terms.txt`
-- `knowledge-base/company-terms.txt`
-- `knowledge-base/user-custom.txt`
+- v1 `ai-terms.txt`, `company-terms.txt`, and `user-custom.txt` are migration
+  inputs only. They must not ship or appear in `hotwords.files`.
+- Runtime schema v2 removes retired seed hashes, imports non-seed additions
+  from modified legacy files, and then deletes the legacy filenames.
 
 Use `wrong=correct` only in correction files.
 
@@ -166,11 +170,29 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Regression Guards
 
-- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint, keep hide as hide-first then offscreen `resetHidden()`, and keep normal stop flow as `show_processing()` -> final transcribe/output/history -> `show_done()` -> hide/reset. Do not call `show_result(text)` for the normal recording stop path.
+- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop freezes audio, invalidates preview, optionally shows finalizing, writes final output/history, shows the compact final summary, and then hides/resets. Do not call `show_result(text)` for the normal recording stop path.
 
-- **Final text overwritten by streaming preview.** The old failure mode was one queued `updateStreaming` arriving after `show_result`. Keep `_stop_streaming()` joining `self._stream_thread`, and keep generation/session guards on `prepareRecording()` and `updateStreaming()`.
+- **Streaming text replay and reverse motion.** The online recognizer owns one
+  stream per recording and receives each new PCM sample exactly once. Its
+  Python-to-JavaScript contract is `appendStreaming(delta, session_id)`:
+  characters are appended once at a fixed cadence and are never retracted or
+  replayed. Do not restore rolling-window SenseVoice preview, full-text
+  `updateStreaming`, common-prefix resets, horizontal transforms, or catch-up
+  acceleration.
 
-- **Long dictation preview cost.** Streaming preview is UI feedback and may use only a recent audio window while the user is actively speaking. A pause during recording is a correction point and may refresh the pill with a more complete in-progress transcription. Long recordings may use progressive final segments plus a stop-time tail pass, but do not output preview text as final unless final transcription is empty and the existing safety fallback is the only available text.
+- **Final text overwritten by streaming preview.** Stop freezes the microphone
+  first, then invalidates the preview generation. `_stop_streaming()` may only
+  perform a bounded join; session guards prevent stale preview work from
+  updating processing or final states. The capsule shows a compact character
+  count after output rather than replaying the final transcript.
+
+- **Long dictation preview cost and coverage.** The lightweight online preview
+  and SenseVoice progressive final cache use separate workers. Active recording
+  PCM must not be discarded. Progressive final segments carry explicit sample
+  ranges; final assembly must prove continuous coverage from sample zero to the
+  frozen stop sample, otherwise retry the retained full PCM. Do not output
+  preview text as final unless final transcription is empty and the explicit
+  safety fallback is the only recoverable text.
 
 ## Coding Rules
 
