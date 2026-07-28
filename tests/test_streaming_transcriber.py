@@ -86,9 +86,12 @@ def test_online_preview_commits_only_stable_prefix_and_flushes_endpoint():
 
     assert first.text == "你好"
     assert first.delta == ""
+    assert first.provisional_text == "你好"
     assert second.text == "你好世界"
     assert second.delta == "你"
+    assert second.provisional_text == "好世界"
     assert third.delta == "好世界"
+    assert third.provisional_text == ""
     assert third.endpoint_final is True
     assert session.committed_text == "你好世界"
     assert session.segment_id == 1
@@ -153,9 +156,41 @@ def test_online_preview_reports_divergence_without_retracting_committed_text():
     ]
 
     assert updates[1].delta == "开放语"
+    assert updates[1].provisional_text == "音输入"
     assert updates[2].delta == ""
+    assert updates[2].provisional_text == ""
     assert updates[2].hypothesis_diverged is True
     assert session.committed_text == "开放语"
+
+
+def test_online_preview_removes_sentence_punctuation_from_live_hypotheses():
+    from streaming_transcriber import OnlinePreviewTranscriber
+
+    recognizer = FakeRecognizer(
+        ["你好，世界。", "你好，世界。"],
+        endpoints=[False, True],
+    )
+    transcriber = OnlinePreviewTranscriber.from_recognizer(
+        recognizer,
+        stability_guard_chars=0,
+    )
+    session = transcriber.create_session()
+
+    first = transcriber.accept_pcm(
+        session,
+        np.ones(1600, dtype=np.int16),
+        16000,
+    )
+    second = transcriber.accept_pcm(
+        session,
+        np.ones(1600, dtype=np.int16),
+        16000,
+    )
+
+    assert first.text == "你好世界"
+    assert first.provisional_text == "你好世界"
+    assert second.delta == "你好世界"
+    assert second.provisional_text == ""
 
 
 def test_online_preview_rejects_a_mismatched_sample_rate():
@@ -309,13 +344,15 @@ def test_voice_system_feeds_each_captured_sample_to_preview_exactly_once():
     system._preview_update_count = 0
     system._preview_max_chunk_chars = 0
     ranges = []
-    deltas = []
+    preview_states = []
     system._audio_snapshot = lambda start, end: (
         ranges.append((start, end))
         or np.ones(end - start, dtype=np.int16)
     )
-    system._append_preview_delta = lambda delta, generation: deltas.append(
-        (delta, generation)
+    system._update_preview_state = (
+        lambda confirmed, provisional, generation: preview_states.append(
+            (confirmed, provisional, generation)
+        )
     )
     preview = FakePreview()
     session = SimpleNamespace(committed_text="")
@@ -339,4 +376,7 @@ def test_voice_system_feeds_each_captured_sample_to_preview_exactly_once():
     assert next_sample == 2400
     assert ranges == [(0, 1600), (1600, 2400)]
     assert preview.lengths == [1600, 800]
-    assert deltas == [("字", 7), ("字", 7)]
+    assert preview_states == [
+        ("字", "", 7),
+        ("字字", "", 7),
+    ]

@@ -16,6 +16,8 @@ class PreviewEvent:
     delta: str
     segment_id: int
     audio_end_sample: int
+    committed_text: str = ""
+    provisional_text: str = ""
     endpoint_final: bool = False
     hypothesis_diverged: bool = False
 
@@ -48,6 +50,12 @@ class OnlinePreviewSession:
 
 class OnlinePreviewTranscriber:
     """Decode preview tokens without allowing UI rollback or replay."""
+
+    LIVE_SENTENCE_PUNCTUATION = str.maketrans(
+        "",
+        "",
+        "，。！？；：,.!?;:…",
+    )
 
     def __init__(
         self,
@@ -159,11 +167,17 @@ class OnlinePreviewTranscriber:
 
         samples = np.asarray(pcm, dtype=np.int16).reshape(-1)
         if not len(samples):
+            provisional = self._provisional_text(
+                session.segment_committed_text,
+                session.latest_text,
+            )
             return PreviewEvent(
                 text=session.latest_text,
                 delta="",
                 segment_id=session.segment_id,
                 audio_end_sample=session.fed_samples,
+                committed_text=session.committed_text,
+                provisional_text=provisional,
             )
 
         waveform = samples.astype(np.float32) / 32768.0
@@ -172,7 +186,9 @@ class OnlinePreviewTranscriber:
         while self.recognizer.is_ready(session.stream):
             self.recognizer.decode_stream(session.stream)
 
-        text = str(self.recognizer.get_result(session.stream) or "").strip()
+        text = self._live_preview_text(
+            str(self.recognizer.get_result(session.stream) or "")
+        )
         session.latest_text = text
         diverged = False
         stable_prefix = self._stable_prefix(session.previous_hypothesis, text)
@@ -188,6 +204,11 @@ class OnlinePreviewTranscriber:
             session.segment_committed_text += delta
             session.committed_text += delta
         session.previous_hypothesis = text
+        provisional = (
+            ""
+            if diverged
+            else self._provisional_text(session.segment_committed_text, text)
+        )
 
         endpoint_final = self._is_endpoint(session.stream)
         event_segment_id = session.segment_id
@@ -200,6 +221,7 @@ class OnlinePreviewTranscriber:
                 if remainder:
                     delta += remainder
                     session.committed_text += remainder
+            provisional = ""
             self._reset_segment(session)
 
         return PreviewEvent(
@@ -207,9 +229,21 @@ class OnlinePreviewTranscriber:
             delta=delta,
             segment_id=event_segment_id,
             audio_end_sample=session.fed_samples,
+            committed_text=session.committed_text,
+            provisional_text=provisional,
             endpoint_final=endpoint_final,
             hypothesis_diverged=diverged,
         )
+
+    @classmethod
+    def _live_preview_text(cls, value: str) -> str:
+        return value.translate(cls.LIVE_SENTENCE_PUNCTUATION).strip()
+
+    @staticmethod
+    def _provisional_text(committed: str, hypothesis: str) -> str:
+        if hypothesis.startswith(committed):
+            return hypothesis[len(committed):]
+        return ""
 
     def _stable_prefix(self, previous: str, current: str) -> str:
         if not previous or not current:

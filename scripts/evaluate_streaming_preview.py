@@ -72,6 +72,7 @@ def evaluate_pcm(
     divergence_count = 0
     queue_delays = []
     next_display_ms = 0.0
+    last_preview_text = ""
     decode_started = time.perf_counter()
 
     for start in range(0, len(samples), chunk_samples):
@@ -79,7 +80,9 @@ def evaluate_pcm(
         event = preview.accept_pcm(session, samples[start:end], sample_rate)
         if event.hypothesis_diverged:
             divergence_count += 1
-        if not event.delta:
+        confirmed = event.committed_text or session.committed_text
+        preview_text = confirmed + event.provisional_text
+        if preview_text == last_preview_text:
             continue
         arrival_ms = end / sample_rate * 1000
         relative_ms = (
@@ -90,11 +93,19 @@ def evaluate_pcm(
         if first_delta_ms is None:
             first_delta_ms = relative_ms
         update_audio_ms.append(arrival_ms)
-        chunks.append(len(event.delta))
-        for _character in event.delta:
+        common_size = 0
+        for left, right in zip(last_preview_text, preview_text):
+            if left != right:
+                break
+            common_size += 1
+        added_characters = max(0, len(preview_text) - common_size)
+        if added_characters:
+            chunks.append(added_characters)
+        for _character in range(added_characters):
             display_ms = max(arrival_ms, next_display_ms)
             queue_delays.append(display_ms - arrival_ms)
             next_display_ms = display_ms + append_interval_ms
+        last_preview_text = preview_text
 
     decode_ms = (time.perf_counter() - decode_started) * 1000
     update_gaps = [
@@ -118,6 +129,7 @@ def evaluate_pcm(
         "divergence_count": divergence_count,
         "decode_ms": round(decode_ms, 3),
         "committed_text": session.committed_text,
+        "preview_text": last_preview_text,
     }
 
 
