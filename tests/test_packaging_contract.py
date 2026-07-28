@@ -15,10 +15,35 @@ def test_windows_ci_forces_utf8_for_chinese_diagnostics():
     assert "scripts/smoke_packaged_runtime.ps1" in workflow
     assert "scripts/smoke_installer.ps1" in workflow
     assert "/DINCLUDE_SENSEVOICE=1" in workflow
+    assert "/DINCLUDE_STREAMING_PREVIEW=1" in workflow
+    assert "scripts/download_models.py --engine streaming-preview" in workflow
     assert "scripts/benchmark_models.py --limit 5 --strict-output" in workflow
     assert "permissions:" in workflow
     assert "contents: read" in workflow
     assert workflow.count("persist-credentials: false") == 3
+
+
+def test_quick_verify_rejects_pathological_model_output():
+    verify = (ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
+
+    assert '"--strict-output"' in verify
+
+
+def test_public_release_excludes_unlicensed_preview_and_requires_signing():
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "check_release_models.py sensevoice-small-int8 "
+        "streaming-zipformer-small-ctc-zh-int8"
+        not in release
+    )
+    assert "download_models.py --engine streaming-preview" not in release
+    assert "/DINCLUDE_STREAMING_PREVIEW=1" not in release
+    assert "WINDOWS_CERTIFICATE_BASE64" in release
+    assert "signtool" in release.lower()
+    assert "Get-AuthenticodeSignature" in release
 
 
 def test_windows_ci_pins_third_party_actions_to_reviewed_commits():
@@ -123,6 +148,7 @@ def test_release_spec_bundles_runtime_assets():
     assert 'version=str(PROJECT_ROOT / "assets" / "version_info.txt")' in spec
     assert "COLLECT(" in spec
     assert '(str(PROJECT_ROOT / "licenses"), "licenses")' in spec
+    assert "streaming-preview-model-review.md" in spec
 
 
 def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_model():
@@ -139,6 +165,14 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
         'Source: "..\\models\\sensevoice\\tokens.txt"; '
         'DestDir: "{app}\\models\\sensevoice"'
     ) in installer
+    assert (
+        'Source: "..\\models\\streaming-preview\\model.int8.onnx"; '
+        'DestDir: "{app}\\models\\streaming-preview"'
+    ) in installer
+    assert (
+        'Source: "..\\models\\streaming-preview\\tokens.txt"; '
+        'DestDir: "{app}\\models\\streaming-preview"'
+    ) in installer
     assert 'Source: "..\\models\\sensevoice\\*"' not in installer
     assert ".cache" not in installer
     assert "AppId={{" in installer
@@ -146,14 +180,19 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
     assert 'Name: "autostart"' not in installer
     assert r"Software\Microsoft\Windows\CurrentVersion\Run" not in installer
     assert r"%LOCALAPPDATA%\VoiceFlow" not in installer
+    assert "#ifndef INCLUDE_STREAMING_PREVIEW" in installer
+    assert (
+        'Type: filesandordirs; Name: "{app}\\models\\streaming-preview"'
+        in installer
+    )
 
 
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 2, 0, 0)" in version
-    assert "StringStruct('FileVersion', '0.2.0')" in version
-    assert "StringStruct('ProductVersion', '0.2.0')" in version
+    assert "filevers=(0, 2, 1, 0)" in version
+    assert "StringStruct('FileVersion', '0.2.1')" in version
+    assert "StringStruct('ProductVersion', '0.2.1')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 

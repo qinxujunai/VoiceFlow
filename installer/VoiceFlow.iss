@@ -1,5 +1,5 @@
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 
@@ -48,6 +48,10 @@ Source: "..\dist\VoiceFlow\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 Source: "..\models\sensevoice\model.int8.onnx"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion
 Source: "..\models\sensevoice\tokens.txt"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion
 #endif
+#ifdef INCLUDE_STREAMING_PREVIEW
+Source: "..\models\streaming-preview\model.int8.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+Source: "..\models\streaming-preview\tokens.txt"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+#endif
 
 [Icons]
 Name: "{group}\VoiceFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
@@ -55,6 +59,16 @@ Name: "{autodesktop}\VoiceFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: 
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 VoiceFlow"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+
+[InstallDelete]
+Type: files; Name: "{app}\knowledge-base\ai-terms.txt"
+Type: files; Name: "{app}\knowledge-base\company-terms.txt"
+Type: files; Name: "{app}\knowledge-base\user-custom.txt"
+#ifndef INCLUDE_STREAMING_PREVIEW
+; Public builds omit experimental preview weights. Remove a copy left by an
+; earlier internal build so the quiet-capsule fallback is deterministic.
+Type: filesandordirs; Name: "{app}\models\streaming-preview"
+#endif
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c taskkill /IM VoiceFlow.exe /F"; Flags: runhidden; RunOnceId: "StopVoiceFlow"

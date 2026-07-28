@@ -49,6 +49,11 @@ upstream terms and pinned source information in `model-manifest.json`.
   `csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`,
   revision `2365baeacb507f821a0c8120fcee3d484dba7a07`, upstream model
   `FunAudioLLM/SenseVoiceSmall`.
+- The internal streaming-preview candidate originates from the official
+  sherpa-onnx release asset
+  `sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01`.
+  Its weight license is not explicitly declared, so it is blocked from public
+  redistribution. See `docs/streaming-preview-model-review.md`.
 
 This notice is an engineering inventory, not legal advice. Release owners must
 retain upstream copyright and license files in every public build.

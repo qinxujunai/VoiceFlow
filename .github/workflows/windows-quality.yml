@@ -31,10 +31,14 @@ jobs:
       - name: Restore model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: models/sensevoice
-          key: sensevoice-${{ hashFiles('model-manifest.json') }}
-      - name: Download and verify pinned baseline model
-        run: python scripts/download_models.py --engine sensevoice
+          path: |
+            models/sensevoice
+            models/streaming-preview
+          key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned runtime models
+        run: |
+          python scripts/download_models.py --engine sensevoice
+          python scripts/download_models.py --engine streaming-preview
       - name: Unit and contract tests
         run: python -m pytest tests -q
       - name: Lifecycle stability gate
@@ -61,10 +65,14 @@ jobs:
       - name: Restore model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: models/sensevoice
-          key: sensevoice-${{ hashFiles('model-manifest.json') }}
-      - name: Download and verify pinned baseline model
-        run: python scripts/download_models.py --engine sensevoice
+          path: |
+            models/sensevoice
+            models/streaming-preview
+          key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned runtime models
+        run: |
+          python scripts/download_models.py --engine sensevoice
+          python scripts/download_models.py --engine streaming-preview
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
       - name: Smoke packaged executable
@@ -77,10 +85,10 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /DINCLUDE_SENSEVOICE=1 /DINCLUDE_STREAMING_PREVIEW=1 installer\VoiceFlow.iss
       - name: Smoke full offline installer
         shell: pwsh
-        run: ./scripts/smoke_installer.ps1
+        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: VoiceFlow-windows-unsigned
