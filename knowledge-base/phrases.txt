@@ -1,4 +1,2 @@
-# Common phrases that should survive cleanup.
-本地语音输入
-系统级语音输入
-自然语言编程
+# User-owned phrases.
+# Add frequently used sentences or domain phrases here.
