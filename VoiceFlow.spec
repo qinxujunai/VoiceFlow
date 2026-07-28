@@ -31,6 +31,10 @@ a = Analysis(
             str(PROJECT_ROOT / "docs" / "qt-lgpl-compliance.md"),
             "docs",
         ),
+        (
+            str(PROJECT_ROOT / "docs" / "streaming-preview-model-review.md"),
+            "docs",
+        ),
         # Vocabulary files.
         (str(PROJECT_ROOT / "knowledge-base"), "knowledge-base"),
         (str(PROJECT_ROOT / "assets" / "voiceflow.ico"), "assets"),
@@ -48,6 +52,7 @@ a = Analysis(
         "pyautogui",
         "yaml",
         "PySide6",
+        "PySide6.QtWebChannel",
         "PySide6.QtWebEngineWidgets",
         "PySide6.QtCore",
         "PySide6.QtGui",

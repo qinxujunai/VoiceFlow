@@ -31,6 +31,11 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
             "duration": 10,
             "trigger_to_feedback_ms": 80,
             "stop_to_paste_ms": 650,
+            "preview_first_model_delta_ms": 700,
+            "preview_first_paint_ms": 780,
+            "preview_update_gap_ms": 420,
+            "preview_queue_delay_ms": 80,
+            "preview_max_chunk_chars": 2,
         })
         rows.append({
             "duration": 120,
@@ -54,7 +59,7 @@ def test_performance_gate_rejects_missing_release_evidence(tmp_path):
     result = performance_gate.analyze_history(tmp_path / "missing.jsonl", minimum_samples=20)
 
     assert result["passed"] is False
-    assert len(result["failures"]) == 3
+    assert len(result["failures"]) == 4
 
 
 def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
@@ -79,7 +84,15 @@ def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
         rows.extend(
             (
                 {"trigger_to_feedback_ms": 50},
-                {"stop_to_paste_ms": 500, "duration": 10},
+                {
+                    "stop_to_paste_ms": 500,
+                    "duration": 10,
+                    "preview_first_model_delta_ms": 700,
+                    "preview_first_paint_ms": 780,
+                    "preview_update_gap_ms": 420,
+                    "preview_queue_delay_ms": 80,
+                    "preview_max_chunk_chars": 2,
+                },
                 {"stop_to_paste_ms": 2200, "duration": 120},
             )
         )
@@ -98,3 +111,36 @@ def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
     assert result["metrics"]["feedback_samples"] == 20
     assert result["metrics"]["short_samples"] == 20
     assert result["metrics"]["two_minute_samples"] == 20
+    assert result["metrics"]["preview_samples"] == 20
+
+
+def test_performance_gate_rejects_slow_or_chunky_preview(tmp_path):
+    import performance_gate
+
+    history = tmp_path / "history.jsonl"
+    rows = []
+    for _ in range(20):
+        rows.append(
+            {
+                "duration": 10,
+                "trigger_to_feedback_ms": 50,
+                "stop_to_paste_ms": 500,
+                "preview_first_model_delta_ms": 950,
+                "preview_first_paint_ms": 1050,
+                "preview_update_gap_ms": 600,
+                "preview_queue_delay_ms": 300,
+                "preview_max_chunk_chars": 5,
+            }
+        )
+        rows.append({"duration": 120, "stop_to_paste_ms": 2200})
+    history.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    result = performance_gate.analyze_history(history, minimum_samples=20)
+
+    assert result["passed"] is False
+    assert any("preview first paint" in item for item in result["failures"])
+    assert any("preview update gap" in item for item in result["failures"])
+    assert any("preview chunk" in item for item in result["failures"])
