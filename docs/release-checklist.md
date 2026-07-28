@@ -38,7 +38,7 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
-venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.0-Windows-x64.exe --output-dir release\v0.2.0 --version 0.2.0
+venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.1-Windows-x64.exe --output-dir release\v0.2.1 --version 0.2.1
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
@@ -47,6 +47,11 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
 - Qt LGPL, GPL, Chromium license texts and `docs/qt-lgpl-compliance.md` are
   present in the installed application.
 - The selected default model has a recorded redistribution-license decision.
+- Every bundled preview model also has an explicit weight license; `NOASSERTION`
+  is a hard public-release failure.
+- When no preview model passes both the distribution and performance gates, the
+  public installer omits it and uses the quiet recording capsule. The source
+  and internal CI build may still exercise pinned experimental candidates.
 - The installer works per-user on a clean VM, upgrades the same AppId, rolls
   back using the previous signed installer, and removes its files on uninstall.
 - A stable public installer and executable are Authenticode signed.
@@ -58,3 +63,18 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
 - `SBOM.cdx.json` parses as CycloneDX 1.6 and includes the bundled model.
 - The tag-driven Release workflow publishes the installer, checksums, SBOM,
   notices, and GitHub build-provenance attestation from the same commit.
+
+## Current 0.2.1 blockers
+
+Do not create a public tag while any item remains open:
+
+- 160-sample authorized release corpus and untouched holdout are incomplete.
+- The current preview candidate fails at least one emission-granularity gate
+  and its model-weight license is `NOASSERTION`.
+- Clean Win10/11 offline install, upgrade, rollback, and uninstall evidence is
+  incomplete.
+- The executable and installer are not Authenticode signed and timestamped.
+- Real 2/5/10-minute microphone coverage and resource-budget evidence are
+  incomplete.
+- The measured installed process tree is approximately 1.32 GB Private Bytes;
+  see `docs/resource-profile-2026-07-28.md`.

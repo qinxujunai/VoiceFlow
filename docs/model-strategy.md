@@ -1,10 +1,13 @@
 # VoiceFlow Model Strategy
 
-Status: accepted for VoiceFlow 0.2
+Status: accepted for the VoiceFlow 0.2.1 release candidate
 
 ## Product decision
 
-VoiceFlow 0.2 ships one CPU-first offline model: SenseVoice Small int8.
+VoiceFlow uses two deliberately separate paths: a lightweight online model for
+append-only capsule feedback and SenseVoice Small int8 for the authoritative
+complete final transcript. Public builds ship only models whose weight license,
+fixed revision, and SHA-256 have passed the release gate.
 Alternative models remain engineering experiments and are not presented to
 normal users as “more accurate” or “enhanced”.
 
@@ -45,16 +48,41 @@ A candidate is evaluated by scenario, not by a single aggregate score:
 | Noisy or accented speech | authorized real-speech corpus by environment |
 | Low-end CPU | RTF, UI long tasks, audio underruns, RSS |
 
-Promotion requires at least 120 authorized, de-identified utterances, no
+Promotion requires at least 160 authorized, de-identified utterances, no
 pathological-output failure, 100% stopped-audio tail coverage, documented model
 license, fixed revision and SHA-256, and a clean-machine package test.
+
+## Streaming preview
+
+The capsule shows no punctuation and never edits text already shown. A token is
+committed only after consecutive hypotheses confirm a common prefix. Permanent
+hypothesis divergence freezes that segment, records the event, and resets at the
+next endpoint so the rest of the session can continue.
+
+The UI reveals confirmed graphemes at a fixed 80 ms cadence. The first
+grapheme is immediate; there is no catch-up acceleration, full-text replay, or
+horizontal translation. Run the measured model gate with:
+
+```bat
+venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
+```
+
+The pinned 2025-04-01 CTC candidate currently remains internal because its
+weights have no explicit redistribution license. Technical success cannot
+override that distribution gate.
+
+The latest same-machine three-candidate result is recorded in
+[`streaming-preview-evaluation-2026-07-28.md`](streaming-preview-evaluation-2026-07-28.md).
+None passes the complete latency, chunk, accuracy-smoke, and license gate.
 
 ## CPU and GPU
 
 VoiceFlow 0.2 promises the CPU path only. On the current eight-core Ryzen 7
 5800H, SenseVoice Chinese P95 was 278.5 ms with two threads, 207.3 ms with four,
-174.0 ms with six, and 154.3 ms with eight. Six threads remains the release
-default because it preserves headroom for Qt, audio, and the operating system.
+174.0 ms with six, and 154.3 ms with eight. Runtime defaults are no longer tied
+to that one machine: 2–4 physical cores use at most two final-ASR threads, 6–8
+cores use four, and 10 or more use six. Preview uses one or two threads, and the
+policy reserves capacity for Qt, audio, and the operating system.
 
 DirectML or CUDA must be delivered as a separate, pinned runtime experiment.
 A configuration switch alone is not GPU support. Promotion requires a clean
@@ -63,8 +91,10 @@ reduction in installation success.
 
 ## Punctuation and local polishing
 
-The 0.2 output path uses deterministic cleanup and user vocabulary. It does not
-let a generative model silently rewrite meaning.
+The 0.2.1 path uses deterministic cleanup and user vocabulary. A final-only
+punctuation adapter is fail-safe: after removing punctuation and spacing, every
+lexical character must be identical or VoiceFlow returns the unpunctuated
+source. No punctuation is predicted in the streaming capsule.
 
 Any future local polishing stage must:
 
