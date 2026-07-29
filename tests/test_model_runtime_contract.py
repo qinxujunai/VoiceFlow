@@ -138,6 +138,7 @@ def test_qwen_adapter_passes_all_required_assets_to_sherpa(tmp_path, monkeypatch
         types.SimpleNamespace(OfflineRecognizer=FakeRecognizer),
     )
     config = {
+        "performance": {"thread_mode": "manual"},
         "engine": {
             "active": "qwen3-asr",
             "qwen3-asr": {
@@ -196,6 +197,10 @@ def test_model_manifest_pins_revision_license_size_and_sha256():
         for asset in model["files"]:
             assert asset["size"] > 0
             assert len(asset["sha256"]) == 64
+    streaming = manifest["models"]["streaming-zipformer-small-ctc-zh-int8"]
+    assert streaming["source"]["provider"] == "github_release_archive"
+    assert len(streaming["source"]["archive_sha256"]) == 64
+    assert streaming["source"]["archive_size"] > 0
 
 
 def test_model_manifest_contains_all_fixed_lab_candidates():
@@ -205,6 +210,9 @@ def test_model_manifest_contains_all_fixed_lab_candidates():
 
     assert set(models) == {
         "sensevoice-small-int8",
+        "streaming-zipformer-small-ctc-zh-int8",
+        "streaming-paraformer-bilingual-zh-en-int8",
+        "streaming-zipformer-ctc-zh-int8-2025-06-30",
         "qwen3-asr-0.6b-int8",
         "fun-asr-nano-0.8b-int8",
         "qwen3-asr-1.7b-conditional",
@@ -213,6 +221,28 @@ def test_model_manifest_contains_all_fixed_lab_candidates():
     assert models["qwen3-asr-1.7b-conditional"]["eligible"] is False
     assert models["whisper-large-v3-turbo-int8"]["license"]["spdx"] == "MIT"
     assert models["sensevoice-small-int8"]["product_status"] == "default"
+    assert (
+        models["streaming-zipformer-small-ctc-zh-int8"]["product_status"]
+        == "internal_candidate"
+    )
+    assert (
+        models["streaming-zipformer-small-ctc-zh-int8"]["license"][
+            "distribution_review_required"
+        ]
+        is True
+    )
+    assert (
+        models["streaming-paraformer-bilingual-zh-en-int8"]["license"]["spdx"]
+        == "Apache-2.0"
+    )
+    assert (
+        models["streaming-paraformer-bilingual-zh-en-int8"]["product_status"]
+        == "experiment"
+    )
+    assert (
+        models["streaming-zipformer-ctc-zh-int8-2025-06-30"]["license"]["spdx"]
+        == "NOASSERTION"
+    )
     assert models["qwen3-asr-0.6b-int8"]["product_status"] == "experiment"
     assert models["fun-asr-nano-0.8b-int8"]["product_status"] == "rejected"
     assert models["qwen3-asr-1.7b-conditional"]["product_status"] == "ineligible"

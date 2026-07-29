@@ -22,10 +22,23 @@ class HistoryStore:
         model="",
         segment_count=None,
         final_length=None,
-        final_tail="",
+        captured_samples=None,
+        covered_samples=None,
+        coverage_ok=None,
+        final_source="",
         trigger_to_feedback_ms=None,
         stop_to_paste_ms=None,
+        audio_frozen_ms=None,
         transcription_ms=None,
+        preview_first_text_ms=None,
+        preview_speech_onset_sample=None,
+        preview_first_model_delta_ms=None,
+        preview_first_paint_ms=None,
+        preview_update_gap_ms=None,
+        preview_queue_delay_ms=None,
+        preview_divergence_count=None,
+        preview_update_count=None,
+        preview_max_chunk_chars=None,
     ):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
@@ -44,14 +57,49 @@ class HistoryStore:
             entry["segment_count"] = int(segment_count)
         if final_length is not None:
             entry["final_length"] = int(final_length)
-        if final_tail:
-            entry["final_tail"] = final_tail
+        if captured_samples is not None:
+            entry["captured_samples"] = int(captured_samples)
+        if covered_samples is not None:
+            entry["covered_samples"] = int(covered_samples)
+        if coverage_ok is not None:
+            entry["coverage_ok"] = bool(coverage_ok)
+        if final_source:
+            entry["final_source"] = final_source
         if trigger_to_feedback_ms is not None:
             entry["trigger_to_feedback_ms"] = round(float(trigger_to_feedback_ms), 3)
         if stop_to_paste_ms is not None:
             entry["stop_to_paste_ms"] = round(float(stop_to_paste_ms), 3)
+        if audio_frozen_ms is not None:
+            entry["audio_frozen_ms"] = round(float(audio_frozen_ms), 3)
         if transcription_ms is not None:
             entry["transcription_ms"] = round(float(transcription_ms), 3)
+        if preview_first_text_ms is not None:
+            entry["preview_first_text_ms"] = round(float(preview_first_text_ms), 3)
+        if preview_speech_onset_sample is not None:
+            entry["preview_speech_onset_sample"] = int(preview_speech_onset_sample)
+        if preview_first_model_delta_ms is not None:
+            entry["preview_first_model_delta_ms"] = round(
+                float(preview_first_model_delta_ms),
+                3,
+            )
+        if preview_first_paint_ms is not None:
+            entry["preview_first_paint_ms"] = round(
+                float(preview_first_paint_ms),
+                3,
+            )
+        if preview_update_gap_ms is not None:
+            entry["preview_update_gap_ms"] = round(float(preview_update_gap_ms), 3)
+        if preview_queue_delay_ms is not None:
+            entry["preview_queue_delay_ms"] = round(
+                float(preview_queue_delay_ms),
+                3,
+            )
+        if preview_divergence_count is not None:
+            entry["preview_divergence_count"] = int(preview_divergence_count)
+        if preview_update_count is not None:
+            entry["preview_update_count"] = int(preview_update_count)
+        if preview_max_chunk_chars is not None:
+            entry["preview_max_chunk_chars"] = int(preview_max_chunk_chars)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry

@@ -10,6 +10,109 @@
     }
   },
   "models": {
+    "streaming-zipformer-small-ctc-zh-int8": {
+      "runtime_engine": "online-zipformer-ctc",
+      "role": "realtime_preview",
+      "product_status": "internal_candidate",
+      "target_dir": "models/streaming-preview",
+      "source": {
+        "provider": "github_release_archive",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2",
+        "archive_size": 21264113,
+        "archive_sha256": "b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b",
+        "archive_root": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
+        "upstream": "csukuangfj/icefall-streaming-zipformer-small-ctc-zh-2025-04-01"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "name": "Upstream model-weight license not explicitly declared",
+        "distribution_review_required": true,
+        "distribution_decision": "docs/streaming-preview-model-review.md",
+        "reviewed_at": "2026-07-28"
+      },
+      "download_bytes": 21264113,
+      "files": [
+        {
+          "path": "model.int8.onnx",
+          "size": 26342340,
+          "sha256": "68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 13366,
+          "sha256": "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd"
+        }
+      ]
+    },
+    "streaming-paraformer-bilingual-zh-en-int8": {
+      "runtime_engine": "online-paraformer",
+      "role": "realtime_preview_challenger",
+      "product_status": "experiment",
+      "target_dir": "models/streaming-paraformer-bilingual",
+      "source": {
+        "provider": "huggingface",
+        "repo_id": "csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+        "revision": "8e40c43232a1c5c66c82111efc5820d3accca11b",
+        "upstream": "damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "distribution_review_required": false
+      },
+      "download_bytes": 237202501,
+      "files": [
+        {
+          "path": "encoder.int8.onnx",
+          "size": 165462184,
+          "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a"
+        },
+        {
+          "path": "decoder.int8.onnx",
+          "size": 71664561,
+          "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 75756,
+          "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"
+        }
+      ]
+    },
+    "streaming-zipformer-ctc-zh-int8-2025-06-30": {
+      "runtime_engine": "online-zipformer-ctc",
+      "role": "realtime_preview_challenger",
+      "product_status": "internal_candidate",
+      "target_dir": "models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30",
+      "source": {
+        "provider": "github_release_archive",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2",
+        "archive_size": 127965713,
+        "archive_sha256": "f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448",
+        "archive_root": "sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30",
+        "upstream": "yuekai/icefall-asr-multi-zh-hans-zipformer"
+      },
+      "license": {
+        "spdx": "NOASSERTION",
+        "name": "Upstream model-weight license not explicitly declared",
+        "distribution_review_required": true,
+        "distribution_decision": "docs/streaming-preview-model-review.md",
+        "reviewed_at": "2026-07-28"
+      },
+      "download_bytes": 127965713,
+      "files": [
+        {
+          "path": "model.int8.onnx",
+          "size": 162290887,
+          "sha256": "24ffdc19ba9aaed5a6a9beaede1e087745217d82425cf4041bca0c696661801e"
+        },
+        {
+          "path": "tokens.txt",
+          "size": 20628,
+          "sha256": "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"
+        }
+      ]
+    },
     "sensevoice-small-int8": {
       "runtime_engine": "sensevoice",
       "role": "baseline",

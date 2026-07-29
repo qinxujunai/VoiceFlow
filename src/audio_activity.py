@@ -104,6 +104,48 @@ def has_speech_activity(
     return False
 
 
+def find_speech_onset(
+    audio_data,
+    sample_rate: int,
+    *,
+    rms_threshold: float = 0.02,
+    min_active_ms: int = 90,
+    frame_ms: int = 30,
+) -> int | None:
+    """Return the first sample of sustained energetic speech-like activity."""
+    audio = np.asarray(audio_data).reshape(-1)
+    if audio.size == 0 or sample_rate <= 0:
+        return None
+    if np.issubdtype(audio.dtype, np.integer):
+        scale = float(max(abs(np.iinfo(audio.dtype).min), np.iinfo(audio.dtype).max))
+        samples = audio.astype(np.float64) / scale
+    else:
+        samples = audio.astype(np.float64)
+
+    frame_samples = max(1, int(sample_rate * frame_ms / 1000))
+    required_frames = max(1, math.ceil(min_active_ms / frame_ms))
+    run_start = None
+    active_frames = 0
+    for start in range(0, samples.size, frame_samples):
+        frame = samples[start:start + frame_samples]
+        if frame.size == 0:
+            continue
+        rms = float(np.sqrt(np.mean(frame * frame)))
+        if rms >= rms_threshold:
+            if run_start is None:
+                run_start = start
+            active_frames += 1
+            if active_frames >= required_frames:
+                active = np.flatnonzero(
+                    np.abs(samples[run_start:start + frame.size]) >= rms_threshold
+                )
+                return run_start + int(active[0]) if active.size else run_start
+        else:
+            run_start = None
+            active_frames = 0
+    return None
+
+
 def has_lexical_content(text: str) -> bool:
     """Punctuation alone is not recoverable dictation content."""
     return any(character.isalnum() for character in str(text or ""))

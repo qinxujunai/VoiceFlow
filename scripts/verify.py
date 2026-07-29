@@ -76,7 +76,16 @@ def main() -> int:
         ("py_compile", [sys.executable, "-m", "py_compile", *PYTHON_FILES]),
         ("pytest", [sys.executable, "-m", "pytest", "tests", "-q"]),
         ("stability", [sys.executable, "scripts/stability_gate.py", "--cycles", "500"]),
-        ("benchmark", [sys.executable, "scripts/benchmark_models.py", "--limit", str(args.benchmark_limit)]),
+        (
+            "benchmark",
+            [
+                sys.executable,
+                "scripts/benchmark_models.py",
+                "--limit",
+                str(args.benchmark_limit),
+                "--strict-output",
+            ],
+        ),
     ]
     if args.release:
         commands.append(("ui-quality", [sys.executable, "scripts/ui_quality_gate.py"]))

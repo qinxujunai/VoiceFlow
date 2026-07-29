@@ -15,9 +15,9 @@ being used as evidence.
 | F04 | Offer Qwen3-ASR, Whisper, SenseVoice, and other models | Deferred by gate | All named candidates were benchmarked. The alternatives are slower, less accurate on current public samples, pathological, or about 1 GB. They remain experiments until one wins a real scenario. |
 | F05 | Add local AI polishing | Deferred by gate | The future stage must be optional, preserve raw text, time out safely, and pass meaning/latency/RSS tests. No hidden local LLM dependency is added to 0.2. |
 | F06 | Add online API choices | Rejected for 0.2 | Cloud ASR conflicts with the core offline promise. A future separately disclosed adapter may be considered, but never in the default path. |
-| F07 | Capsule text appears in chunks | Adopted | Confirmed suffixes now reveal at a 24 ms rhythm while preserving the stable prefix and catching up within 420 ms. Processing and final states cancel the animation immediately. |
+| F07 | Capsule text appears in chunks | Partially closed | Confirmed graphemes now reveal at a fixed 80 ms rhythm with no acceleration, replay, or reverse motion. The current preview model still fails the update-gap and chunk-size targets and remains an internal candidate. |
 | F08 | Prefer smooth per-character output | Adopted with truth constraint | Only text already returned by ASR is animated. The UI does not fabricate unrecognized tokens or delay the final result. Reduced-motion users receive immediate text. |
-| F09 | Long-running use may lag | Adopted | Preview uses a fixed recent window and latest-only mailbox; stable long-audio segments release old PCM; release gates cover 500 lifecycle cycles and long-duration timing. |
+| F09 | Long-running use may lag | Adopted with a new safety tradeoff | Preview consumes only new PCM. Full int16 mono PCM is retained through stop (about 19 MB for ten minutes), while progressive final segments provide bounded finalization without sacrificing recoverability. |
 | F10 | Create a WeChat or QQ group | Deferred | GitHub Issues is the current auditable support channel. A private group requires an owner, moderation, privacy rules, and response capacity before publication. |
 | F11 | Study CapsWriter-Offline, VocoType, AriaType, VoiceSnap, and Typeoff | Completed | Their relevant architecture and product lessons are summarized below; license boundaries are preserved. |
 | F12 | Installer is missing from GitHub Packages | Corrected | Windows installers belong in GitHub Releases. The website and READMEs link directly to the versioned Release asset; Packages remains intentionally unused. |
@@ -63,7 +63,7 @@ Its smooth real-time cloud text is not evidence that an offline CPU model emits
 tokens at the same granularity. VoiceFlow therefore smooths confirmed local
 increments while keeping final output immediate and recoverable.
 
-## Result for VoiceFlow 0.2
+## Result for the VoiceFlow 0.2.1 candidate
 
 The release keeps one bundled SenseVoice model, CPU-first execution, no cloud
 path, no hidden AI rewriting, and no false macOS asset. The capsule, application
@@ -71,8 +71,8 @@ information architecture, website story, release naming, and model communication
 were revised. Alternative models and local polishing now have explicit admission
 contracts instead of unfinished customer-facing controls.
 
-The final local release gate passed 171 automated tests, 500 lifecycle cycles,
-four DPI capture levels, packaged-runtime smoke, full installer lifecycle
-smoke, and a real per-user upgrade. The upgrade preserved every one of the nine
-pre-existing configuration, history, vocabulary, and model files checked by
-SHA-256.
+The privacy migration, stopped-audio coverage, and append-only preview contracts
+have automated regression coverage. This is not yet a public-release claim:
+authorized holdout data, real 2/5/10-minute microphone evidence, resource
+budget, clean Win10/11 lifecycle evidence, model-weight redistribution rights,
+and Authenticode signing remain hard blockers.

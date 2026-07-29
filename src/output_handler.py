@@ -1,9 +1,7 @@
 """
 文字输出模块
 将转写文字注入到当前活动窗口的光标位置。
-支持两种模式：
-  - clipboard: 复制到剪贴板 + 模拟 Ctrl+V 粘贴
-  - keyboard: 模拟键盘逐字输入
+只使用剪贴板优先路径：复制完整文本，再发送 Ctrl+V。
 兜底：粘贴失败时自动存入剪贴板和本地历史文件。
 """
 
@@ -28,8 +26,6 @@ class OutputHandler:
             config = yaml.safe_load(f)
 
         out_cfg = config.get("output", {})
-        self.mode = out_cfg.get("mode", "clipboard")
-        self.typing_interval = out_cfg.get("typing_interval", 0.01)
         self.auto_space = out_cfg.get("auto_space", True)
         self.auto_period = out_cfg.get("auto_period", False)
 
@@ -49,15 +45,31 @@ class OutputHandler:
         if not text:
             return "empty"
 
+        text = self._prepare_text(text)
+        self.last_text = text
+
+        return "clipboard_copied_paste_sent" if self._paste(text) else "fallback"
+
+    def copy_only(self, text):
+        """完整性未确认时只保留文字，不向目标窗口发送粘贴。"""
+        if not text:
+            return "empty"
+
+        text = self._prepare_text(text)
+        self.last_text = text
+        try:
+            pyperclip.copy(text)
+            return "clipboard_copied_integrity_warning"
+        except Exception:
+            self._fallback(text)
+            return "fallback"
+
+    def _prepare_text(self, text):
         text = text.strip()
         if self.auto_period:
             if text and text[-1] not in "。！？.!?,，；;：:":
                 text += "。"
-        self.last_text = text
-
-        if self.mode == "clipboard":
-            return "clipboard_copied_paste_sent" if self._paste(text) else "fallback"
-        return "typed" if self._type(text) else "fallback"
+        return text
 
     def repeat_last(self):
         """重新输出最近一次成功进入输出模块的文本"""
@@ -121,20 +133,3 @@ class OutputHandler:
                 pass
 
         return False
-
-    def _type(self, text):
-        """模拟键盘输入"""
-        try:
-            pyautogui.write(text, interval=self.typing_interval)
-            return True
-        except Exception:
-            # pyautogui.write 不支持中文，用 press 逐字符 fallback
-            try:
-                for char in text:
-                    pyautogui.press(char)
-                    time.sleep(self.typing_interval)
-                return True
-            except Exception:
-                # 连键盘输入都失败了，走兜底
-                self._fallback(text)
-                return False

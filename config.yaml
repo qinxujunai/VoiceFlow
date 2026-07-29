@@ -16,7 +16,7 @@ engine:
     language: "zh"              # 主要语言: zh / en / auto
     use_itn: true               # 逆文本正则化（数字、日期等标准化）
     provider: "cpu"             # sherpa-onnx provider；默认 CPU 最稳
-    num_threads: 6              # Ryzen 7 5800H 上的低延迟默认值
+    num_threads: "auto"         # 按物理核心自动选择，给音频和界面留出余量
 
   qwen3-asr:
     conv_frontend_path: "models/qwen3-asr/conv_frontend.onnx"
@@ -25,7 +25,7 @@ engine:
     tokenizer_path: "models/qwen3-asr/tokenizer"
     hotwords: ""                # 可选热词，以空格分隔
     provider: "cpu"
-    num_threads: 6
+    num_threads: "auto"
 
   fun-asr-nano:
     encoder_adaptor_path: "models/fun-asr-nano/encoder_adaptor.int8.onnx"
@@ -36,7 +36,7 @@ engine:
     use_itn: true
     hotwords: ""
     provider: "cpu"
-    num_threads: 6
+    num_threads: "auto"
 
   whisper-turbo:
     encoder_path: "models/whisper-turbo/turbo-encoder.int8.onnx"
@@ -44,7 +44,21 @@ engine:
     tokens_path: "models/whisper-turbo/turbo-tokens.txt"
     language: "zh"
     provider: "cpu"
-    num_threads: 6
+    num_threads: "auto"
+
+# 胶囊使用独立的小型真流式模型，只负责边说边显示。
+# 停止后的最终文本仍由上面的主引擎完整识别。
+streaming_preview:
+  enabled: true
+  model_path: "models/streaming-preview/model.int8.onnx"
+  tokens_path: "models/streaming-preview/tokens.txt"
+  provider: "cpu"
+  num_threads: "auto"
+  stability_guard_chars: 1
+
+performance:
+  # 默认自动按物理核心分档；manual 仅供维护者做受控基准。
+  thread_mode: "auto"
 
 # ============================================================
 # 音频配置
@@ -89,11 +103,8 @@ hotkeys:
 # 输出配置
 # ============================================================
 output:
-  # 输出方式: keyboard（模拟键盘输入）/ clipboard（剪贴板粘贴）
+  # 完整文本先进入剪贴板，再发送 Ctrl+V；不模拟中文逐字键入。
   mode: "clipboard"
-
-  # keyboard 模式的输入速度（每个字符间隔，秒）
-  typing_interval: 0.01
 
   # 是否在输出后自动加空格
   auto_space: true
@@ -121,10 +132,6 @@ hotwords:
     - "corrections.txt"
     - "user-dictionary.txt"
     - "phrases.txt"
-    # legacy lists kept for compatibility while the new layered dictionary grows
-    - "ai-terms.txt"
-    - "company-terms.txt"
-    - "user-custom.txt"
   # 热词权重（默认 1.0，越大越优先匹配）
   default_weight: 1.0
 
@@ -147,9 +154,6 @@ system:
 # 文本清理器（后处理，零延迟）
 # ============================================================
 cleaner:
-  # 去除口头禅：嗯、啊、那个、就是说 等
-  remove_fillers: true
-
   # 中英文之间自动加空格
   auto_space_en: true
 

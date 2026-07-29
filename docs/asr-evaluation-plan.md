@@ -32,6 +32,8 @@ same local manifest.
 - Term hit rate: configured product and AI vocabulary terms recognized correctly.
 - RTF: transcription time divided by audio duration.
 - Segment count: number of cached final segments used for long recordings.
+- Speech-onset-to-first-delta and speech-onset-to-first-browser-paint.
+- Preview update-gap P95, chunk-size P95, queue-delay P95, and divergence count.
 
 ## Manifest Shape
 
@@ -41,6 +43,16 @@ example manifest can use public or synthetic audio only.
 ```jsonl
 {"id":"zh-short-command-001","audio":"audio/zh-short-command-001.wav","reference":"把这个方案整理成三个重点。","terms":["方案"]}
 ```
+
+## Fixed release corpus
+
+- 160 authorized, de-identified natural utterances from at least eight speakers.
+- 64 Chinese, 24 English, 32 mixed Chinese/English, 20 terminology/ITN, 12
+  natural pauses and self-corrections, and 8 silence or non-speech samples.
+- 12 additional 30-second, 2-minute, 5-minute, and 10-minute recordings.
+- Synthetic speech and noise derivatives are regression aids only; they never
+  support public accuracy claims.
+- A release holdout is never used to tune rules or choose models.
 
 ## Acceptance Bar
 
@@ -66,3 +78,14 @@ gate passes.
 The weekly model smoke also runs `benchmark_models.py --strict-output`.
 Pathological repetition or an impossible output rate is a hard failure, even
 when the process itself exits normally.
+
+The streaming model is measured separately:
+
+```bat
+venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
+```
+
+It must meet first delta P95 <= 900 ms from detected speech onset, update gap
+P95 <= 450 ms, chunk-size P95 <= 2 graphemes with a hard maximum of 4, and
+queue delay P95 <= 250 ms. A candidate must also have an explicit model-weight
+license before it can enter a public installer.

@@ -94,3 +94,17 @@ def test_analysis_worker_owns_generation_specific_queue_and_stop_event():
     assert "stop_event = threading.Event()" in worker
     assert "while not stop_event.is_set() or not analysis_queue.empty()" in worker
     assert "block = analysis_queue.get(timeout=0.1)" in worker
+
+
+def test_ten_minutes_of_pcm_stays_within_the_25_mb_recovery_budget():
+    sample_rate = 16000
+    block_samples = sample_rate // 10
+    blocks = [
+        np.zeros((block_samples, 1), dtype=np.int16)
+        for _ in range(10 * 60 * 10)
+    ]
+
+    payload_bytes = sum(block.nbytes for block in blocks)
+
+    assert payload_bytes == 19_200_000
+    assert payload_bytes <= 25 * 1024 * 1024

@@ -1,6 +1,7 @@
 param(
-    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.0-Windows-x64.exe",
-    [int]$StartupSeconds = 8
+    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.1-Windows-x64.exe",
+    [int]$StartupSeconds = 8,
+    [switch]$RequireStreamingPreview
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,13 @@ $smokeRoot = Join-Path $temporaryRoot (
 $installRoot = Join-Path $smokeRoot "install"
 $localAppData = Join-Path $smokeRoot "localappdata"
 $null = New-Item -ItemType Directory -Path $localAppData
+if (-not $RequireStreamingPreview) {
+    $stalePreview = Join-Path $installRoot "models\streaming-preview"
+    $null = New-Item -ItemType Directory -Path $stalePreview -Force
+    Set-Content `
+        -LiteralPath (Join-Path $stalePreview "stale-internal-model.txt") `
+        -Value "must be removed by the public installer"
+}
 $previousLocalAppData = $env:LOCALAPPDATA
 $appProcess = $null
 
@@ -62,8 +70,15 @@ try {
         "licenses\Chromium-BSD.txt",
         "docs\sensevoice-redistribution-decision.md",
         "docs\qt-lgpl-compliance.md",
+        "docs\streaming-preview-model-review.md",
         "unins000.exe"
     )
+    if ($RequireStreamingPreview) {
+        $required += @(
+            "models\streaming-preview\model.int8.onnx",
+            "models\streaming-preview\tokens.txt"
+        )
+    }
     foreach ($relative in $required) {
         $target = Join-Path $installRoot $relative
         if (-not (Test-Path -LiteralPath $target)) {
@@ -73,27 +88,43 @@ try {
     if (Test-Path -LiteralPath (Join-Path $installRoot "models\sensevoice\.cache")) {
         throw "Installer contains a Hugging Face cache"
     }
+    if (
+        -not $RequireStreamingPreview -and
+        (Test-Path -LiteralPath (Join-Path $installRoot "models\streaming-preview"))
+    ) {
+        throw "Public installer retained an experimental preview model"
+    }
+    & python scripts\scan_private_vocabulary.py --root $installRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installed private-vocabulary scan failed with code $LASTEXITCODE"
+    }
 
     $manifest = Get-Content -Raw (
         Join-Path $installRoot "model-manifest.json"
     ) | ConvertFrom-Json
-    $model = $manifest.models.'sensevoice-small-int8'
-    foreach ($entry in $model.files) {
-        if ($entry.path -notin @("model.int8.onnx", "tokens.txt")) {
-            continue
-        }
-        $target = Join-Path (
-            Join-Path $installRoot $model.target_dir
-        ) $entry.path
-        $file = Get-Item -LiteralPath $target
-        $actualHash = (
-            Get-FileHash -LiteralPath $target -Algorithm SHA256
-        ).Hash.ToLowerInvariant()
-        if ($file.Length -ne [int64]$entry.size) {
-            throw "Installed model size mismatch: $($entry.path)"
-        }
-        if ($actualHash -ne $entry.sha256) {
-            throw "Installed model SHA256 mismatch: $($entry.path)"
+    $modelIds = @("sensevoice-small-int8")
+    if ($RequireStreamingPreview) {
+        $modelIds += "streaming-zipformer-small-ctc-zh-int8"
+    }
+    foreach ($modelId in $modelIds) {
+        $model = $manifest.models.$modelId
+        foreach ($entry in $model.files) {
+            if ($entry.path -notin @("model.int8.onnx", "tokens.txt")) {
+                continue
+            }
+            $target = Join-Path (
+                Join-Path $installRoot $model.target_dir
+            ) $entry.path
+            $file = Get-Item -LiteralPath $target
+            $actualHash = (
+                Get-FileHash -LiteralPath $target -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+            if ($file.Length -ne [int64]$entry.size) {
+                throw "Installed model size mismatch: $modelId/$($entry.path)"
+            }
+            if ($actualHash -ne $entry.sha256) {
+                throw "Installed model SHA256 mismatch: $modelId/$($entry.path)"
+            }
         }
     }
 
