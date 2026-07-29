@@ -118,9 +118,15 @@ def _download_archive_model(base_dir, model_id):
 
         archive_root = source["archive_root"].rstrip("/")
         with tarfile.open(archive, "r:bz2") as bundle:
+            members = {
+                member.name.removeprefix("./"): member
+                for member in bundle.getmembers()
+            }
             for asset in model["files"]:
                 member_name = f"{archive_root}/{asset['path']}"
-                member = bundle.getmember(member_name)
+                member = members.get(member_name)
+                if member is None:
+                    raise RuntimeError(f"archive member not found: {member_name}")
                 if not member.isfile():
                     raise RuntimeError(f"archive member is not a file: {member_name}")
                 destination = partial_dir / asset["path"]
@@ -220,26 +226,29 @@ def main():
     base_dir = os.path.abspath(args.base_dir)
 
     if args.all:
-        download_sensevoice(base_dir)
-        download_streaming_preview(base_dir)
-        download_qwen3_asr(base_dir)
-        download_fun_asr_nano(base_dir)
-        download_whisper_turbo(base_dir)
+        succeeded = all((
+            download_sensevoice(base_dir),
+            download_streaming_preview(base_dir),
+            download_qwen3_asr(base_dir),
+            download_fun_asr_nano(base_dir),
+            download_whisper_turbo(base_dir),
+        ))
     elif args.engine == "sensevoice":
-        download_sensevoice(base_dir)
+        succeeded = download_sensevoice(base_dir)
     elif args.engine == "streaming-preview":
-        download_streaming_preview(base_dir)
+        succeeded = download_streaming_preview(base_dir)
     elif args.engine == "streaming-paraformer":
-        download_streaming_paraformer(base_dir)
+        succeeded = download_streaming_paraformer(base_dir)
     elif args.engine == "streaming-zipformer-2025-06-30":
-        download_streaming_zipformer_2025_06_30(base_dir)
+        succeeded = download_streaming_zipformer_2025_06_30(base_dir)
     elif args.engine == "qwen3-asr":
-        download_qwen3_asr(base_dir)
+        succeeded = download_qwen3_asr(base_dir)
     elif args.engine == "fun-asr-nano":
-        download_fun_asr_nano(base_dir)
+        succeeded = download_fun_asr_nano(base_dir)
     elif args.engine == "whisper-turbo":
-        download_whisper_turbo(base_dir)
+        succeeded = download_whisper_turbo(base_dir)
+    return 0 if succeeded else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -138,6 +138,7 @@ def test_qwen_adapter_passes_all_required_assets_to_sherpa(tmp_path, monkeypatch
         types.SimpleNamespace(OfflineRecognizer=FakeRecognizer),
     )
     config = {
+        "performance": {"thread_mode": "manual"},
         "engine": {
             "active": "qwen3-asr",
             "qwen3-asr": {
