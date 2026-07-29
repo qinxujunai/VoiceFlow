@@ -40,7 +40,7 @@ def test_streaming_renders_confirmed_text_and_a_replaceable_provisional_tail():
         update_start:html.index("function appendStreaming(", update_start)
     ]
 
-    assert ".ticker-provisional" in html
+    assert "provisionalNode.className = 'ticker-provisional';" in html
     assert "streamingTargetConfirmed" in update_block
     assert "streamingTargetProvisional" in update_block
     assert "commonGraphemePrefix" in update_block
@@ -48,6 +48,14 @@ def test_streaming_renders_confirmed_text_and_a_replaceable_provisional_tail():
     assert "innerHTML" not in html
     assert "def update_streaming(self, confirmed, provisional, session_id):" in overlay
     assert "self.overlay.update_streaming(" in main
+
+
+def test_streaming_text_uses_one_color_without_a_color_transition():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "transition: color" not in html
+    assert "rgba(245, 245, 247, 0.48)" not in html
+    assert ".ticker-provisional {" not in html
 
 
 def test_streaming_pill_grows_monotonically_with_each_visible_character():
