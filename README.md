@@ -7,7 +7,7 @@
 > 开口，文字就位。
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
-[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe)
+[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)
 
 ![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
 
@@ -24,7 +24,7 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按 `F2` 开始说话，�
 ## 下载
 
 普通用户只需下载
-[VoiceFlow-0.2.0-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe)。
+[VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)。
 安装包已经包含默认离线模型，不需要 Python。
 
 > 当前安装包尚未完成 Authenticode 代码签名，Windows 可能显示信誉提示。

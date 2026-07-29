@@ -100,9 +100,9 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert '<html lang="zh-CN">' in index
     assert 'data-language="zh"' in index
     assert 'data-language="en"' in index
-    assert "VoiceFlow-0.2.0-Windows-x64.exe" in index
+    assert "VoiceFlow-0.2.1-Windows-x64.exe" in index
     assert "releases/latest/download" not in index
-    assert "releases/download/v0.2.0/" in index
+    assert "releases/download/v0.2.1/" in index
     assert "macOS" not in index
     assert "Not available yet" not in copy
     assert "尚未代码签名" in index
