@@ -16,8 +16,7 @@ This gate runs:
 - Python compilation for project files
 - pytest
 - deterministic 500-cycle recording state test
-- quick ASR benchmark
-- pathological output detection for strict scheduled model smoke
+- quick ASR benchmark with pathological-output detection enabled
 - integration test
 
 For a release candidate, run:
@@ -25,6 +24,7 @@ For a release candidate, run:
 ```bat
 venv\Scripts\python.exe scripts\verify.py --release
 venv\Scripts\python.exe scripts\ui_quality_gate.py
+venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
 ```
 
 Release mode also requires at least 20 reproducible measurements in each
@@ -48,6 +48,8 @@ capture covers 100%, 125%, 150%, and 200% scale.
 - Final output is copied before paste is attempted.
 - Streaming preview is never treated as the final source of truth unless final
   transcription is empty and preview is the only safe fallback.
+- Preview text is append-only, unpunctuated, fixed at an 80 ms display cadence,
+  and resumes after a divergent segment reaches an endpoint.
 - Long recording output must include the final tail.
 - The previous clipboard is not restored after dictation.
 - Default triggers stay single-key: `F2`, `Right Ctrl`, `xbutton1`, `xbutton2`.

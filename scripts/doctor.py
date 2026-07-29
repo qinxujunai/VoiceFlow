@@ -20,6 +20,11 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from performance_profile import final_thread_count
 REQUIRED_IMPORTS = (
     "numpy",
     "sherpa_onnx",
@@ -113,8 +118,60 @@ def _check_active_engine(root: Path, config: dict[str, Any]) -> list[dict[str, s
         })
     provider = str(active_config.get("provider", "cpu"))
     rows.append({"name": "provider", "status": "ok", "detail": provider})
-    rows.append({"name": "num_threads", "status": "ok", "detail": str(active_config.get("num_threads", 6))})
+    configured_threads = active_config.get("num_threads", "auto")
+    effective_threads = final_thread_count(configured_threads)
+    detail = (
+        f"{effective_threads} (auto)"
+        if str(configured_threads).lower() == "auto"
+        else str(effective_threads)
+    )
+    rows.append({"name": "num_threads", "status": "ok", "detail": detail})
     return rows
+
+
+def _check_streaming_preview(root: Path, config: dict[str, Any]) -> list[dict[str, str]]:
+    preview = config.get("streaming_preview", {})
+    if not preview.get("enabled", True):
+        return [{
+            "name": "streaming_preview",
+            "status": "warning",
+            "detail": "disabled",
+        }]
+    assets = {
+        "preview_model_path": preview.get(
+            "model_path",
+            "models/streaming-preview/model.int8.onnx",
+        ),
+        "preview_tokens_path": preview.get(
+            "tokens_path",
+            "models/streaming-preview/tokens.txt",
+        ),
+    }
+    packaged_without_preview = (
+        (root / "VoiceFlow.exe").is_file()
+        and all(not (root / raw_path).is_file() for raw_path in assets.values())
+        and set(assets.values()) == {
+            "models/streaming-preview/model.int8.onnx",
+            "models/streaming-preview/tokens.txt",
+        }
+    )
+    if packaged_without_preview:
+        return [
+            {
+                "name": name,
+                "status": "warning",
+                "detail": "not bundled; quiet capsule is active",
+            }
+            for name in assets
+        ]
+    return [
+        {
+            "name": name,
+            "status": "ok" if (root / raw_path).is_file() else "missing",
+            "detail": str(root / raw_path),
+        }
+        for name, raw_path in assets.items()
+    ]
 
 
 def _check_knowledge_base(root: Path, config: dict[str, Any]) -> list[dict[str, str]]:
@@ -181,6 +238,7 @@ def run_doctor(root: Path = ROOT) -> dict[str, Any]:
     checks.extend(_check_python_runtime(root))
     checks.extend(_check_imports())
     checks.extend(_check_active_engine(root, config))
+    checks.extend(_check_streaming_preview(root, config))
     checks.extend(_check_knowledge_base(root, config))
     checks.extend(_check_samples(root))
     checks.extend(_check_vad(root, config))

@@ -8,133 +8,113 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 
-def test_streaming_update_writes_text_before_measuring_width():
+def test_streaming_delta_queue_is_monotonic_and_uses_a_fixed_cadence():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    set_width_idx = html.index("function setWidthForText(text")
-    text_write_idx = html.index("txt.textContent = displayText;", set_width_idx)
-    measure_idx = html.index("var est = measureTextWidth(displayText);", set_width_idx)
+    update_start = html.index(
+        "function updateStreaming(confirmedText, provisionalText, sessionId)"
+    )
+    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
+    drain_start = html.index("function drainStreamingQueue()")
+    drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
 
-    assert text_write_idx < measure_idx
-    reveal_idx = html.index("function renderStreamingText(text, mode)")
-    reveal_block = html[reveal_idx:html.index("function commonPrefixLength", reveal_idx)]
-    assert "setWidthForText(text, true)" in reveal_block
+    assert "const STREAM_APPEND_INTERVAL_MS = 80;" in html
+    assert "streamingTargetConfirmed = nextConfirmed;" in update_block
+    assert "streamingTargetProvisional = nextProvisional;" in update_block
+    assert "cancelStreamingQueue();" not in update_block
+    assert "drainStreamingQueue();" in update_block
+    assert "displayedStreamingText.push(" in drain_block
+    assert "setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS)" in drain_block
+    assert "Math.ceil(" not in update_block
+    assert "Math.max(0, 250 - queueDelayMs)" not in update_block
 
 
-def test_streaming_pill_width_animates_and_keeps_content_driven_growth():
+def test_streaming_renders_confirmed_text_and_a_replaceable_provisional_tail():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    set_width_idx = html.index("function setWidthForText(text")
-    set_width_block = html[set_width_idx:html.index("let _tickerRaf", set_width_idx)]
-    streaming_block = html[html.index("function updateStreaming(text, sessionId)"):html.index("function showProcessing()")]
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
-    assert "width 180ms cubic-bezier(0.2, 0, 0, 1)" in html
-    assert "let maxStreamingWidth = MIN_WIDTH;" in html
-    assert "var est = measureTextWidth(displayText);" in set_width_block
-    assert "Math.max(maxStreamingWidth, width)" in set_width_block
-    assert "maxStreamingWidth = width;" in set_width_block
-    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
-    assert "ticker.style.textAlign = 'center';" not in streaming_block
-
-
-def test_streaming_pill_keeps_system_overlay_width_not_banner_width():
-    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    set_width_idx = html.index("function setWidthForText(text")
-    set_width_block = html[set_width_idx:html.index("let _tickerRaf", set_width_idx)]
-
-    assert "max-width: 312px;" in html
-    assert "const MAX_WIDTH = 312;" in html
-    assert "clamp(50 + est + 36, MIN_WIDTH, MAX_WIDTH)" in set_width_block
-
-
-def test_streaming_pill_caps_rendered_text_for_long_dictation_performance():
-    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    display_idx = html.index("function displayTextForPill(text)")
-    set_width_idx = html.index("function setWidthForText(text")
-    display_block = html[display_idx:set_width_idx]
-    set_width_block = html[set_width_idx:html.index("let _tickerTarget", set_width_idx)]
-
-    assert "const MAX_DISPLAY_CHARS = 72;" in html
-    assert "DISPLAY_HEAD_CHARS" not in html
-    assert "const DISPLAY_TAIL_CHARS = 72;" in html
-    assert "'… ' + text.slice(-DISPLAY_TAIL_CHARS)" in display_block
-    assert "var displayText = displayTextForPill(text);" in set_width_block
-    assert "txt.textContent = displayText;" in set_width_block
-    assert "measureTextWidth(displayText)" in set_width_block
-
-
-def test_streaming_ticker_only_overflows_after_reaching_max_width():
-    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    ticker_idx = html.index("function updateTickerOffset")
-    ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
-
-    assert "text-align: center;" in html[html.index(".ticker {"):html.index(".ticker.overflowing")]
-    assert "const overflow = Math.max(0, txt.scrollWidth - tickerW);" in ticker_block
-    assert "ticker.classList.toggle('overflowing', overflow > 0);" in ticker_block
-    assert "ticker.style.textAlign = 'center';" in ticker_block
-    assert "var nextTarget = overflow > 0 ? -overflow : 0;" in ticker_block
-
-
-def test_streaming_ticker_jumps_to_latest_tail_without_visual_backlog():
-    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    ticker_idx = html.index("function updateTickerOffset")
-    ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
-    smooth_block = html[html.index("function smoothTicker()"):ticker_idx]
-
-    assert "marquee" not in html
-    assert "text-replace" not in html
-    assert "tickerTrack" not in html
-    assert "_tickerCurrent += (_tickerTarget - _tickerCurrent) * 0.32;" in smooth_block
-    assert "mode === 'live'" in ticker_block
-    assert "setTickerOffset(nextTarget);" in ticker_block
-
-
-def test_streaming_text_reveals_confirmed_increment_at_a_bounded_uniform_cadence():
-    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    reveal_idx = html.index("function scheduleStreamingReveal")
-    reveal_block = html[reveal_idx:html.index("function resetTextMotion", reveal_idx)]
-    streaming_block = html[
-        html.index("function updateStreaming(text, sessionId)"):
-        html.index("function updateCorrection(text, sessionId)")
+    update_start = html.index(
+        "function updateStreaming(confirmedText, provisionalText, sessionId)"
+    )
+    update_block = html[
+        update_start:html.index("function appendStreaming(", update_start)
     ]
 
-    assert "const STREAM_REVEAL_INTERVAL_MS = 24;" in html
-    assert "const STREAM_REVEAL_MAX_CATCHUP_MS = 420;" in html
-    assert "prefers-reduced-motion: reduce" in reveal_block
-    assert "Math.ceil(remaining / maxTicks)" in reveal_block
-    assert "renderStreamingText(displayedStreamingText, mode);" in reveal_block
-    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
-    assert "setWidthForText(text, true)" not in streaming_block
+    assert "provisionalNode.className = 'ticker-provisional';" in html
+    assert "streamingTargetConfirmed" in update_block
+    assert "streamingTargetProvisional" in update_block
+    assert "commonGraphemePrefix" in update_block
+    assert "txt.replaceChildren(confirmedNode, provisionalNode)" in html
+    assert "innerHTML" not in html
+    assert "def update_streaming(self, confirmed, provisional, session_id):" in overlay
+    assert "self.overlay.update_streaming(" in main
 
 
-def test_streaming_reveal_is_canceled_before_processing_or_final_text():
+def test_streaming_text_uses_one_color_without_a_color_transition():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    cancel_idx = html.index("function cancelStreamingReveal")
-    cancel_block = html[cancel_idx:html.index("function renderStreamingText", cancel_idx)]
-    processing_block = html[
+
+    assert "transition: color" not in html
+    assert "rgba(245, 245, 247, 0.48)" not in html
+    assert ".ticker-provisional {" not in html
+
+
+def test_streaming_pill_grows_monotonically_with_each_visible_character():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    update_start = html.index(
+        "function updateStreaming(confirmedText, provisionalText, sessionId)"
+    )
+    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
+    drain_start = html.index("function drainStreamingQueue()")
+    drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
+
+    assert "const STREAM_GROWTH_PER_GRAPHEME = 10;" in html
+    assert "function growStreamingWidthTo(characterCount)" in html
+    assert "Math.max(streamingTargetWidth, target)" in html
+    assert "growStreamingWidthTo(displayedStreamingText.length);" in drain_block
+    assert "growStreamingWidthTo(displayedStreamingText.length);" in update_block
+    assert "if (!streamingExpanded)" not in update_block
+    assert "measureTextWidth(provisionalText)" not in update_block
+
+
+def test_streaming_tail_is_cropped_without_horizontal_translation():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    render_start = html.index("function renderStreamingTail()")
+    render_block = html[render_start:html.index("function drainStreamingQueue()", render_start)]
+
+    assert "const STREAM_VISIBLE_GRAPHEMES = 20;" in html
+    assert "displayedStreamingText.length - STREAM_VISIBLE_GRAPHEMES" in render_block
+    assert "displayedStreamingText.slice(start)" in render_block
+    assert "translateX" not in html
+    assert "--ticker-offset" not in html
+    assert "horizontalOffset: 0" in html
+
+
+def test_processing_and_final_summary_cancel_pending_characters():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    processing = html[
         html.index("function showProcessing()"):
         html.index("function showFinalizing(")
     ]
-    final_block = html[
-        html.index("function showFinalText("):
+    final = html[
+        html.index("function showFinalSummary("):
         html.index("function showResult(")
     ]
 
-    assert "clearTimeout(streamingRevealTimer);" in cancel_block
-    assert "streamingRevealToken += 1;" in cancel_block
-    assert "cancelStreamingReveal();" in processing_block
-    assert "cancelStreamingReveal();" in final_block
+    assert "cancelStreamingQueue();" in processing
+    assert "resetTextMotion();" in final
+    assert "`已复制 · ${count}字`" in final
 
 
-def test_streaming_ticker_keeps_motion_when_text_changes_at_same_width():
+def test_reduced_motion_appends_the_confirmed_delta_immediately():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    ticker_idx = html.index("function updateTickerOffset")
-    ticker_block = html[ticker_idx:html.index("function resetTextMotion", ticker_idx)]
-    streaming_block = html[html.index("function updateStreaming(text, sessionId)"):html.index("function showProcessing()")]
+    update_start = html.index(
+        "function updateStreaming(confirmedText, provisionalText, sessionId)"
+    )
+    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
 
-    assert "STREAMING_MOTION_NUDGE" not in html
-    assert "function updateTickerOffset(targetWidth, mode)" in html
-    assert "restartTextRefresh" not in html
-    assert "scheduleStreamingReveal(text, sessionId, 'live');" in streaming_block
-    assert "if (nextTarget > _tickerCurrent)" in ticker_block
+    assert "prefers-reduced-motion: reduce" in update_block
+    assert "displayedStreamingText = nextTarget.slice();" in update_block
+    assert "renderStreamingTail();" in update_block
 
 
 def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
@@ -162,51 +142,52 @@ def test_recording_meter_is_driven_by_real_audio_without_animation_backlog():
     assert "self.audio.set_level_callback(self._on_audio_levels)" in main
 
 
-def test_streaming_bridge_uses_coalesced_preview_channel():
+def test_streaming_bridge_preserves_every_ordered_delta():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert "preview_js_requested = Signal(str)" in overlay
-    assert "self._bridge.preview_js_requested.emit" in overlay
-    assert "def _queue_preview_js" in overlay
-    assert "QTimer.singleShot(16, self._flush_preview_js)" in overlay
+    append_start = overlay.index("def append_streaming(self, delta, session_id):")
+    append_end = overlay.index("def update_audio_level", append_start)
+    append_block = overlay[append_start:append_end]
+
+    assert "self._js(" in append_block
+    assert "preview_js_requested" not in overlay
+    assert "_preview_mailbox" not in overlay
+    assert "_queue_preview_js" not in overlay
 
 
-def test_pause_correction_is_distinct_and_non_flashing():
+def test_online_preview_uses_one_monotonic_append_path():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
-    correction_block = html[html.index("function updateCorrection(text, sessionId)"):html.index("function showProcessing()")]
     stream_idx = main.index("def _start_streaming")
     stop_idx = main.index("def _stop_streaming", stream_idx)
     stream_block = main[stream_idx:stop_idx]
 
-    assert ".pill.streaming.corrected" in html
-    assert "text-replace" not in html
-    assert "pill.className = 'pill streaming corrected';" in correction_block
-    assert "scheduleStreamingReveal(text, sessionId, 'settled');" in correction_block
-    assert "correctionTimer = setTimeout" in correction_block
-    assert "def update_correction(self, text, session_id):" in overlay
-    assert "updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
-    assert "self.overlay.update_correction(clean, generation)" in stream_block
+    assert "function updateCorrection" not in html
+    assert "def update_correction" not in overlay
+    assert main.count("self._update_preview_state(") == 1
+    assert "_preview_accumulator" not in stream_block
+    assert "_stream_preview_snapshot" not in stream_block
+    assert "self.overlay.update_streaming(confirmed, provisional, generation)" in main
 
 
-def test_finalizing_and_final_text_are_session_guarded():
+def test_finalizing_and_final_summary_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
     assert "function showFinalizing(sessionId)" in html
     assert "activeSession = sessionId;" in html[html.index("function showFinalizing(sessionId)"):html.index("function showDone()")]
     assert "pill.className = 'pill finalizing';" in html
-    assert "function showFinalText(text, sessionId)" in html
-    final_text_block = html[html.index("function showFinalText(text, sessionId)"):html.index("function showResult(msg)")]
-    assert "if (sessionId < activeSession) return;" in final_text_block
-    assert "pill.className = 'pill final_ready success';" in final_text_block
-    assert "resetTextMotion();" in final_text_block
-    assert "updateTickerOffset(width, 'final')" in final_text_block
+    assert "function showFinalSummary(characterCount, sessionId)" in html
+    final_block = html[html.index("function showFinalSummary(characterCount, sessionId)"):html.index("function showResult(msg)")]
+    assert "if (sessionId < activeSession) return;" in final_block
+    assert "pill.className = 'pill final_ready success';" in final_block
+    assert "resetTextMotion();" in final_block
+    assert "已复制 · ${count}字" in final_block
     assert "def show_finalizing(self, session_id):" in overlay
     assert "showFinalizing({int(session_id)})" in overlay
-    assert "def show_final_text(self, text, session_id):" in overlay
-    assert "showFinalText({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
+    assert "def show_final_summary(self, character_count, session_id):" in overlay
+    assert "showFinalSummary({int(character_count)}, {int(session_id)})" in overlay
 
 
 def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
@@ -265,7 +246,9 @@ def test_recording_state_has_explicit_reset_entrypoints():
     assert prepare_block.index("pill.classList.add('no-width-transition');") < prepare_block.index("resetHidden();")
     assert "pill.style.setProperty('--target-width', MIN_WIDTH + 'px');" in prepare_block
     assert "requestAnimationFrame(() => pill.classList.remove('no-width-transition'));" in html
-    assert "maxStreamingWidth = MIN_WIDTH;" in html[html.index("function resetTextMotion()"):]
+    reset_motion = html[html.index("function resetTextMotion()"):]
+    assert "streamingCharacterCount = 0;" in reset_motion
+    assert "streamingTargetWidth = MIN_WIDTH;" in reset_motion
     assert "activeSession = sessionId;" in html
 
 
@@ -300,13 +283,37 @@ def test_trigger_feedback_is_recorded_after_the_real_qt_paint():
     ]
 
 
+def test_first_preview_text_reports_after_two_browser_paint_frames():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+    assert "qrc:///qtwebchannel/qwebchannel.js" in html
+    assert "requestAnimationFrame(() => {" in html
+    assert "nativeBridge.previewPainted(paintedSession)" in html
+    assert "class _PreviewPaintReporter(QObject):" in overlay
+    assert "self._on_preview_painted(session_id, time.perf_counter())" in overlay
+    assert "def _on_preview_painted(self, generation, painted_at):" in main
+    assert "self._preview_first_paint_ms" in main
+
+
+def test_final_shortness_guard_uses_live_preview_text_not_removed_accumulator():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    final_start = main.index("def _transcribe_final_result")
+    final_end = main.index("def _transcribe_final_text", final_start)
+    final_block = main[final_start:final_end]
+
+    assert "_preview_accumulator" not in final_block
+    assert 'getattr(self, "_latest_text", "")' in final_block
+
+
 def test_recording_start_cancels_pending_hide_timer():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     init_idx = overlay.index("def __init__(self):")
     run_idx = overlay.index("def _run(self):", init_idx)
     init_block = overlay[init_idx:run_idx]
     recording_idx = overlay.index("def show_recording(self, session_id, triggered_at=None):")
-    streaming_idx = overlay.index("def update_streaming", recording_idx)
+    streaming_idx = overlay.index("def append_streaming", recording_idx)
     recording_block = overlay[recording_idx:streaming_idx]
 
     assert "self._hide_timer = None" in init_block
@@ -460,13 +467,13 @@ def test_streaming_updates_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert "function updateStreaming(text, sessionId)" in html
+    assert "function appendStreaming(delta, sessionId)" in html
     assert "if (sessionId !== activeSession) return;" in html
     assert "activeSession += 1;" in html[html.index("function showState(state, label)"):]
-    assert "updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})" in overlay
+    assert "appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})" in overlay
 
 
-def test_stop_flow_outputs_before_final_text_feedback():
+def test_stop_flow_outputs_before_final_summary_feedback():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     stop_idx = main.index("def _on_record_stop")
     stream_idx = main.index("def _start_streaming", stop_idx)
@@ -474,8 +481,9 @@ def test_stop_flow_outputs_before_final_text_feedback():
 
     assert "final_generation = self._stop_streaming()" in stop_block
     assert "self.overlay.show_finalizing(final_generation)" in stop_block
-    assert "self.overlay.show_final_text(text, final_generation)" in stop_block
-    assert stop_block.index("output_status = self.output_handler.output(text)") < stop_block.index("self.overlay.show_final_text(text, final_generation)")
+    assert "self.overlay.show_final_summary(len(text), final_generation)" in stop_block
+    assert "self.output_handler.copy_only(text)" in stop_block
+    assert stop_block.index("output_status = self.output_handler.output(text)") < stop_block.index("self.overlay.show_final_summary(len(text), final_generation)")
     assert "self.overlay.show_done()" not in stop_block
     assert "self.overlay.show_result(text)" not in stop_block
 
@@ -504,7 +512,7 @@ def test_overlay_has_processing_finalizing_spinner_and_final_checkmark():
     assert "color: var(--text);" in processing_ticker_block
     assert "pill.className = 'pill processing';" in processing_block
     assert "showState('done', '已完成')" in html
-    assert "ticker.style.textAlign = 'center';" in html[html.index("function showState(state, label)"):html.index("function showRecording(sessionId)")]
+    assert "setWidthForLabel(label || '');" in html[html.index("function showState(state, label)"):html.index("function showRecording(sessionId)")]
     assert "position: absolute;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
     assert "inset: 2.5px;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
     assert "border-right: 1.8px solid var(--green);" in html

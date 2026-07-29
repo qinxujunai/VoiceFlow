@@ -39,12 +39,55 @@ jobs:
           }
       - name: Install pinned dependencies
         run: python -m pip install -r requirements.lock
-      - name: Restore default model cache
+      - name: Import required signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64)) {
+            throw "WINDOWS_CERTIFICATE_BASE64 is required for a public release"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw "WINDOWS_CERTIFICATE_PASSWORD is required for a public release"
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "voiceflow-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
+          )
+          $password = ConvertTo-SecureString `
+            $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate `
+            -FilePath $certificatePath `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -Password $password
+          Remove-Item -LiteralPath $certificatePath -Force
+          if (-not $certificate -or -not $certificate.HasPrivateKey) {
+            throw "The release certificate could not be imported with a private key"
+          }
+          $signTool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signTool) {
+            $signTool = Get-ChildItem `
+              -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Filter signtool.exe -Recurse |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $signTool) {
+            throw "signtool.exe was not found on the release runner"
+          }
+          "VOICEFLOW_CERT_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+          "SIGNTOOL_PATH=$signTool" >> $env:GITHUB_ENV
+      - name: Verify bundled-model distribution decisions
+        run: python scripts/check_release_models.py sensevoice-small-int8
+      - name: Restore runtime model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: models/sensevoice
-          key: sensevoice-${{ hashFiles('model-manifest.json') }}
-      - name: Download and verify pinned default model
+          key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned runtime models
         run: python scripts/download_models.py --engine sensevoice
       - name: Test core contracts
         run: |
@@ -54,6 +97,18 @@ jobs:
           python test_integration.py
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
+      - name: Sign application
+        shell: pwsh
+        run: |
+          & $env:SIGNTOOL_PATH sign `
+            /sha1 $env:VOICEFLOW_CERT_THUMBPRINT `
+            /fd SHA256 `
+            /tr http://timestamp.digicert.com `
+            /td SHA256 `
+            dist\VoiceFlow\VoiceFlow.exe
+          if ($LASTEXITCODE -ne 0) {
+            throw "Application signing failed with exit code $LASTEXITCODE"
+          }
       - name: Smoke packaged runtime
         shell: pwsh
         run: ./scripts/smoke_packaged_runtime.ps1
@@ -61,7 +116,45 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
+          $signCommand = (
+            "`"$env:SIGNTOOL_PATH`" sign " +
+            "/sha1 $env:VOICEFLOW_CERT_THUMBPRINT " +
+            "/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `$f"
+          )
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
+            "/Svoiceflowsign=$signCommand" `
+            /DSIGNTOOL=voiceflowsign `
+            /DINCLUDE_SENSEVOICE=1 `
+            installer\VoiceFlow.iss
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installer build failed with exit code $LASTEXITCODE"
+          }
+      - name: Verify release signatures
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart("v")
+          $files = @(
+            "dist\VoiceFlow\VoiceFlow.exe",
+            "dist\installer\VoiceFlow-$version-Windows-x64.exe"
+          )
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne "Valid") {
+              throw "Invalid Authenticode signature for $file`: $($signature.Status)"
+            }
+          }
+      - name: Remove imported signing certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:VOICEFLOW_CERT_THUMBPRINT)) {
+            $certificatePath = (
+              "Cert:\CurrentUser\My\" + $env:VOICEFLOW_CERT_THUMBPRINT
+            )
+            if (Test-Path -LiteralPath $certificatePath) {
+              Remove-Item -LiteralPath $certificatePath -Force
+            }
+          }
       - name: Smoke installer lifecycle
         shell: pwsh
         run: ./scripts/smoke_installer.ps1

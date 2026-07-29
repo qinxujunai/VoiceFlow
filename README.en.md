@@ -7,7 +7,7 @@
 > Speak. Words land.
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
-[![Download for Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe)
+[![Download for Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)
 
 ![VoiceFlow animated demo](docs/voiceflow-demo.svg)
 
@@ -25,7 +25,7 @@ without an account or audio upload.
 ## Download
 
 Most people only need
-[VoiceFlow-0.2.0-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.0/VoiceFlow-0.2.0-Windows-x64.exe).
+[VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe).
 The installer includes the default offline model and does not require Python.
 
 > The installer is not yet Authenticode-signed, so Windows may display a

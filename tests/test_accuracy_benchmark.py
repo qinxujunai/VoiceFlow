@@ -85,9 +85,11 @@ def test_pathological_output_accepts_normal_multilingual_transcription():
 
 def test_transcriber_reads_provider_and_thread_settings_from_config():
     adapter = (ROOT / "src" / "engine_adapter.py").read_text(encoding="utf-8")
+    transcriber = (ROOT / "src" / "transcriber.py").read_text(encoding="utf-8")
     config = (ROOT / "config.yaml").read_text(encoding="utf-8")
 
     assert 'self.config.get("provider", "cpu")' in adapter
     assert 'self.config.get("num_threads", 6)' in adapter
+    assert "final_thread_count(" in transcriber
     assert 'provider: "cpu"' in config
-    assert "num_threads: 6" in config
+    assert 'num_threads: "auto"' in config

@@ -15,7 +15,7 @@ from qt_compat import (
     QPlainTextEdit, QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
     QCheckBox, QComboBox,
-    QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
+    QWebChannel, QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket,
 )
 
@@ -41,6 +41,7 @@ from runtime_services import (
     format_diagnostics,
     run_runtime_diagnostics,
 )
+from performance_profile import final_thread_count
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
@@ -80,6 +81,14 @@ class _PaintAwareWindow(QMainWindow):
             return
         self._first_paint_pending = False
         QTimer.singleShot(0, self.first_paint_completed.emit)
+
+
+class _PreviewPaintReporter(QObject):
+    painted = Signal(int)
+
+    @Slot(int)
+    def previewPainted(self, session_id):
+        self.painted.emit(int(session_id))
 
 
 class _SettingsWindow(QMainWindow):
@@ -150,7 +159,7 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setObjectName("statusBadge")
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
-        build_label = QLabel("0.2.0 · Windows x64")
+        build_label = QLabel("0.2.1 · Windows x64")
         build_label.setObjectName("sidebarVersion")
         sidebar_layout.addWidget(build_label)
         sidebar_panel.setFixedWidth(184)
@@ -550,7 +559,7 @@ class _SettingsWindow(QMainWindow):
         about_copy.setSpacing(2)
         about_title = QLabel("VoiceFlow")
         about_title.setObjectName("aboutTitle")
-        version = QLabel("版本 0.2.0 · Windows x64")
+        version = QLabel("版本 0.2.1 · Windows x64")
         version.setObjectName("aboutVersion")
         about_copy.addWidget(about_title)
         about_copy.addWidget(version)
@@ -763,8 +772,10 @@ class _SettingsWindow(QMainWindow):
         self.model_profile_title.setText(title)
         self.model_profile_description.setText(description)
         self.model_profile_meta.setText(meta)
-        threads = int((engine.get(active) or {}).get("num_threads", 6))
-        self.performance_status.setText(f"平衡 · {threads} 个识别线程")
+        threads = final_thread_count(
+            (engine.get(active) or {}).get("num_threads", "auto")
+        )
+        self.performance_status.setText(f"自动平衡 · {threads} 个最终识别线程")
 
         self.language_combo.clear()
         for label, value in (("中文", "zh"), ("自动检测", "auto"), ("English", "en"), ("粤语", "yue")):
@@ -824,6 +835,7 @@ class _SettingsWindow(QMainWindow):
     def _output_status_label(self, status):
         return {
             "clipboard_copied_paste_sent": "已复制并发送粘贴",
+            "clipboard_copied_integrity_warning": "完整性未确认，仅保留到剪贴板",
             "fallback": "已保留在剪贴板",
             "typed": "已输入",
             "error": "处理失败",
@@ -1427,6 +1439,7 @@ class OverlayWindow:
         self._on_open_dictionary = None
         self._on_quit = None
         self._on_recording_painted = None
+        self._on_preview_painted = None
         self._recording_feedback_lock = threading.Lock()
         self._pending_recording_feedback = None
         self._html_path = str(self.paths.install_resource("src/overlay.html"))
@@ -1438,6 +1451,8 @@ class OverlayWindow:
         self._hide_timer = None
         self._settings_window = None
         self._single_instance_server = None
+        self._preview_paint_reporter = None
+        self._web_channel = None
 
     def set_actions(
         self,
@@ -1447,6 +1462,7 @@ class OverlayWindow:
         on_open_dictionary=None,
         on_quit=None,
         on_recording_painted=None,
+        on_preview_painted=None,
     ):
         self._on_copy_last = on_copy_last
         self._on_repaste_last = on_repaste_last
@@ -1454,6 +1470,7 @@ class OverlayWindow:
         self._on_open_dictionary = on_open_dictionary
         self._on_quit = on_quit
         self._on_recording_painted = on_recording_painted
+        self._on_preview_painted = on_preview_painted
 
     def start(self, on_ready=None):
         self._on_ready = on_ready
@@ -1482,6 +1499,14 @@ class OverlayWindow:
 
         # ---- WebView ----
         self.web_view = QWebEngineView()
+        self._preview_paint_reporter = _PreviewPaintReporter()
+        self._preview_paint_reporter.painted.connect(self._preview_painted)
+        self._web_channel = QWebChannel(self.web_view.page())
+        self._web_channel.registerObject(
+            "voiceflowBridge",
+            self._preview_paint_reporter,
+        )
+        self.web_view.page().setWebChannel(self._web_channel)
         self.web_view.setUrl(QUrl.fromLocalFile(self._html_path))
         self.web_view.setStyleSheet("background: transparent;")
         self.web_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
@@ -1634,6 +1659,10 @@ class OverlayWindow:
         elapsed_ms = (time.perf_counter() - triggered_at) * 1000
         self._on_recording_painted(session_id, elapsed_ms)
 
+    def _preview_painted(self, session_id):
+        if self._on_preview_painted:
+            self._on_preview_painted(session_id, time.perf_counter())
+
     def _hide(self):
         if self.window:
             self.window.hide()
@@ -1748,23 +1777,24 @@ class OverlayWindow:
         if self._bridge:
             self._bridge.js_then_show_requested.emit(f"prepareRecording({int(session_id)})")
 
-    def update_streaming(self, text, session_id):
-        if self._bridge:
-            self._bridge.preview_js_requested.emit(
-                f"updateStreaming({json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
-            )
+    def append_streaming(self, delta, session_id):
+        self._js(
+            f"appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})"
+        )
+
+    def update_streaming(self, confirmed, provisional, session_id):
+        self._js(
+            "updateStreaming("
+            f"{json.dumps(confirmed, ensure_ascii=False)}, "
+            f"{json.dumps(provisional, ensure_ascii=False)}, "
+            f"{int(session_id)})"
+        )
 
     def update_audio_level(self, levels, session_id):
         if self._bridge:
             safe_levels = [max(0.0, min(float(level), 1.0)) for level in levels[:3]]
             self._bridge.level_js_requested.emit(
                 f"updateAudioLevel({json.dumps(safe_levels)}, {int(session_id)})"
-            )
-
-    def update_correction(self, text, session_id):
-        if self._bridge:
-            self._bridge.preview_js_requested.emit(
-                f"updateCorrection({json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
             )
 
     def show_processing(self):
@@ -1780,9 +1810,9 @@ class OverlayWindow:
         self._tray_state(TRAY_ICON_IDLE)
         self._js("showDone()")
 
-    def show_final_text(self, text, session_id):
+    def show_final_summary(self, character_count, session_id):
         self._tray_state(TRAY_ICON_IDLE)
-        self._js(f"showFinalText({json.dumps(text, ensure_ascii=False)}, {int(session_id)})")
+        self._js(f"showFinalSummary({int(character_count)}, {int(session_id)})")
 
 
     def show_result(self, text):
@@ -1830,7 +1860,6 @@ class OverlayWindow:
 
 class _Bridge(QObject):
     js_requested = Signal(str)
-    preview_js_requested = Signal(str)
     level_js_requested = Signal(str)
     show_requested = Signal()
     hide_requested = Signal()
@@ -1848,13 +1877,10 @@ class _Bridge(QObject):
         self._before_show = before_show
         self._page_ready = False
         self._pending_js = []
-        self._preview_mailbox = _LatestPreviewMailbox()
-        self._preview_flush_scheduled = False
         self._level_mailbox = _LatestPreviewMailbox()
         self._level_flush_scheduled = False
         self._web_view.loadFinished.connect(self._on_load_finished)
         self.js_requested.connect(self._run_js)
-        self.preview_js_requested.connect(self._queue_preview_js)
         self.level_js_requested.connect(self._queue_level_js)
         self.js_then_show_requested.connect(self._run_js_then_show)
         self.js_then_hide_requested.connect(self._run_js_then_hide)
@@ -1878,21 +1904,6 @@ class _Bridge(QObject):
             return
         if self._web_view and self._web_view.page():
             self._web_view.page().runJavaScript(code)
-
-    @Slot(str)
-    def _queue_preview_js(self, code):
-        self._preview_mailbox.put(code)
-        if self._preview_flush_scheduled:
-            return
-        self._preview_flush_scheduled = True
-        QTimer.singleShot(16, self._flush_preview_js)
-
-    @Slot()
-    def _flush_preview_js(self):
-        self._preview_flush_scheduled = False
-        code = self._preview_mailbox.take()
-        if code is not None:
-            self._run_js(code)
 
     @Slot(str)
     def _queue_level_js(self, code):

@@ -19,17 +19,11 @@ class TextCleaner:
         cfg = config.get("cleaner", {}) if config else {}
         self.base_dir = base_dir
 
-        self.remove_fillers = cfg.get("remove_fillers", True)
         self.auto_space_en = cfg.get("auto_space_en", True)
         self.fix_mistakes = cfg.get("fix_mistakes", True)
         self.basic_punctuation = cfg.get("basic_punctuation", cfg.get("basic_punctuation", False))
 
-        # --- 口头禅正则 ---
-        self.filler_pattern = re.compile(
-            r"\b(?:嗯|啊|额|哦|噢|啧|诶|"
-            r"那个|就是说|然后然后|我想说的是|就是|你知道吧|你知道吗|知道吗)\b"
-        )
-        # "然后" 只去掉连续重复的
+        # 只压缩完全重复的“然后”，不猜测并删除用户语义。
         self.then_dedup = re.compile(r"然后(然后)+")
 
         # --- 中英空格 ---
@@ -127,9 +121,6 @@ class TextCleaner:
             "嗯嗯": "", "啊啊": "",
             "额额": "",
 
-            # 人物 / 账号
-            "秦旭俊": "秦徐俊", "秦绪俊": "秦徐俊",
-
             # 格式修正
             "http": "HTTP", "https": "HTTPS",
             "url": "URL",
@@ -199,8 +190,7 @@ class TextCleaner:
 
         text = text.strip()
 
-        if self.remove_fillers:
-            text = self._strip_fillers(text)
+        text = self.then_dedup.sub("然后", text)
         if self.fix_mistakes:
             self._reload_corrections_if_changed()
             text = self._fix_mistakes(text)
@@ -221,13 +211,6 @@ class TextCleaner:
             return ""
         return stripped
 
-
-    def _strip_fillers(self, text: str) -> str:
-        text = self.filler_pattern.sub("", text)
-        text = self.then_dedup.sub("然后", text)
-        text = re.sub(r"，,+", "，", text)
-        text = re.sub(r"  +", " ", text)
-        return text
 
     def _add_cjk_en_space(self, text: str) -> str:
         return self.cjk_en_boundary.sub(" ", text)

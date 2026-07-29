@@ -33,10 +33,9 @@ from qt_compat import (  # noqa: E402
 
 OVERLAY_STATES = {
     "recording": "prepareRecording(1); updateAudioLevel([0.018, 0.092, 0.044], 1)",
-    "streaming": "prepareRecording(2); updateStreaming('正在整理 VoiceFlow 的完整转写', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
-    "correction": "prepareRecording(3); updateCorrection('正在整理 VoiceFlow 的完整转写', 3)",
+    "streaming": "prepareRecording(2); appendStreaming('正在稳定追加完整转写', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
     "finalizing": "prepareRecording(4); showFinalizing(4)",
-    "completed": "prepareRecording(5); showFinalText('完整文字已保留', 5)",
+    "completed": "prepareRecording(5); showFinalSummary(24, 5)",
     "error": "showState('error', '麦克风不可用')",
     "canceled": "showState('canceled', '已取消')",
 }
@@ -116,7 +115,6 @@ def _sanitized_paths(data_dir: Path) -> AppPaths:
             "corrected_text": "开口说话，文字就会回到当前光标。",
             "output_status": "clipboard_copied_paste_sent",
             "duration": 4.2,
-            "final_tail": "回到当前光标。",
         },
         {
             "timestamp": "2026-07-28T09:38:00",
@@ -124,7 +122,6 @@ def _sanitized_paths(data_dir: Path) -> AppPaths:
             "corrected_text": "核心听写离线完成，结果保留在剪贴板和本地历史。",
             "output_status": "clipboard_copied_paste_sent",
             "duration": 8.6,
-            "final_tail": "剪贴板和本地历史。",
         },
     )
     paths.history_file.write_text(
