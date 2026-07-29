@@ -31,7 +31,7 @@ def test_archive_model_download_extracts_only_pinned_verified_assets(
     (archive_root / "ignored.bin").write_bytes(b"must-not-be-extracted")
     archive = tmp_path / "preview.tar.bz2"
     with tarfile.open(archive, "w:bz2") as bundle:
-        bundle.add(archive_root, arcname="upstream-model")
+        bundle.add(archive_root, arcname="./upstream-model")
 
     def asset(path):
         return {
@@ -70,3 +70,20 @@ def test_archive_model_download_extracts_only_pinned_verified_assets(
     assert (target / "model.int8.onnx").read_bytes() == b"pinned-model"
     assert (target / "tokens.txt").read_bytes() == b"pinned-tokens"
     assert not (target / "ignored.bin").exists()
+
+
+def test_download_cli_returns_failure_when_the_selected_model_fails(monkeypatch):
+    import download_models
+
+    monkeypatch.setattr(
+        download_models,
+        "download_streaming_preview",
+        lambda _base_dir: False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["download_models.py", "--engine", "streaming-preview"],
+    )
+
+    assert download_models.main() == 1
