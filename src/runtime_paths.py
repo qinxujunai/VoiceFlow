@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from platform_utils import default_data_dir
+
 
 DATA_SCHEMA_VERSION = 2
 
@@ -137,11 +139,7 @@ class AppPaths:
 
         if data_dir is None:
             env = os.environ if environ is None else environ
-            local_app_data = env.get("LOCALAPPDATA")
-            if local_app_data:
-                data_dir = Path(local_app_data) / "VoiceFlow"
-            else:
-                data_dir = Path.home() / "AppData" / "Local" / "VoiceFlow"
+            data_dir = env.get("VOICEFLOW_DATA_DIR") or default_data_dir(env)
 
         return cls(
             mode=mode,

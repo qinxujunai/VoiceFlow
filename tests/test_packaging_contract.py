@@ -105,8 +105,9 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert "releases/download/v0.2.1/" in index
     assert "macOS" not in index
     assert "Not available yet" not in copy
-    assert "尚未代码签名" in index
-    assert "not code-signed yet" in copy
+    assert index.count("data-download") == 1
+    assert "尚未代码签名" not in index
+    assert "not code-signed yet" not in copy
     assert "Beta" not in index
     assert "Beta" not in copy
 
@@ -122,7 +123,7 @@ def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
 
     assert html_keys <= zh_keys
     assert html_keys <= en_keys
-    assert 'property="og:image" content="assets/voiceflow-demo.svg"' in index
+    assert 'property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-demo.svg"' in index
     assert "voiceflow-demo.svg" in index
     assert "voiceflow-app-home" not in index
     assert "voiceflow-ambient" not in index
@@ -269,8 +270,7 @@ def test_release_bundles_offline_silero_vad_asset():
 def test_tray_uses_app_icon_and_keeps_exit_action():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert '"assets",' in overlay
-    assert '"voiceflow.ico"' in overlay
+    assert "icon_asset_name()" in overlay
     assert "build_tray_icon(TRAY_ICON_IDLE, icon_path)" in overlay
     assert 'QAction("退出", self._tray_menu)' in overlay
 
@@ -287,5 +287,13 @@ def test_generated_icon_contains_common_windows_sizes():
 
     assert reserved == 0
     assert icon_type == 1
-    assert "SIZES = (16, 20, 24, 32, 48, 64, 128, 256)" in script
+    assert "ICO_SIZES = (16, 20, 24, 32, 48, 64, 128, 256)" in script
     assert {(16, 16), (20, 20), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)} <= sizes
+
+
+def test_generated_icon_includes_macos_and_png_assets():
+    icns = ROOT / "assets" / "voiceflow.icns"
+    png = ROOT / "assets" / "voiceflow.png"
+
+    assert icns.read_bytes().startswith(b"icns")
+    assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")

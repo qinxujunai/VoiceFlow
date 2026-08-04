@@ -77,6 +77,22 @@ def test_pathological_output_accepts_normal_multilingual_transcription():
         "开放时间早上九点至下午五点。",
         duration=5.7,
     ) is None
+
+
+def test_product_benchmark_skips_models_already_rejected_by_the_gate():
+    import benchmark_models
+
+    statuses = benchmark_models._runtime_product_statuses()
+
+    assert statuses["sensevoice"] == "default"
+    assert statuses["fun-asr-nano"] == "rejected"
+    assert benchmark_models._is_model_benchmark_eligible("default") is True
+    assert benchmark_models._is_model_benchmark_eligible("experiment") is True
+    assert benchmark_models._is_model_benchmark_eligible("rejected") is False
+    assert benchmark_models._is_model_benchmark_eligible(
+        "rejected",
+        include_rejected=True,
+    ) is True
     assert benchmark_models._pathological_output_reason(
         "The tribal chieftain presented him with fifty pieces of gold.",
         duration=7.2,

@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import os
+import plistlib
 import re
 import sys
 from pathlib import Path
+
+
+MACOS_LAUNCH_AGENT_LABEL = "ai.voiceflow.app"
 
 
 def _yaml_scalar(value) -> str:
@@ -135,7 +139,41 @@ def autostart_command(root) -> str:
     return f'"{pythonw}" "{launcher}"'
 
 
+def _macos_launch_agent_path(home: str | Path | None = None) -> Path:
+    home_dir = Path.home() if home is None else Path(home)
+    return home_dir / "Library" / "LaunchAgents" / f"{MACOS_LAUNCH_AGENT_LABEL}.plist"
+
+
+def _macos_program_arguments(root) -> list[str]:
+    mode = getattr(getattr(root, "mode", None), "value", None)
+    if mode == "frozen":
+        return [str(Path(root.executable).resolve())]
+    install_dir = Path(getattr(root, "install_dir", root)).resolve()
+    executable = Path(getattr(root, "executable", sys.executable)).resolve()
+    return [str(executable), str(install_dir / "src" / "main.py")]
+
+
+def _macos_launch_agent_payload(root) -> dict:
+    install_dir = Path(getattr(root, "install_dir", root)).resolve()
+    return {
+        "Label": MACOS_LAUNCH_AGENT_LABEL,
+        "ProgramArguments": _macos_program_arguments(root),
+        "RunAtLoad": True,
+        "KeepAlive": False,
+        "WorkingDirectory": str(install_dir),
+        "ProcessType": "Interactive",
+    }
+
+
 def is_autostart_enabled(root) -> bool:
+    if sys.platform == "darwin":
+        path = _macos_launch_agent_path()
+        try:
+            with path.open("rb") as handle:
+                payload = plistlib.load(handle)
+        except (OSError, plistlib.InvalidFileException):
+            return False
+        return payload.get("ProgramArguments") == _macos_program_arguments(root)
     if sys.platform != "win32":
         return False
     import winreg
@@ -152,6 +190,20 @@ def is_autostart_enabled(root) -> bool:
 
 
 def set_autostart(root, enabled: bool) -> None:
+    if sys.platform == "darwin":
+        path = _macos_launch_agent_path()
+        if not enabled:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".plist.tmp")
+        with temporary.open("wb") as handle:
+            plistlib.dump(_macos_launch_agent_payload(root), handle, sort_keys=False)
+        os.replace(temporary, path)
+        return
     if sys.platform != "win32":
         return
     import winreg

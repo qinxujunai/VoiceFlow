@@ -42,6 +42,14 @@ from runtime_services import (
     run_runtime_diagnostics,
 )
 from performance_profile import final_thread_count
+from platform_utils import (
+    data_location_label,
+    icon_asset_name,
+    open_path,
+    platform_label,
+    trigger_instruction,
+    trigger_summary,
+)
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
@@ -130,7 +138,9 @@ class _SettingsWindow(QMainWindow):
         brand.setSpacing(10)
         brand_icon = QLabel()
         brand_icon.setObjectName("brandIcon")
-        icon_path = str(self.paths.install_resource("assets/voiceflow.ico"))
+        icon_path = str(
+            self.paths.install_resource(f"assets/{icon_asset_name()}")
+        )
         brand_icon.setPixmap(
             build_tray_icon(TRAY_ICON_IDLE, icon_path).pixmap(32, 32)
         )
@@ -159,7 +169,7 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setObjectName("statusBadge")
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
-        build_label = QLabel("0.2.1 · Windows x64")
+        build_label = QLabel(f"0.2.1 · {platform_label()}")
         build_label.setObjectName("sidebarVersion")
         sidebar_layout.addWidget(build_label)
         sidebar_panel.setFixedWidth(184)
@@ -258,7 +268,7 @@ class _SettingsWindow(QMainWindow):
 
         practice_label = QLabel("先试一次")
         practice_label.setObjectName("subsectionTitle")
-        practice_note = QLabel("把光标放在下方。按 F2 开始说话，再按一次完成。")
+        practice_note = QLabel(f"把光标放在下方。{trigger_instruction()}")
         practice_note.setObjectName("sectionSubtitle")
         self.practice_box = QPlainTextEdit()
         self.practice_box.setObjectName("practiceBox")
@@ -368,7 +378,9 @@ class _SettingsWindow(QMainWindow):
         self.language_combo.setAccessibleName("识别语言")
         self.microphone_combo = QComboBox()
         self.microphone_combo.setAccessibleName("麦克风")
-        self.autostart_check = QCheckBox("登录 Windows 后自动启动")
+        self.autostart_check = QCheckBox(
+            "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
+        )
         self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
         self.mode_status = QLabel("离线 · 录音不会离开这台电脑")
         self.performance_status = QLabel("平衡 · 6 个识别线程")
@@ -397,7 +409,7 @@ class _SettingsWindow(QMainWindow):
         hotkey_copy.setSpacing(2)
         hotkey_title = QLabel("开始与停止")
         hotkey_title.setObjectName("readinessName")
-        hotkey_value = QLabel("F2 · 右 Ctrl · 鼠标侧键 1 / 2　　Esc 取消")
+        hotkey_value = QLabel(f"{trigger_summary()}　　Esc 取消")
         hotkey_value.setObjectName("hotkeyValue")
         hotkey_copy.addWidget(hotkey_title)
         hotkey_copy.addWidget(hotkey_value)
@@ -491,7 +503,7 @@ class _SettingsWindow(QMainWindow):
         save.clicked.connect(self._save_dictionary)
         open_folder = QPushButton("打开词典目录")
         open_folder.clicked.connect(
-            lambda: os.startfile(str(self.paths.knowledge_dir))
+            lambda: open_path(self.paths.knowledge_dir)
         )
         actions.addWidget(save)
         actions.addWidget(open_folder)
@@ -531,7 +543,7 @@ class _SettingsWindow(QMainWindow):
         copy_report = QPushButton("复制诊断报告")
         copy_report.clicked.connect(self._copy_diagnostics)
         open_data = QPushButton("打开数据目录")
-        open_data.clicked.connect(lambda: os.startfile(str(self.paths.data_dir)))
+        open_data.clicked.connect(lambda: open_path(self.paths.data_dir))
         actions.addWidget(copy_report)
         actions.addWidget(open_data)
         actions.addStretch(1)
@@ -551,7 +563,9 @@ class _SettingsWindow(QMainWindow):
         about_layout.setContentsMargins(18, 16, 18, 16)
         about_layout.setSpacing(14)
         about_icon = QLabel()
-        icon_path = str(self.paths.install_resource("assets/voiceflow.ico"))
+        icon_path = str(
+            self.paths.install_resource(f"assets/{icon_asset_name()}")
+        )
         about_icon.setPixmap(
             build_tray_icon(TRAY_ICON_IDLE, icon_path).pixmap(48, 48)
         )
@@ -559,7 +573,7 @@ class _SettingsWindow(QMainWindow):
         about_copy.setSpacing(2)
         about_title = QLabel("VoiceFlow")
         about_title.setObjectName("aboutTitle")
-        version = QLabel("版本 0.2.1 · Windows x64")
+        version = QLabel(f"版本 0.2.1 · {platform_label()}")
         version.setObjectName("aboutVersion")
         about_copy.addWidget(about_title)
         about_copy.addWidget(version)
@@ -586,7 +600,7 @@ class _SettingsWindow(QMainWindow):
         layout.addWidget(privacy_panel)
 
         data_location = (
-            r"%LOCALAPPDATA%\VoiceFlow"
+            data_location_label(self.paths.data_dir)
             if self.paths.mode is RuntimeMode.FROZEN
             else "项目目录（开发模式）"
         )
@@ -596,12 +610,10 @@ class _SettingsWindow(QMainWindow):
         layout.addWidget(data)
         actions = QHBoxLayout()
         open_data = QPushButton("打开数据目录")
-        open_data.clicked.connect(lambda: os.startfile(str(self.paths.data_dir)))
+        open_data.clicked.connect(lambda: open_path(self.paths.data_dir))
         open_licenses = QPushButton("查看第三方许可")
         open_licenses.clicked.connect(
-            lambda: os.startfile(
-                str(self.paths.install_resource("THIRD_PARTY_NOTICES.md"))
-            )
+            lambda: open_path(self.paths.install_resource("THIRD_PARTY_NOTICES.md"))
         )
         actions.addWidget(open_data)
         actions.addWidget(open_licenses)
@@ -672,13 +684,13 @@ class _SettingsWindow(QMainWindow):
             if model_ready
             else "需要修复"
         )
-        self.home_hotkeys.setText("F2 · 右 Ctrl · 鼠标侧键")
+        self.home_hotkeys.setText(trigger_summary())
         self.trial_button.setEnabled(all_ready)
 
     def _start_trial(self):
         self.sidebar.setCurrentRow(0)
         self.practice_box.setFocus()
-        self._set_status_badge("按 F2 开始试说")
+        self._set_status_badge(trigger_instruction())
 
     def _dictionary_path(self, filename):
         return self.paths.knowledge_dir / filename
@@ -1433,6 +1445,7 @@ class OverlayWindow:
         self._bridge = None
         self._tray = None
         self._tray_icons = {}
+        self._on_record_toggle = None
         self._on_copy_last = None
         self._on_repaste_last = None
         self._on_output_text = None
@@ -1456,6 +1469,7 @@ class OverlayWindow:
 
     def set_actions(
         self,
+        on_record_toggle=None,
         on_copy_last=None,
         on_repaste_last=None,
         on_output_text=None,
@@ -1464,6 +1478,7 @@ class OverlayWindow:
         on_recording_painted=None,
         on_preview_painted=None,
     ):
+        self._on_record_toggle = on_record_toggle
         self._on_copy_last = on_copy_last
         self._on_repaste_last = on_repaste_last
         self._on_output_text = on_output_text
@@ -1587,10 +1602,8 @@ class OverlayWindow:
 
     def _setup_tray(self):
         self._tray = QSystemTrayIcon()
-        icon_path = os.path.join(
-            self.paths.install_dir,
-            "assets",
-            "voiceflow.ico",
+        icon_path = str(
+            self.paths.install_resource(f"assets/{icon_asset_name()}")
         )
         self._tray_icons = {
             TRAY_ICON_IDLE: build_tray_icon(TRAY_ICON_IDLE, icon_path),
@@ -1605,6 +1618,16 @@ class OverlayWindow:
 
         self._tray_menu = QMenu()
         self._tray_actions = []
+
+        dictate_act = QAction("开始 / 停止听写", self._tray_menu)
+        if self._on_record_toggle:
+            dictate_act.triggered.connect(self._on_record_toggle)
+        else:
+            dictate_act.setEnabled(False)
+        self._tray_menu.addAction(dictate_act)
+        self._tray_actions.append(dictate_act)
+
+        self._tray_menu.addSeparator()
 
         show_act = QAction("打开设置", self._tray_menu)
         show_act.triggered.connect(self._show_settings)

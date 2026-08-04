@@ -5,6 +5,7 @@ VoiceFlow — 本地语音转文字。F2 切换录音，Esc 取消。
 
 import os
 import sys
+import json
 import time
 import argparse
 import logging
@@ -34,6 +35,7 @@ from audio_activity import (
 from runtime_paths import AppPaths, prepare_runtime_layout
 from streaming_transcriber import OnlinePreviewTranscriber
 from punctuation import FinalPunctuationRestorer
+from platform_utils import open_path
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -173,6 +175,7 @@ class VoiceInputSystem:
             self.config_path, base_dir=self.base_dir, overlay=self.overlay
         )
         self.overlay.set_actions(
+            on_record_toggle=self._on_record_toggle,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
             on_output_text=self._output_text,
@@ -868,7 +871,7 @@ class VoiceInputSystem:
             self.output_handler.output(text)
 
     def _open_dictionary(self):
-        os.startfile(str(self.paths.knowledge_dir))
+        open_path(self.paths.knowledge_dir)
 
     # ---- 生命周期 ----
 
@@ -914,6 +917,7 @@ class VoiceInputSystem:
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
+                self.overlay.show_error("快捷键不可用，请从托盘菜单开始听写")
 
         def on_error(e):
             import traceback
@@ -982,12 +986,32 @@ def test_mode(config_path):
     print(f"耗时: {time.time()-t0:.2f}s, RTF: {(time.time()-t0)/d:.3f}")
 
 
+def runtime_smoke(config_path=None):
+    """Headless packaged-runtime contract used by platform build jobs."""
+    from runtime_services import run_runtime_diagnostics
+
+    paths = AppPaths.discover(config_path=config_path)
+    migration = prepare_runtime_layout(paths)
+    diagnostics = run_runtime_diagnostics(paths)
+    payload = {
+        "ok": diagnostics["ok"],
+        "runtime_mode": paths.mode.value,
+        "schema_version": migration.schema_version,
+        "checks": diagnostics["checks"],
+    }
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0 if diagnostics["ok"] else 1
+
+
 def main():
     p = argparse.ArgumentParser(description="VoiceFlow")
     p.add_argument("--test", action="store_true")
+    p.add_argument("--runtime-smoke", action="store_true")
     p.add_argument("--config", default=None)
     args = p.parse_args()
 
+    if args.runtime_smoke:
+        raise SystemExit(runtime_smoke(args.config))
     if args.test:
         config_path = args.config or os.path.join(
             os.path.dirname(os.path.dirname(__file__)),

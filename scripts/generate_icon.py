@@ -1,21 +1,33 @@
 """
-Generate the static VoiceFlow Windows icon.
+Generate the static VoiceFlow desktop icons.
 
 The runtime tray icon is still state-aware and drawn by src/tray_icon.py.
-This script creates the application/shortcut icon at assets/voiceflow.ico
-without adding image dependencies.
+This script creates Windows ICO, macOS ICNS, and PNG assets without adding
+image dependencies.
 """
 
 from __future__ import annotations
 
 import math
 import struct
+import zlib
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "assets" / "voiceflow.ico"
-SIZES = (16, 20, 24, 32, 48, 64, 128, 256)
+ICO_OUT = ROOT / "assets" / "voiceflow.ico"
+ICNS_OUT = ROOT / "assets" / "voiceflow.icns"
+PNG_OUT = ROOT / "assets" / "voiceflow.png"
+ICO_SIZES = (16, 20, 24, 32, 48, 64, 128, 256)
+ICNS_TYPES = {
+    16: b"icp4",
+    32: b"icp5",
+    64: b"icp6",
+    128: b"ic07",
+    256: b"ic08",
+    512: b"ic09",
+    1024: b"ic10",
+}
 
 
 def _clamp(value: float) -> int:
@@ -64,14 +76,20 @@ def _bar_alpha(x, y, cx, cy, width, height, radius):
     return _rounded_rect_alpha(x, y, left, top, right, bottom, radius)
 
 
-def _make_pixels(size):
+def _make_pixels(size, *, macos=False):
     pixels = [(0, 0, 0, 0)] * (size * size)
     scale = size / 256
+    left = 18 if macos else 34
+    right = 238 if macos else 222
+    radius = 52 if macos else 44
+    highlight_inset = 3 if macos else 3
+    highlight_inner_inset = 5 if macos else 5
     for y in range(size):
         for x in range(size):
             # Soft shadow.
-            dx = max(abs(x - size / 2) - 86 * scale, 0)
-            dy = max(abs(y - size / 2) - 86 * scale, 0)
+            shadow_extent = 102 if macos else 86
+            dx = max(abs(x - size / 2) - shadow_extent * scale, 0)
+            dy = max(abs(y - size / 2) - shadow_extent * scale, 0)
             shadow_dist = math.hypot(dx, dy)
             shadow = max(0, 42 - shadow_dist * 5 / scale)
             color = (0, 0, 0, _clamp(shadow))
@@ -80,11 +98,11 @@ def _make_pixels(size):
             a = _rounded_rect_alpha(
                 x,
                 y,
-                34 * scale,
-                34 * scale,
-                222 * scale,
-                222 * scale,
-                44 * scale,
+                left * scale,
+                left * scale,
+                right * scale,
+                right * scale,
+                radius * scale,
             )
             if a:
                 color = _blend(color, (24, 24, 26, a))
@@ -93,20 +111,20 @@ def _make_pixels(size):
             border_a = _rounded_rect_alpha(
                 x,
                 y,
-                37 * scale,
-                37 * scale,
-                219 * scale,
-                219 * scale,
-                41 * scale,
+                (left + highlight_inset) * scale,
+                (left + highlight_inset) * scale,
+                (right - highlight_inset) * scale,
+                (right - highlight_inset) * scale,
+                (radius - highlight_inset) * scale,
             )
             inner_a = _rounded_rect_alpha(
                 x,
                 y,
-                39 * scale,
-                39 * scale,
-                217 * scale,
-                217 * scale,
-                39 * scale,
+                (left + highlight_inner_inset) * scale,
+                (left + highlight_inner_inset) * scale,
+                (right - highlight_inner_inset) * scale,
+                (right - highlight_inner_inset) * scale,
+                (radius - highlight_inner_inset) * scale,
             )
             if border_a and not inner_a:
                 color = _blend(color, (255, 255, 255, 36))
@@ -183,10 +201,53 @@ def _write_ico(path: Path, images):
     path.write_bytes(icon_dir + entries + payload)
 
 
+def _png_chunk(kind: bytes, payload: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(payload))
+        + kind
+        + payload
+        + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+    )
+
+
+def _png_bytes(size: int, pixels) -> bytes:
+    rows = bytearray()
+    for y in range(size):
+        rows.append(0)
+        for x in range(size):
+            rows.extend(pixels[y * size + x])
+    header = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", header)
+        + _png_chunk(b"IDAT", zlib.compress(bytes(rows), level=9))
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _write_icns(path: Path, images) -> None:
+    entries = bytearray()
+    for size, pixels in images:
+        payload = _png_bytes(size, pixels)
+        entries.extend(ICNS_TYPES[size])
+        entries.extend(struct.pack(">I", len(payload) + 8))
+        entries.extend(payload)
+    path.write_bytes(b"icns" + struct.pack(">I", len(entries) + 8) + entries)
+
+
 def main():
-    images = [(size, _make_pixels(size)) for size in SIZES]
-    _write_ico(OUT, images)
-    print(f"Wrote {OUT}")
+    icon_images = [(size, _make_pixels(size)) for size in ICO_SIZES]
+    _write_ico(ICO_OUT, icon_images)
+    print(f"Wrote {ICO_OUT}")
+
+    icns_images = [
+        (size, _make_pixels(size, macos=True))
+        for size in ICNS_TYPES
+    ]
+    _write_icns(ICNS_OUT, icns_images)
+    PNG_OUT.write_bytes(_png_bytes(512, dict(icns_images)[512]))
+    print(f"Wrote {ICNS_OUT}")
+    print(f"Wrote {PNG_OUT}")
 
 
 if __name__ == "__main__":

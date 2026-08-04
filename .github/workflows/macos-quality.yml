@@ -1,0 +1,112 @@
+name: macOS quality
+
+env:
+  PYTHONUTF8: "1"
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/macos-quality.yml"
+      - "VoiceFlow.macOS.spec"
+      - "assets/**"
+      - "config.yaml"
+      - "installer/macos/**"
+      - "model-manifest.json"
+      - "requirements-macos.in"
+      - "requirements-macos.lock"
+      - "requirements.lock"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/macos-quality.yml"
+      - "VoiceFlow.macOS.spec"
+      - "assets/**"
+      - "config.yaml"
+      - "installer/macos/**"
+      - "model-manifest.json"
+      - "requirements-macos.in"
+      - "requirements-macos.lock"
+      - "requirements.lock"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-smoke:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon
+            runner: macos-15
+            artifact: VoiceFlow-0.2.1-macOS-Apple-Silicon
+          - name: Intel
+            runner: macos-15-intel
+            artifact: VoiceFlow-0.2.1-macOS-Intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-macos.lock
+      - name: Restore runtime model cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            models/sensevoice
+            models/streaming-preview
+          key: voiceflow-macos-${{ runner.arch }}-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned runtime models
+        run: |
+          python scripts/download_models.py --engine sensevoice
+          python scripts/download_models.py --engine streaming-preview
+      - name: Generate platform icons
+        run: python scripts/generate_icon.py
+      - name: Unit and platform contract tests
+        run: python -m pytest tests -q
+      - name: Lifecycle stability gate
+        run: python scripts/stability_gate.py --cycles 500
+      - name: Build application bundle
+        run: python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
+      - name: Verify packaged runtime
+        env:
+          QT_QPA_PLATFORM: offscreen
+          VOICEFLOW_DATA_DIR: ${{ runner.temp }}/voiceflow-data
+        run: |
+          test -x dist/VoiceFlow.app/Contents/MacOS/VoiceFlow
+          dist/VoiceFlow.app/Contents/MacOS/VoiceFlow --runtime-smoke
+          codesign --verify --deep --strict --verbose=2 dist/VoiceFlow.app
+      - name: Build disk image
+        run: |
+          mkdir -p dist/dmg
+          cp -R dist/VoiceFlow.app dist/dmg/VoiceFlow.app
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create \
+            -volname VoiceFlow \
+            -srcfolder dist/dmg \
+            -ov \
+            -format UDZO \
+            "dist/${{ matrix.artifact }}.dmg"
+      - name: Verify disk image
+        run: |
+          hdiutil verify "dist/${{ matrix.artifact }}.dmg"
+          shasum -a 256 "dist/${{ matrix.artifact }}.dmg"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.dmg
+          if-no-files-found: error
