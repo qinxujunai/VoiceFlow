@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 import numpy as np
 
@@ -56,6 +57,10 @@ class OnlinePreviewTranscriber:
         "",
         "，。！？；：,.!?;:…",
     )
+    MODEL_CONTROL_TOKEN = re.compile(
+        r"<\|[^<>]*\|>|</?(?:unk|blk|blank|eps|s)>",
+        flags=re.IGNORECASE,
+    )
 
     def __init__(
         self,
@@ -94,10 +99,14 @@ class OnlinePreviewTranscriber:
             )
         )
         runtime_engine = preview.get("runtime_engine", "online-zipformer-ctc")
-        if runtime_engine == "online-paraformer":
+        if runtime_engine in {"online-paraformer", "online-transducer"}:
             encoder = Path(resolve_asset(preview.get("encoder_path", "")))
             decoder = Path(resolve_asset(preview.get("decoder_path", "")))
-            assets = (encoder, decoder, tokens)
+            if runtime_engine == "online-transducer":
+                joiner = Path(resolve_asset(preview.get("joiner_path", "")))
+                assets = (encoder, decoder, joiner, tokens)
+            else:
+                assets = (encoder, decoder, tokens)
         elif runtime_engine == "online-zipformer-ctc":
             model = Path(
                 resolve_asset(
@@ -137,6 +146,13 @@ class OnlinePreviewTranscriber:
             recognizer = sherpa_onnx.OnlineRecognizer.from_paraformer(
                 encoder=str(encoder),
                 decoder=str(decoder),
+                **common,
+            )
+        elif runtime_engine == "online-transducer":
+            recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+                encoder=str(encoder),
+                decoder=str(decoder),
+                joiner=str(joiner),
                 **common,
             )
         else:
@@ -237,7 +253,13 @@ class OnlinePreviewTranscriber:
 
     @classmethod
     def _live_preview_text(cls, value: str) -> str:
-        return value.translate(cls.LIVE_SENTENCE_PUNCTUATION).strip()
+        value = cls.MODEL_CONTROL_TOKEN.sub(" ", value)
+        value = value.translate(cls.LIVE_SENTENCE_PUNCTUATION)
+        value = " ".join(value.split())
+        letters = [char for char in value if char.isalpha()]
+        if letters and all(not char.islower() for char in letters):
+            value = value.capitalize()
+        return value
 
     @staticmethod
     def _provisional_text(committed: str, hypothesis: str) -> str:

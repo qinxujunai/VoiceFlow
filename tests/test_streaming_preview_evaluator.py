@@ -48,7 +48,7 @@ def test_streaming_metrics_use_speech_onset_and_include_queue_delay():
         pcm,
         16000,
         chunk_ms=50,
-        append_interval_ms=80,
+        append_interval_ms=48,
     )
 
     assert result["speech_onset_ms"] == 50.0
@@ -58,7 +58,7 @@ def test_streaming_metrics_use_speech_onset_and_include_queue_delay():
     assert result["committed_text"] == "你好世界"
 
 
-def test_streaming_metrics_count_the_first_provisional_hypothesis_as_visible_text():
+def test_streaming_metrics_ignore_replaceable_provisional_hypotheses():
     from evaluate_streaming_preview import evaluate_pcm
     from streaming_transcriber import PreviewEvent
 
@@ -115,9 +115,9 @@ def test_streaming_metrics_count_the_first_provisional_hypothesis_as_visible_tex
         pcm,
         16000,
         chunk_ms=50,
-        append_interval_ms=80,
+        append_interval_ms=48,
     )
 
-    assert result["first_delta_ms"] == 0.0
+    assert result["first_delta_ms"] == 50.0
     assert result["max_chunk_chars"] == 1
     assert result["preview_text"] == "你好"

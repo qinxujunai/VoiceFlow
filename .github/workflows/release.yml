@@ -81,14 +81,18 @@ jobs:
           "VOICEFLOW_CERT_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
           "SIGNTOOL_PATH=$signTool" >> $env:GITHUB_ENV
       - name: Verify bundled-model distribution decisions
-        run: python scripts/check_release_models.py sensevoice-small-int8
+        run: python scripts/check_release_models.py sensevoice-small-int8 streaming-zipformer-small-bilingual-zh-en-int8
       - name: Restore runtime model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: models/sensevoice
+          path: |
+            models/sensevoice
+            models/streaming-preview
           key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
       - name: Download and verify pinned runtime models
-        run: python scripts/download_models.py --engine sensevoice
+        run: |
+          python scripts/download_models.py --engine sensevoice
+          python scripts/download_models.py --engine streaming-preview
       - name: Test core contracts
         run: |
           python -m pytest tests -q
@@ -125,6 +129,7 @@ jobs:
             "/Svoiceflowsign=$signCommand" `
             /DSIGNTOOL=voiceflowsign `
             /DINCLUDE_SENSEVOICE=1 `
+            /DINCLUDE_STREAMING_PREVIEW=1 `
             installer\VoiceFlow.iss
           if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
@@ -157,7 +162,7 @@ jobs:
           }
       - name: Smoke installer lifecycle
         shell: pwsh
-        run: ./scripts/smoke_installer.ps1
+        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview
       - name: Generate checksums, SBOM, and notices
         shell: pwsh
         run: |

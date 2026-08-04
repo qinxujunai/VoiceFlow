@@ -13,7 +13,7 @@ venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --candidate MODEL_
 ```
 
 All candidates used 80 ms PCM chunks, the same one-character stability guard,
-the same endpoint state machine, CPU execution, and the fixed 80 ms capsule
+the same endpoint state machine, CPU execution, and the then-current 80 ms capsule
 display cadence.
 
 | Candidate | Speech onset to first delta | Update gap P95 | Chunk P95 / max | Decode time | Sample transcript | Decision |

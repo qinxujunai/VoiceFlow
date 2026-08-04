@@ -5,6 +5,7 @@ VoiceFlow — 本地语音转文字。F2 切换录音，Esc 取消。
 
 import os
 import sys
+import json
 import time
 import argparse
 import logging
@@ -34,6 +35,7 @@ from audio_activity import (
 from runtime_paths import AppPaths, prepare_runtime_layout
 from streaming_transcriber import OnlinePreviewTranscriber
 from punctuation import FinalPunctuationRestorer
+from platform_utils import open_path
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -111,7 +113,6 @@ class VoiceInputSystem:
         self._preview_divergence_count = 0
         self._preview_update_count = 0
         self._preview_max_chunk_chars = 0
-        self._preview_render_state = ("", "")
         self._last_trigger_to_feedback_ms = None
         self._final_segments = []
         self._finalized_audio_len = 0
@@ -173,6 +174,7 @@ class VoiceInputSystem:
             self.config_path, base_dir=self.base_dir, overlay=self.overlay
         )
         self.overlay.set_actions(
+            on_record_toggle=self._on_record_toggle,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
             on_output_text=self._output_text,
@@ -242,7 +244,6 @@ class VoiceInputSystem:
             self._preview_divergence_count = 0
             self._preview_update_count = 0
             self._preview_max_chunk_chars = 0
-            self._preview_render_state = ("", "")
             self._reset_final_cache()
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
@@ -374,40 +375,23 @@ class VoiceInputSystem:
         chunk = np.concatenate(tuple(blocks), axis=0).flatten()
         return chunk[max(0, start_sample):max(0, end_sample)].copy()
 
-    def _update_preview_state(
-        self,
-        confirmed,
-        provisional,
-        generation,
-    ):
+    def _append_preview_delta(self, delta, generation):
         if generation != self._stream_generation:
             return
-        confirmed = str(confirmed or "")
-        provisional = str(provisional or "")
-        state = (confirmed, provisional)
-        previous_state = getattr(self, "_preview_render_state", ("", ""))
-        if state == previous_state:
+        delta = str(delta or "")
+        if not delta:
             return
-        previous_text = "".join(previous_state)
-        preview_text = confirmed + provisional
-        common_size = 0
-        for left, right in zip(previous_text, preview_text):
-            if left != right:
-                break
-            common_size += 1
-        added_characters = max(0, len(preview_text) - common_size)
         now = time.perf_counter()
         if (
             self._preview_first_model_delta_ms is None
             and self._speech_onset_at is not None
-            and preview_text
         ):
             self._preview_first_model_delta_at = now
             self._preview_first_model_delta_ms = max(
                 0.0,
                 (now - self._speech_onset_at) * 1000,
             )
-        if preview_text and self._preview_last_delta_at is not None:
+        if self._preview_last_delta_at is not None:
             gap_ms = (
                 now - self._preview_last_delta_at
             ) * 1000
@@ -415,15 +399,13 @@ class VoiceInputSystem:
                 gap_ms,
                 self._preview_update_gap_ms or 0.0,
             )
-        if preview_text:
-            self._preview_last_delta_at = now
-            self._preview_update_count += 1
+        self._preview_last_delta_at = now
+        self._preview_update_count += 1
         self._preview_max_chunk_chars = max(
             self._preview_max_chunk_chars,
-            added_characters,
+            len(delta),
         )
-        self._preview_render_state = state
-        self.overlay.update_streaming(confirmed, provisional, generation)
+        self.overlay.append_streaming(delta, generation)
 
     def _feed_preview_audio(
         self,
@@ -462,17 +444,8 @@ class VoiceInputSystem:
             self._latest_text = preview_session.committed_text
         if update.hypothesis_diverged:
             self._preview_divergence_count += 1
-        confirmed = (
-            getattr(update, "committed_text", "")
-            or preview_session.committed_text
-        )
-        provisional = getattr(update, "provisional_text", "")
-        if generation == self._stream_generation:
-            self._update_preview_state(
-                confirmed,
-                provisional,
-                generation,
-            )
+        if generation == self._stream_generation and update.delta:
+            self._append_preview_delta(update.delta, generation)
         return next_sample
 
     def _reset_final_cache(self):
@@ -868,7 +841,7 @@ class VoiceInputSystem:
             self.output_handler.output(text)
 
     def _open_dictionary(self):
-        os.startfile(str(self.paths.knowledge_dir))
+        open_path(self.paths.knowledge_dir)
 
     # ---- 生命周期 ----
 
@@ -914,6 +887,7 @@ class VoiceInputSystem:
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
+                self.overlay.show_error("快捷键不可用，请从托盘菜单开始听写")
 
         def on_error(e):
             import traceback
@@ -982,12 +956,32 @@ def test_mode(config_path):
     print(f"耗时: {time.time()-t0:.2f}s, RTF: {(time.time()-t0)/d:.3f}")
 
 
+def runtime_smoke(config_path=None):
+    """Headless packaged-runtime contract used by platform build jobs."""
+    from runtime_services import run_runtime_diagnostics
+
+    paths = AppPaths.discover(config_path=config_path)
+    migration = prepare_runtime_layout(paths)
+    diagnostics = run_runtime_diagnostics(paths)
+    payload = {
+        "ok": diagnostics["ok"],
+        "runtime_mode": paths.mode.value,
+        "schema_version": migration.schema_version,
+        "checks": diagnostics["checks"],
+    }
+    print(json.dumps(payload, ensure_ascii=False))
+    return 0 if diagnostics["ok"] else 1
+
+
 def main():
     p = argparse.ArgumentParser(description="VoiceFlow")
     p.add_argument("--test", action="store_true")
+    p.add_argument("--runtime-smoke", action="store_true")
     p.add_argument("--config", default=None)
     args = p.parse_args()
 
+    if args.runtime_smoke:
+        raise SystemExit(runtime_smoke(args.config))
     if args.test:
         config_path = args.config or os.path.join(
             os.path.dirname(os.path.dirname(__file__)),

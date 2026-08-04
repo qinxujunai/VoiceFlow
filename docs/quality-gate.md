@@ -48,7 +48,7 @@ capture covers 100%, 125%, 150%, and 200% scale.
 - Final output is copied before paste is attempted.
 - Streaming preview is never treated as the final source of truth unless final
   transcription is empty and preview is the only safe fallback.
-- Preview text is append-only, unpunctuated, fixed at an 80 ms display cadence,
+- Preview text is append-only, unpunctuated, fixed at a 48 ms display cadence,
   and resumes after a divergent segment reaches an endpoint.
 - Long recording output must include the final tail.
 - The previous clipboard is not restored after dictation.

@@ -193,6 +193,40 @@ def test_online_preview_removes_sentence_punctuation_from_live_hypotheses():
     assert second.provisional_text == ""
 
 
+def test_online_preview_never_exposes_model_control_tokens():
+    from streaming_transcriber import OnlinePreviewTranscriber
+
+    recognizer = FakeRecognizer(
+        [
+            "<unk><unk><blk><|en|>",
+            "<unk> HELLO <s> WORLD </s> <eps>",
+        ],
+        endpoints=[False, True],
+    )
+    transcriber = OnlinePreviewTranscriber.from_recognizer(
+        recognizer,
+        stability_guard_chars=0,
+    )
+    session = transcriber.create_session()
+
+    first = transcriber.accept_pcm(
+        session,
+        np.ones(1600, dtype=np.int16),
+        16000,
+    )
+    second = transcriber.accept_pcm(
+        session,
+        np.ones(1600, dtype=np.int16),
+        16000,
+    )
+
+    assert first.text == ""
+    assert first.provisional_text == ""
+    assert second.text == "Hello world"
+    assert "<" not in second.text
+    assert ">" not in second.text
+
+
 def test_online_preview_rejects_a_mismatched_sample_rate():
     from streaming_transcriber import OnlinePreviewTranscriber
 
@@ -313,6 +347,59 @@ def test_online_preview_can_load_the_bilingual_paraformer_candidate(
     assert calls[0]["enable_endpoint_detection"] is True
 
 
+def test_online_preview_can_load_a_bilingual_transducer(
+    monkeypatch,
+    tmp_path,
+):
+    from streaming_transcriber import OnlinePreviewTranscriber
+
+    model_dir = tmp_path / "models" / "streaming-preview"
+    model_dir.mkdir(parents=True)
+    (model_dir / "encoder-epoch-99-avg-1.int8.onnx").write_bytes(b"encoder")
+    (model_dir / "decoder-epoch-99-avg-1.onnx").write_bytes(b"decoder")
+    (model_dir / "joiner-epoch-99-avg-1.int8.onnx").write_bytes(b"joiner")
+    (model_dir / "tokens.txt").write_text("tokens", encoding="utf-8")
+    calls = []
+
+    class FakeOnlineRecognizer:
+        @staticmethod
+        def from_transducer(**kwargs):
+            calls.append(kwargs)
+            return FakeRecognizer([""])
+
+    monkeypatch.setitem(
+        sys.modules,
+        "sherpa_onnx",
+        types.SimpleNamespace(OnlineRecognizer=FakeOnlineRecognizer),
+    )
+    config = {
+        "streaming_preview": {
+            "runtime_engine": "online-transducer",
+            "encoder_path": "models/streaming-preview/encoder-epoch-99-avg-1.int8.onnx",
+            "decoder_path": "models/streaming-preview/decoder-epoch-99-avg-1.onnx",
+            "joiner_path": "models/streaming-preview/joiner-epoch-99-avg-1.int8.onnx",
+            "tokens_path": "models/streaming-preview/tokens.txt",
+        }
+    }
+
+    OnlinePreviewTranscriber.from_config(
+        config,
+        resolve_asset=lambda raw: tmp_path / raw,
+    )
+
+    assert calls[0]["encoder"] == str(
+        model_dir / "encoder-epoch-99-avg-1.int8.onnx"
+    )
+    assert calls[0]["decoder"] == str(
+        model_dir / "decoder-epoch-99-avg-1.onnx"
+    )
+    assert calls[0]["joiner"] == str(
+        model_dir / "joiner-epoch-99-avg-1.int8.onnx"
+    )
+    assert calls[0]["tokens"] == str(model_dir / "tokens.txt")
+    assert calls[0]["enable_endpoint_detection"] is True
+
+
 def test_voice_system_feeds_each_captured_sample_to_preview_exactly_once():
     from main import VoiceInputSystem
     from streaming_transcriber import PreviewUpdate
@@ -344,15 +431,13 @@ def test_voice_system_feeds_each_captured_sample_to_preview_exactly_once():
     system._preview_update_count = 0
     system._preview_max_chunk_chars = 0
     ranges = []
-    preview_states = []
+    preview_deltas = []
     system._audio_snapshot = lambda start, end: (
         ranges.append((start, end))
         or np.ones(end - start, dtype=np.int16)
     )
-    system._update_preview_state = (
-        lambda confirmed, provisional, generation: preview_states.append(
-            (confirmed, provisional, generation)
-        )
+    system._append_preview_delta = (
+        lambda delta, generation: preview_deltas.append((delta, generation))
     )
     preview = FakePreview()
     session = SimpleNamespace(committed_text="")
@@ -376,7 +461,4 @@ def test_voice_system_feeds_each_captured_sample_to_preview_exactly_once():
     assert next_sample == 2400
     assert ranges == [(0, 1600), (1600, 2400)]
     assert preview.lengths == [1600, 800]
-    assert preview_states == [
-        ("字", "", 7),
-        ("字字", "", 7),
-    ]
+    assert preview_deltas == [("字", 7), ("字", 7)]

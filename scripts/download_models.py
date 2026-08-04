@@ -162,10 +162,10 @@ def download_sensevoice(base_dir):
 
 
 def download_streaming_preview(base_dir):
-    """下载胶囊使用的中文实时预览模型。"""
+    """下载胶囊使用的中英双语实时预览模型。"""
     return _download_pinned_model(
         base_dir,
-        "streaming-zipformer-small-ctc-zh-int8",
+        "streaming-zipformer-small-bilingual-zh-en-int8",
     )
 
 

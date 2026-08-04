@@ -22,6 +22,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+MODEL_MANIFEST = ROOT / "model-manifest.json"
 
 import sys
 
@@ -44,9 +45,34 @@ def _force_utf8_stdout():
     )
 
 
-def _variant_configs(config):
+def _runtime_product_statuses():
+    if not MODEL_MANIFEST.exists():
+        return {}
+    manifest = json.loads(MODEL_MANIFEST.read_text(encoding="utf-8"))
+    statuses = {}
+    for model in manifest.get("models", {}).values():
+        engine = model.get("runtime_engine")
+        status = model.get("product_status")
+        if engine and status:
+            statuses[engine] = status
+    return statuses
+
+
+def _is_model_benchmark_eligible(status, *, include_rejected=False):
+    return include_rejected or status not in {"rejected", "ineligible"}
+
+
+def _variant_configs(config, *, include_rejected=False):
     variants = []
     engine = config.get("engine", {})
+    product_statuses = _runtime_product_statuses()
+
+    def eligible(runtime_engine):
+        return _is_model_benchmark_eligible(
+            product_statuses.get(runtime_engine),
+            include_rejected=include_rejected,
+        )
+
     sense = copy.deepcopy(engine.get("sensevoice", {}))
     qwen = copy.deepcopy(engine.get("qwen3-asr", {}))
     fun_asr = copy.deepcopy(engine.get("fun-asr-nano", {}))
@@ -78,7 +104,7 @@ def _variant_configs(config):
         ROOT / fun_asr.get(key, "")
         for key in ("encoder_adaptor_path", "llm_path", "embedding_path", "tokenizer_path")
     ]
-    if fun_asr and all(path.exists() for path in fun_assets):
+    if fun_asr and eligible("fun-asr-nano") and all(path.exists() for path in fun_assets):
         fun_cfg = copy.deepcopy(config)
         fun_cfg["engine"]["active"] = "fun-asr-nano"
         variants.append(("fun-asr-nano", fun_cfg))
@@ -226,7 +252,7 @@ def _pathological_output_reason(text, duration):
     return None
 
 
-def benchmark(limit=None, manifest=None, *, strict_output=False):
+def benchmark(limit=None, manifest=None, *, strict_output=False, include_rejected=False):
     config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     samples = _eval_samples(manifest, limit) if manifest else _wav_files(limit)
     terms = _domain_terms(config)
@@ -235,7 +261,7 @@ def benchmark(limit=None, manifest=None, *, strict_output=False):
     if not samples:
         raise SystemExit("No benchmark samples found")
 
-    for name, cfg in _variant_configs(config):
+    for name, cfg in _variant_configs(config, include_rejected=include_rejected):
         cfg_path = _write_temp_config(cfg)
         try:
             transcriber = Transcriber(cfg_path)
@@ -293,11 +319,17 @@ def main():
         action="store_true",
         help="fail on pathological repetition or impossible output rate",
     )
+    parser.add_argument(
+        "--include-rejected",
+        action="store_true",
+        help="also probe models already marked rejected or ineligible",
+    )
     args = parser.parse_args()
     benchmark(
         limit=args.limit,
         manifest=args.manifest,
         strict_output=args.strict_output,
+        include_rejected=args.include_rejected,
     )
 
 

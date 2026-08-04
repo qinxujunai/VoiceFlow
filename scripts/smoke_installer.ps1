@@ -1,5 +1,5 @@
 param(
-    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.1-Windows-x64.exe",
+    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.2-Windows-x64.exe",
     [int]$StartupSeconds = 8,
     [switch]$RequireStreamingPreview
 )
@@ -75,7 +75,9 @@ try {
     )
     if ($RequireStreamingPreview) {
         $required += @(
-            "models\streaming-preview\model.int8.onnx",
+            "models\streaming-preview\encoder-epoch-99-avg-1.int8.onnx",
+            "models\streaming-preview\decoder-epoch-99-avg-1.onnx",
+            "models\streaming-preview\joiner-epoch-99-avg-1.int8.onnx",
             "models\streaming-preview\tokens.txt"
         )
     }
@@ -104,12 +106,16 @@ try {
     ) | ConvertFrom-Json
     $modelIds = @("sensevoice-small-int8")
     if ($RequireStreamingPreview) {
-        $modelIds += "streaming-zipformer-small-ctc-zh-int8"
+        $modelIds += "streaming-zipformer-small-bilingual-zh-en-int8"
     }
     foreach ($modelId in $modelIds) {
         $model = $manifest.models.$modelId
         foreach ($entry in $model.files) {
-            if ($entry.path -notin @("model.int8.onnx", "tokens.txt")) {
+            if (
+                $entry.path.StartsWith("test_wavs/") -or
+                $entry.PSObject.Properties.Name -contains "package" -and
+                -not $entry.package
+            ) {
                 continue
             }
             $target = Join-Path (
