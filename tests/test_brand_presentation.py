@@ -40,6 +40,10 @@ def test_product_site_uses_only_the_real_demo():
     for phrase in forbidden_copy:
         assert phrase not in page
 
+    assert page.count("data-download") == 1
+    assert 'class="download"' not in page
+    assert "尚未代码签名" not in page
+
 
 def test_product_site_demo_matches_readme_demo():
     docs_demo = _read("docs/voiceflow-demo.svg")
@@ -47,6 +51,8 @@ def test_product_site_demo_matches_readme_demo():
 
     assert site_demo == docs_demo
     assert "prefers-reduced-motion: reduce" in site_demo
+    assert 'rx="48" fill="#f5f5f7"' in site_demo
+    assert 'id="softPanel"' not in site_demo
 
 
 def test_removed_composite_assets_stay_removed():

@@ -11,26 +11,21 @@
 
 ![VoiceFlow animated demo](docs/voiceflow-demo.svg)
 
-VoiceFlow is offline dictation for Windows. Press `F2`, speak, and press it
-again—the text returns to your current cursor. Recognition runs on your PC
-without an account or audio upload.
+VoiceFlow is offline dictation for Windows. Press `F2` once to start and again
+to finish. Stay in the current app while speech becomes text on your PC and
+returns to the cursor.
 
 ## Why VoiceFlow
 
-- **Entirely offline**: core dictation makes no cloud recognition calls and works without a network.
-- **Any text field**: dictate directly into notes, browsers, documents, and chat windows.
-- **Recoverable results**: text reaches the clipboard before paste is attempted and is also saved to local history.
-- **Complete long dictation**: live preview provides feedback while the stop path finishes all recorded audio.
+- **Entirely offline**: no account and no audio upload; dictation keeps working without a network.
+- **Any text field**: stay in notes, browsers, documents, or chat while words return to the cursor.
+- **Always recoverable**: if paste misses, the complete text remains in the clipboard and local history.
+- **Complete audio first**: the capsule provides live feedback while the final result is produced from the complete recording.
 
 ## Download
 
-Most people only need
-[VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe).
+Download [VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe).
 The installer includes the default offline model and does not require Python.
-
-> The installer is not yet Authenticode-signed, so Windows may display a
-> reputation warning. Download only from this repository or the
-> [product site](https://qinxujunai.github.io/VoiceFlow/?lang=en).
 
 Requirements: Windows 10 / 11 x64 and a working microphone.
 

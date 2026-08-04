@@ -1,0 +1,16 @@
+# VoiceFlow macOS runtime, test, and packaging dependencies.
+# Resolve with:
+# uv pip compile requirements-macos.in --python-version 3.12 --python-platform macos -o requirements-macos.lock
+
+sherpa-onnx==1.13.3
+sounddevice==0.5.5
+soundfile==0.14.0
+pynput==1.8.2
+pyautogui==0.9.54
+pyperclip==1.11.0
+pyyaml==6.0.3
+huggingface_hub==1.21.0
+numpy==2.5.0
+PySide6==6.11.1
+pytest==9.1.1
+pyinstaller==6.21.0

@@ -395,7 +395,7 @@ def test_settings_merges_static_hotkey_help_into_dictation():
     settings_block = overlay[settings_idx:overlay_window_idx]
 
     assert "def _hotkeys_page" not in settings_block
-    assert "F2 · 右 Ctrl · 鼠标侧键 1 / 2" in settings_block
+    assert "trigger_summary()" in settings_block
     assert 'trial.clicked.connect(self._start_trial)' in settings_block
 
 
@@ -568,13 +568,14 @@ def test_readme_demo_uses_single_product_pill_state_machine():
 def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
-    assert 'width="86" height="34" rx="17"' in svg
+    assert 'width="96" height="52" rx="26"' in svg
     assert "@keyframes pillState" in svg
-    assert "34%, 88% { width: 236px; }" in svg
+    assert "22%, 64% { width: 380px; }" in svg
     assert "prefers-reduced-motion: reduce" in svg
     assert "明早十点，把方案同步给团队。" in svg
-    assert "把声音收束成文字，把文字送回光标。" in svg
-    assert "真实胶囊状态：录音预览 → 最终确认 → 剪贴板兜底" in svg
+    assert "按一下开始，再按一下完成" in svg
+    assert "已复制 · 14字" in svg
+    assert 'id="softPanel"' not in svg
 
 
 def test_readme_defaults_to_chinese_with_english_switch():
@@ -596,3 +597,12 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## Download" in english
     assert "## Controls" in english
     assert "docs/voiceflow-demo.svg" in english
+
+
+def test_tray_menu_can_toggle_dictation_without_a_global_hotkey():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+    assert 'QAction("开始 / 停止听写"' in overlay
+    assert "dictate_act.triggered.connect(self._on_record_toggle)" in overlay
+    assert "on_record_toggle=self._on_record_toggle" in main
