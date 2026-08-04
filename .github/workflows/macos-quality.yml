@@ -49,10 +49,10 @@ jobs:
         include:
           - name: Apple Silicon
             runner: macos-15
-            artifact: VoiceFlow-0.2.1-macOS-Apple-Silicon
+            artifact: VoiceFlow-0.2.2-macOS-Apple-Silicon
           - name: Intel
             runner: macos-15-intel
-            artifact: VoiceFlow-0.2.1-macOS-Intel
+            artifact: VoiceFlow-0.2.2-macOS-Intel
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

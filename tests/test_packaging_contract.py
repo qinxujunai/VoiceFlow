@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import re
 import struct
 
@@ -29,18 +30,18 @@ def test_quick_verify_rejects_pathological_model_output():
     assert '"--strict-output"' in verify
 
 
-def test_public_release_excludes_unlicensed_preview_and_requires_signing():
+def test_public_release_bundles_reviewed_preview_and_requires_signing():
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
 
     assert (
         "check_release_models.py sensevoice-small-int8 "
-        "streaming-zipformer-small-ctc-zh-int8"
-        not in release
+        "streaming-zipformer-small-bilingual-zh-en-int8"
+        in release
     )
-    assert "download_models.py --engine streaming-preview" not in release
-    assert "/DINCLUDE_STREAMING_PREVIEW=1" not in release
+    assert "download_models.py --engine streaming-preview" in release
+    assert "/DINCLUDE_STREAMING_PREVIEW=1" in release
     assert "WINDOWS_CERTIFICATE_BASE64" in release
     assert "signtool" in release.lower()
     assert "Get-AuthenticodeSignature" in release
@@ -100,9 +101,9 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert '<html lang="zh-CN">' in index
     assert 'data-language="zh"' in index
     assert 'data-language="en"' in index
-    assert "VoiceFlow-0.2.1-Windows-x64.exe" in index
+    assert "VoiceFlow-0.2.2-Windows-x64.exe" in index
     assert "releases/latest/download" not in index
-    assert "releases/download/v0.2.1/" in index
+    assert "releases/download/v0.2.2/" in index
     assert "macOS" not in index
     assert "Not available yet" not in copy
     assert index.count("data-download") == 1
@@ -166,10 +167,16 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
         'Source: "..\\models\\sensevoice\\tokens.txt"; '
         'DestDir: "{app}\\models\\sensevoice"'
     ) in installer
-    assert (
-        'Source: "..\\models\\streaming-preview\\model.int8.onnx"; '
-        'DestDir: "{app}\\models\\streaming-preview"'
-    ) in installer
+    for filename in (
+        "encoder-epoch-99-avg-1.int8.onnx",
+        "decoder-epoch-99-avg-1.onnx",
+        "joiner-epoch-99-avg-1.int8.onnx",
+        "tokens.txt",
+    ):
+        assert (
+            f'Source: "..\\models\\streaming-preview\\{filename}"; '
+            'DestDir: "{app}\\models\\streaming-preview"'
+        ) in installer
     assert (
         'Source: "..\\models\\streaming-preview\\tokens.txt"; '
         'DestDir: "{app}\\models\\streaming-preview"'
@@ -191,10 +198,19 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 2, 1, 0)" in version
-    assert "StringStruct('FileVersion', '0.2.1')" in version
-    assert "StringStruct('ProductVersion', '0.2.1')" in version
+    assert "filevers=(0, 2, 2, 0)" in version
+    assert "StringStruct('FileVersion', '0.2.2')" in version
+    assert "StringStruct('ProductVersion', '0.2.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
+
+
+def test_development_audio_samples_are_explicitly_excluded_from_the_installer():
+    manifest = json.loads((ROOT / "model-manifest.json").read_text(encoding="utf-8"))
+    files = manifest["models"]["sensevoice-small-int8"]["files"]
+    samples = [entry for entry in files if entry["path"].startswith("test_wavs/")]
+
+    assert samples
+    assert all(entry.get("package") is False for entry in samples)
 
 
 def test_public_release_has_project_and_third_party_license_notices():

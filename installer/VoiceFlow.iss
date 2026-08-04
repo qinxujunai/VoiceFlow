@@ -1,5 +1,5 @@
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "0.2.1"
+#define MyAppVersion "0.2.2"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 
@@ -49,7 +49,9 @@ Source: "..\models\sensevoice\model.int8.onnx"; DestDir: "{app}\models\sensevoic
 Source: "..\models\sensevoice\tokens.txt"; DestDir: "{app}\models\sensevoice"; Flags: ignoreversion
 #endif
 #ifdef INCLUDE_STREAMING_PREVIEW
-Source: "..\models\streaming-preview\model.int8.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+Source: "..\models\streaming-preview\encoder-epoch-99-avg-1.int8.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+Source: "..\models\streaming-preview\decoder-epoch-99-avg-1.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+Source: "..\models\streaming-preview\joiner-epoch-99-avg-1.int8.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
 Source: "..\models\streaming-preview\tokens.txt"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
 #endif
 

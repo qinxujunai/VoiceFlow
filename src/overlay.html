@@ -204,10 +204,11 @@ body {
 }
 
 .done .ticker,
-.final_ready .ticker,
-.canceled .ticker {
-    color: var(--muted);
+.final_ready .ticker {
+    color: var(--text);
 }
+
+.canceled .ticker { color: var(--muted); }
 
 .processing .ticker,
 .finalizing .ticker {
@@ -271,10 +272,9 @@ const MAX_WIDTH = 312;
 const STREAM_VISIBLE_GRAPHEMES = 20;
 const STREAM_BASE_WIDTH = 96;
 const STREAM_GROWTH_PER_GRAPHEME = 10;
-const STREAM_APPEND_INTERVAL_MS = 80;
+const STREAM_APPEND_INTERVAL_MS = 48;
 let activeSession = 0;
 let streamingTargetConfirmed = [];
-let streamingTargetProvisional = [];
 let displayedStreamingText = [];
 let streamingAppendTimer = 0;
 let streamingCharacterCount = 0;
@@ -340,16 +340,8 @@ function splitGraphemes(value) {
     return Array.from(value);
 }
 
-function commonGraphemePrefix(left, right) {
-    let size = 0;
-    while (size < left.length && size < right.length && left[size] === right[size]) {
-        size += 1;
-    }
-    return size;
-}
-
 function currentStreamingTarget() {
-    return streamingTargetConfirmed.concat(streamingTargetProvisional);
+    return streamingTargetConfirmed;
 }
 
 function renderStreamingTail() {
@@ -358,18 +350,7 @@ function renderStreamingTail() {
         displayedStreamingText.length - STREAM_VISIBLE_GRAPHEMES
     );
     const tail = displayedStreamingText.slice(start);
-    const confirmedCount = clamp(
-        streamingTargetConfirmed.length - start,
-        0,
-        tail.length
-    );
-    const confirmedNode = document.createElement('span');
-    confirmedNode.className = 'ticker-confirmed';
-    confirmedNode.textContent = tail.slice(0, confirmedCount).join('');
-    const provisionalNode = document.createElement('span');
-    provisionalNode.className = 'ticker-provisional';
-    provisionalNode.textContent = tail.slice(confirmedCount).join('');
-    txt.replaceChildren(confirmedNode, provisionalNode);
+    txt.textContent = tail.join('');
 }
 
 function growStreamingWidthTo(characterCount) {
@@ -413,7 +394,6 @@ function cancelStreamingQueue() {
     clearTimeout(streamingAppendTimer);
     streamingAppendTimer = 0;
     streamingTargetConfirmed = [];
-    streamingTargetProvisional = [];
 }
 
 function resetTextMotion() {
@@ -464,34 +444,20 @@ function showRecording(sessionId) {
     prepareRecording(sessionId);
 }
 
-function updateStreaming(confirmedText, provisionalText, sessionId) {
-    if (sessionId !== activeSession) return;
+function appendStreaming(delta, sessionId) {
+    if (!delta || sessionId !== activeSession) return;
     pill.className = 'pill streaming';
-    const nextConfirmed = splitGraphemes(confirmedText || '');
-    const nextProvisional = splitGraphemes(provisionalText || '');
-    const nextTarget = nextConfirmed.concat(nextProvisional);
-    const commonLength = commonGraphemePrefix(displayedStreamingText, nextTarget);
-    if (commonLength < displayedStreamingText.length) {
-        displayedStreamingText.splice(commonLength);
-    }
-    streamingTargetConfirmed = nextConfirmed;
-    streamingTargetProvisional = nextProvisional;
+    const nextDelta = splitGraphemes(delta);
+    streamingTargetConfirmed.push(...nextDelta);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        displayedStreamingText = nextTarget.slice();
+        displayedStreamingText.push(...nextDelta);
         renderStreamingTail();
         growStreamingWidthTo(displayedStreamingText.length);
         return;
     }
-    renderStreamingTail();
     if (!streamingAppendTimer) {
         drainStreamingQueue();
     }
-}
-
-function appendStreaming(delta, sessionId) {
-    if (!delta) return;
-    const confirmed = streamingTargetConfirmed.join('') + delta;
-    updateStreaming(confirmed, '', sessionId);
 }
 
 function showProcessing() {
@@ -542,7 +508,7 @@ function getStreamingDebugState() {
         ),
         visibleText: displayedStreamingText.join(''),
         confirmedText: streamingTargetConfirmed.join(''),
-        provisionalText: streamingTargetProvisional.join(''),
+        provisionalText: '',
         horizontalOffset: 0,
         expanded: streamingCharacterCount > 0,
         characterCount: streamingCharacterCount,

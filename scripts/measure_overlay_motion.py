@@ -15,6 +15,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = "这是一次平稳的逐字显示测试"
+FOLLOW_UP = " English stays readable"
 
 
 class _PaintReporter(QObject):
@@ -71,8 +72,8 @@ def main():
     _javascript(
         app,
         view.page(),
-        "updateStreaming("
-        f"'', {json.dumps(SAMPLE, ensure_ascii=False)}, 1)",
+        "appendStreaming("
+        f"{json.dumps(SAMPLE, ensure_ascii=False)}, 1)",
     )
     frames = []
     previous_length = -1
@@ -98,24 +99,18 @@ def main():
             break
         time.sleep(0.01)
 
-    _javascript(
-        app,
-        view.page(),
-        "updateStreaming("
-        f"{json.dumps(SAMPLE, ensure_ascii=False)}, '', 1)",
-    )
-    promoted = json.loads(
+    before_follow_up = json.loads(
         _javascript(
             app,
             view.page(),
             "JSON.stringify(getStreamingDebugState())",
         )
     )
-    _javascript(app, view.page(), "prepareRecording(2)")
     _javascript(
         app,
         view.page(),
-        "updateStreaming('稳定', '临时错误', 2)",
+        "appendStreaming("
+        f"{json.dumps(FOLLOW_UP, ensure_ascii=False)}, 1)",
     )
     _wait(
         app,
@@ -127,29 +122,7 @@ def main():
             )
         )["queueLength"] == 0,
     )
-    before_correction = json.loads(
-        _javascript(
-            app,
-            view.page(),
-            "JSON.stringify(getStreamingDebugState())",
-        )
-    )
-    _javascript(
-        app,
-        view.page(),
-        "updateStreaming('稳定', '修正尾巴', 2)",
-    )
-    _wait(
-        app,
-        lambda: json.loads(
-            _javascript(
-                app,
-                view.page(),
-                "JSON.stringify(getStreamingDebugState())",
-            )
-        )["queueLength"] == 0,
-    )
-    after_correction = json.loads(
+    after_follow_up = json.loads(
         _javascript(
             app,
             view.page(),
@@ -164,23 +137,24 @@ def main():
     ]
     widths = [frame["width"] for frame in frames]
     result = {
+        "intervals_ms": intervals,
         "passed": (
             bool(frames)
             and bool(painted)
             and painted[0]["session_id"] == 1
             and frames[0]["elapsed_ms"] <= 100
             and lengths == list(range(1, len(SAMPLE) + 1))
-            and all(55 <= interval <= 130 for interval in intervals)
+            and bool(intervals)
+            and 35 <= sorted(intervals)[len(intervals) // 2] <= 75
+            and max(intervals) <= 110
             and widths == sorted(widths)
             and all(frame["horizontal_offset"] == 0 for frame in frames)
-            and promoted["visibleText"] == SAMPLE
-            and promoted["confirmedText"] == SAMPLE
-            and promoted["provisionalText"] == ""
-            and before_correction["visibleText"] == "稳定临时错误"
-            and after_correction["visibleText"] == "稳定修正尾巴"
-            and after_correction["confirmedText"] == "稳定"
-            and after_correction["targetWidth"] >= before_correction["targetWidth"]
-            and after_correction["horizontalOffset"] == 0
+            and before_follow_up["visibleText"] == SAMPLE
+            and before_follow_up["confirmedText"] == SAMPLE
+            and after_follow_up["confirmedText"] == SAMPLE + FOLLOW_UP
+            and after_follow_up["visibleText"] == SAMPLE + FOLLOW_UP
+            and after_follow_up["targetWidth"] >= before_follow_up["targetWidth"]
+            and after_follow_up["horizontalOffset"] == 0
         ),
         "characters": len(SAMPLE),
         "first_character_ms": frames[0]["elapsed_ms"] if frames else None,

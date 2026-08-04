@@ -18,7 +18,9 @@ def test_doctor_reports_current_runtime_ok():
     assert checks["active_engine"]["detail"] == "sensevoice"
     assert checks["provider"]["detail"] == "cpu"
     assert checks["num_threads"]["detail"].endswith("(auto)")
-    assert checks["preview_model_path"]["status"] == "ok"
+    assert checks["preview_encoder_path"]["status"] == "ok"
+    assert checks["preview_decoder_path"]["status"] == "ok"
+    assert checks["preview_joiner_path"]["status"] == "ok"
     assert checks["preview_tokens_path"]["status"] == "ok"
     assert checks["python_version"]["status"] == "ok"
     assert checks["app_icon"]["status"] == "ok"
@@ -44,7 +46,7 @@ def test_doctor_reports_missing_streaming_preview_model(tmp_path):
     from scripts import doctor
 
     config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
-    config["streaming_preview"]["model_path"] = "models/streaming-preview/missing.onnx"
+    config["streaming_preview"]["encoder_path"] = "models/streaming-preview/missing.onnx"
     (tmp_path / "config.yaml").write_text(
         yaml.safe_dump(config, allow_unicode=True),
         encoding="utf-8",
@@ -54,7 +56,7 @@ def test_doctor_reports_missing_streaming_preview_model(tmp_path):
     checks = {item["name"]: item for item in result["checks"]}
 
     assert result["ok"] is False
-    assert checks["preview_model_path"]["status"] == "missing"
+    assert checks["preview_encoder_path"]["status"] == "missing"
 
 
 def test_doctor_treats_intentionally_unbundled_packaged_preview_as_warning(tmp_path):
@@ -70,9 +72,11 @@ def test_doctor_treats_intentionally_unbundled_packaged_preview_as_warning(tmp_p
     result = doctor.run_doctor(tmp_path)
     checks = {item["name"]: item for item in result["checks"]}
 
-    assert checks["preview_model_path"]["status"] == "warning"
+    assert checks["preview_encoder_path"]["status"] == "warning"
+    assert checks["preview_decoder_path"]["status"] == "warning"
+    assert checks["preview_joiner_path"]["status"] == "warning"
     assert checks["preview_tokens_path"]["status"] == "warning"
-    assert "quiet capsule" in checks["preview_model_path"]["detail"]
+    assert "quiet capsule" in checks["preview_encoder_path"]["detail"]
 
 
 def test_doctor_checks_qwen_asset_contract(tmp_path):

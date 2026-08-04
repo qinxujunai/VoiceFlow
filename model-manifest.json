@@ -10,37 +10,45 @@
     }
   },
   "models": {
-    "streaming-zipformer-small-ctc-zh-int8": {
-      "runtime_engine": "online-zipformer-ctc",
+    "streaming-zipformer-small-bilingual-zh-en-int8": {
+      "runtime_engine": "online-transducer",
       "role": "realtime_preview",
-      "product_status": "internal_candidate",
+      "product_status": "default",
       "target_dir": "models/streaming-preview",
       "source": {
         "provider": "github_release_archive",
-        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2",
-        "archive_size": 21264113,
-        "archive_sha256": "b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b",
-        "archive_root": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
-        "upstream": "csukuangfj/icefall-streaming-zipformer-small-ctc-zh-2025-04-01"
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16.tar.bz2",
+        "archive_size": 458187351,
+        "archive_sha256": "2b7c63322b32e5e0f2526043a1103366119ca58dd615cd7105a37c01db9553d7",
+        "archive_root": "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16",
+        "upstream": "csukuangfj/k2fsa-zipformer-bilingual-zh-en-t"
       },
       "license": {
-        "spdx": "NOASSERTION",
-        "name": "Upstream model-weight license not explicitly declared",
-        "distribution_review_required": true,
-        "distribution_decision": "docs/streaming-preview-model-review.md",
-        "reviewed_at": "2026-07-28"
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "distribution_review_required": false
       },
-      "download_bytes": 21264113,
+      "download_bytes": 60142871,
       "files": [
         {
-          "path": "model.int8.onnx",
-          "size": 26342340,
-          "sha256": "68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a"
+          "path": "encoder-epoch-99-avg-1.int8.onnx",
+          "size": 42980793,
+          "sha256": "db6f51551762e40e549166fe041ea3e45464370b595e9ad23f06478ec3794fbb"
+        },
+        {
+          "path": "decoder-epoch-99-avg-1.onnx",
+          "size": 13877276,
+          "sha256": "89be509a83175261695bdef5fd1c7b9ab1129a663d1284e7ba9f8507b21e0906"
+        },
+        {
+          "path": "joiner-epoch-99-avg-1.int8.onnx",
+          "size": 3228485,
+          "sha256": "bdda356d6f9b8c2d7cee9ee0e26075fa537490f7fd06520be408d287073667b9"
         },
         {
           "path": "tokens.txt",
-          "size": 13366,
-          "sha256": "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd"
+          "size": 56317,
+          "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3"
         }
       ]
     },
@@ -145,11 +153,11 @@
           "size": 315894,
           "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
         },
-        {"path": "test_wavs/en.wav", "size": 228908, "sha256": "eb1eb008904465b74c304aad8342e8c7d3c6e61ffe9f66adcaca9cf0f76a93f4"},
-        {"path": "test_wavs/ja.wav", "size": 230444, "sha256": "460bd8dccb0d2a5f4e29c628f837be4082d13defc64c3fc21dd1b6bb0e119095"},
-        {"path": "test_wavs/ko.wav", "size": 147500, "sha256": "0dc797a5c81ed30fc339d91f3da718ab02854e17ffa37cb93c4c039ac5c6bb9c"},
-        {"path": "test_wavs/yue.wav", "size": 164780, "sha256": "0960b2db54ae202071d250e6462fbf74a3c863f0e3e7f01273e4939c996875a0"},
-        {"path": "test_wavs/zh.wav", "size": 178988, "sha256": "b77f1794fe374a0ba1ee1dc458bfaf9349496cbbfc32780c50ba3c5a7ad8e373"}
+        {"path": "test_wavs/en.wav", "size": 228908, "sha256": "eb1eb008904465b74c304aad8342e8c7d3c6e61ffe9f66adcaca9cf0f76a93f4", "package": false},
+        {"path": "test_wavs/ja.wav", "size": 230444, "sha256": "460bd8dccb0d2a5f4e29c628f837be4082d13defc64c3fc21dd1b6bb0e119095", "package": false},
+        {"path": "test_wavs/ko.wav", "size": 147500, "sha256": "0dc797a5c81ed30fc339d91f3da718ab02854e17ffa37cb93c4c039ac5c6bb9c", "package": false},
+        {"path": "test_wavs/yue.wav", "size": 164780, "sha256": "0960b2db54ae202071d250e6462fbf74a3c863f0e3e7f01273e4939c996875a0", "package": false},
+        {"path": "test_wavs/zh.wav", "size": 178988, "sha256": "b77f1794fe374a0ba1ee1dc458bfaf9349496cbbfc32780c50ba3c5a7ad8e373", "package": false}
       ]
     },
     "qwen3-asr-0.6b-int8": {

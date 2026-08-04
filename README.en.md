@@ -7,7 +7,7 @@
 > Speak. Words land.
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
-[![Download for Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)
+[![Download for Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe)
 
 ![VoiceFlow animated demo](docs/voiceflow-demo.svg)
 
@@ -24,7 +24,7 @@ returns to the cursor.
 
 ## Download
 
-Download [VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe).
+Download [VoiceFlow-0.2.2-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe).
 The installer includes the default offline model and does not require Python.
 
 Requirements: Windows 10 / 11 x64 and a working microphone.

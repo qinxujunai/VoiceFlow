@@ -113,7 +113,6 @@ class VoiceInputSystem:
         self._preview_divergence_count = 0
         self._preview_update_count = 0
         self._preview_max_chunk_chars = 0
-        self._preview_render_state = ("", "")
         self._last_trigger_to_feedback_ms = None
         self._final_segments = []
         self._finalized_audio_len = 0
@@ -245,7 +244,6 @@ class VoiceInputSystem:
             self._preview_divergence_count = 0
             self._preview_update_count = 0
             self._preview_max_chunk_chars = 0
-            self._preview_render_state = ("", "")
             self._reset_final_cache()
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
@@ -377,40 +375,23 @@ class VoiceInputSystem:
         chunk = np.concatenate(tuple(blocks), axis=0).flatten()
         return chunk[max(0, start_sample):max(0, end_sample)].copy()
 
-    def _update_preview_state(
-        self,
-        confirmed,
-        provisional,
-        generation,
-    ):
+    def _append_preview_delta(self, delta, generation):
         if generation != self._stream_generation:
             return
-        confirmed = str(confirmed or "")
-        provisional = str(provisional or "")
-        state = (confirmed, provisional)
-        previous_state = getattr(self, "_preview_render_state", ("", ""))
-        if state == previous_state:
+        delta = str(delta or "")
+        if not delta:
             return
-        previous_text = "".join(previous_state)
-        preview_text = confirmed + provisional
-        common_size = 0
-        for left, right in zip(previous_text, preview_text):
-            if left != right:
-                break
-            common_size += 1
-        added_characters = max(0, len(preview_text) - common_size)
         now = time.perf_counter()
         if (
             self._preview_first_model_delta_ms is None
             and self._speech_onset_at is not None
-            and preview_text
         ):
             self._preview_first_model_delta_at = now
             self._preview_first_model_delta_ms = max(
                 0.0,
                 (now - self._speech_onset_at) * 1000,
             )
-        if preview_text and self._preview_last_delta_at is not None:
+        if self._preview_last_delta_at is not None:
             gap_ms = (
                 now - self._preview_last_delta_at
             ) * 1000
@@ -418,15 +399,13 @@ class VoiceInputSystem:
                 gap_ms,
                 self._preview_update_gap_ms or 0.0,
             )
-        if preview_text:
-            self._preview_last_delta_at = now
-            self._preview_update_count += 1
+        self._preview_last_delta_at = now
+        self._preview_update_count += 1
         self._preview_max_chunk_chars = max(
             self._preview_max_chunk_chars,
-            added_characters,
+            len(delta),
         )
-        self._preview_render_state = state
-        self.overlay.update_streaming(confirmed, provisional, generation)
+        self.overlay.append_streaming(delta, generation)
 
     def _feed_preview_audio(
         self,
@@ -465,17 +444,8 @@ class VoiceInputSystem:
             self._latest_text = preview_session.committed_text
         if update.hypothesis_diverged:
             self._preview_divergence_count += 1
-        confirmed = (
-            getattr(update, "committed_text", "")
-            or preview_session.committed_text
-        )
-        provisional = getattr(update, "provisional_text", "")
-        if generation == self._stream_generation:
-            self._update_preview_state(
-                confirmed,
-                provisional,
-                generation,
-            )
+        if generation == self._stream_generation and update.delta:
+            self._append_preview_delta(update.delta, generation)
         return next_sample
 
     def _reset_final_cache(self):

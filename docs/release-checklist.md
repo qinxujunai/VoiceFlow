@@ -38,7 +38,7 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
-venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.1-Windows-x64.exe --output-dir release\v0.2.1 --version 0.2.1
+venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.2-Windows-x64.exe --output-dir release\v0.2.2 --version 0.2.2
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
@@ -64,13 +64,13 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
 - The tag-driven Release workflow publishes the installer, checksums, SBOM,
   notices, and GitHub build-provenance attestation from the same commit.
 
-## Current 0.2.1 blockers
+## Current 0.2.2 blockers
 
 Do not create a public tag while any item remains open:
 
 - 160-sample authorized release corpus and untouched holdout are incomplete.
-- The current preview candidate fails at least one emission-granularity gate
-  and its model-weight license is `NOASSERTION`.
+- The bilingual preview has an Apache-2.0 weight license and passes control-token
+  safety; the authorized real-speech accuracy holdout remains incomplete.
 - Clean Win10/11 offline install, upgrade, rollback, and uninstall evidence is
   incomplete.
 - The executable and installer are not Authenticode signed and timestamped.
