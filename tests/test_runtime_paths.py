@@ -23,6 +23,7 @@ def test_frozen_runtime_separates_install_resources_from_user_data(tmp_path):
         install_dir=install_dir,
         executable=executable,
         environ={"LOCALAPPDATA": str(local_app_data)},
+        platform_name="win32",
     )
 
     assert paths.mode is RuntimeMode.FROZEN

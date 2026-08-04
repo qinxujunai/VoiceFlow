@@ -37,11 +37,13 @@ class HotkeyManager:
         self._mouse_listener = None
         self._pynput_kb_listener = None
         self._keyboard_backend = None
-        # Map pynput mouse buttons to config names
-        self._mouse_buttons = {
-            mouse.Button.x1: "xbutton1",
-            mouse.Button.x2: "xbutton2",
-        }
+        # Side-button constants are Windows-specific in pynput. Build the map
+        # only from buttons the active backend actually exposes.
+        self._mouse_buttons = {}
+        for attribute, name in (("x1", "xbutton1"), ("x2", "xbutton2")):
+            button = getattr(mouse.Button, attribute, None)
+            if button is not None:
+                self._mouse_buttons[button] = name
 
     def _on_ptt(self, event):
         if event.event_type != "down":
@@ -105,7 +107,9 @@ class HotkeyManager:
         keyboard.add_hotkey(self.cancel_key, self._on_cancel, suppress=False)
 
     def start(self):
-        mouse_keys = [k for k in self.ptt_keys if k in ("xbutton1", "xbutton2", "mouse4", "mouse5")]
+        mouse_keys = [
+            key for key in self.ptt_keys if key in self._mouse_buttons.values()
+        ]
         kb_keys = [k for k in self.ptt_keys if k not in mouse_keys and k != "right_ctrl"]
 
         if self.platform_name == "win32":
