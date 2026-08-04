@@ -77,7 +77,7 @@ def data_location_label(data_dir: str | Path, platform_name: str | None = None) 
 def trigger_summary(platform_name: str | None = None) -> str:
     platform_value = sys.platform if platform_name is None else platform_name
     if platform_value == "darwin":
-        return "F2 · 鼠标侧键 · 托盘菜单"
+        return "F2 · 托盘菜单"
     return "F2 · 右 Ctrl · 鼠标侧键"
 
 

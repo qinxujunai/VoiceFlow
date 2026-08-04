@@ -35,7 +35,7 @@ def test_platform_output_and_icon_choices():
     assert icon_asset_name("darwin") == "voiceflow.png"
     assert icon_asset_name("win32") == "voiceflow.ico"
     assert platform_label("darwin") == "macOS"
-    assert "托盘菜单" in trigger_summary("darwin")
+    assert trigger_summary("darwin") == "F2 · 托盘菜单"
     assert "托盘菜单" in trigger_instruction("darwin")
 
 
