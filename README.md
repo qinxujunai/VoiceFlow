@@ -7,28 +7,24 @@
 > 开口，文字就位。
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
-[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)
+[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe)
 
 ![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
 
-VoiceFlow 是 Windows 上的离线语音输入工具。按 `F2` 开始说话，再按一次，
-文字就会回到当前光标处。识别在本机完成，不需要账户，也不上传录音。
+VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，再按一下完成；
+无需切换应用，声音在本机变成文字，结果回到当前光标。
 
 ## 为什么是 VoiceFlow
 
-- **完全离线**：核心听写不调用云端识别，断网仍可使用。
-- **任意输入框**：在记事本、浏览器、文档或聊天窗口中直接说话输入。
-- **结果可恢复**：文字先进入剪贴板，再尝试粘贴，并同步保存到本地历史。
-- **长语音不丢尾**：实时预览只负责反馈，停止后仍会完成全部音频的最终转写。
+- **完全离线**：无需账户，不上传录音；断开网络照常听写。
+- **任意输入框**：留在记事本、浏览器、文档或聊天窗口，文字直接回到光标。
+- **始终可找回**：即使没有粘贴成功，剪贴板和本地历史仍有完整文字。
+- **完整录音优先**：胶囊只负责实时反馈，停止后会基于完整录音生成最终结果。
 
 ## 下载
 
-普通用户只需下载
-[VoiceFlow-0.2.1-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.1/VoiceFlow-0.2.1-Windows-x64.exe)。
-安装包已经包含默认离线模型，不需要 Python。
-
-> 当前安装包尚未完成 Authenticode 代码签名，Windows 可能显示信誉提示。
-> 请仅从本仓库或[产品网站](https://qinxujunai.github.io/VoiceFlow/)下载。
+下载 [VoiceFlow-0.2.2-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe)。
+安装包已经包含默认离线模型，不需要 Python，安装完成即可使用。
 
 系统要求：Windows 10 / 11 x64、可用麦克风。
 

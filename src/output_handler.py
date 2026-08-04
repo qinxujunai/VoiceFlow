@@ -11,6 +11,8 @@ import yaml
 import pyperclip
 import pyautogui
 
+from platform_utils import paste_modifier
+
 # 禁用 pyautogui 的安全暂停（我们自己控制）
 pyautogui.PAUSE = 0.01
 pyautogui.FAILSAFE = False
@@ -87,8 +89,8 @@ class OutputHandler:
             pyperclip.copy(text)
             time.sleep(0.05)
 
-            # 模拟 Ctrl+V 粘贴
-            pyautogui.hotkey("ctrl", "v")
+            # Windows uses Ctrl+V; macOS uses Command+V.
+            pyautogui.hotkey(paste_modifier(), "v")
             time.sleep(0.1)
 
             if self.auto_space:

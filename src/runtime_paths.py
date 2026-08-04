@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from platform_utils import default_data_dir
+
 
 DATA_SCHEMA_VERSION = 2
 
@@ -112,6 +114,8 @@ class AppPaths:
         data_dir: str | Path | None = None,
         executable: str | Path | None = None,
         environ: Mapping[str, str] | None = None,
+        platform_name: str | None = None,
+        home: str | Path | None = None,
     ) -> AppPaths:
         is_frozen = bool(getattr(sys, "frozen", False)) if frozen is None else frozen
         if config_path is not None:
@@ -137,11 +141,11 @@ class AppPaths:
 
         if data_dir is None:
             env = os.environ if environ is None else environ
-            local_app_data = env.get("LOCALAPPDATA")
-            if local_app_data:
-                data_dir = Path(local_app_data) / "VoiceFlow"
-            else:
-                data_dir = Path.home() / "AppData" / "Local" / "VoiceFlow"
+            data_dir = env.get("VOICEFLOW_DATA_DIR") or default_data_dir(
+                env,
+                platform_name=platform_name,
+                home=home,
+            )
 
         return cls(
             mode=mode,

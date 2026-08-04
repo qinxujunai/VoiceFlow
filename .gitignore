@@ -24,6 +24,8 @@ dist/
 # 日志
 logs/
 .planning/
+.playwright-cli/
+output/playwright/
 
 # IDE
 .vscode/

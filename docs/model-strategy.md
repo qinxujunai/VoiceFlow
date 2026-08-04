@@ -1,6 +1,6 @@
 # VoiceFlow Model Strategy
 
-Status: accepted for the VoiceFlow 0.2.1 release candidate
+Status: accepted for the next VoiceFlow release candidate
 
 ## Product decision
 
@@ -59,7 +59,7 @@ committed only after consecutive hypotheses confirm a common prefix. Permanent
 hypothesis divergence freezes that segment, records the event, and resets at the
 next endpoint so the rest of the session can continue.
 
-The UI reveals confirmed graphemes at a fixed 80 ms cadence. The first
+The UI reveals confirmed graphemes at a fixed 48 ms cadence. The first
 grapheme is immediate; there is no catch-up acceleration, full-text replay, or
 horizontal translation. Run the measured model gate with:
 
@@ -67,13 +67,15 @@ horizontal translation. Run the measured model gate with:
 venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
 ```
 
-The pinned 2025-04-01 CTC candidate currently remains internal because its
-weights have no explicit redistribution license. Technical success cannot
-override that distribution gate.
+The bundled first pass is the Apache-2.0 small bilingual Zipformer transducer.
+It handles Chinese and English without exposing control tokens. It is a
+responsive, replaceable preview rather than the authoritative transcript;
+SenseVoice still rechecks the complete stopped audio before output.
 
-The latest same-machine three-candidate result is recorded in
+The original rejection study is retained in
 [`streaming-preview-evaluation-2026-07-28.md`](streaming-preview-evaluation-2026-07-28.md).
-None passes the complete latency, chunk, accuracy-smoke, and license gate.
+The promoted bilingual first-pass evidence is recorded in
+[`streaming-preview-evaluation-2026-08-05.md`](streaming-preview-evaluation-2026-08-05.md).
 
 ## CPU and GPU
 
@@ -91,7 +93,7 @@ reduction in installation success.
 
 ## Punctuation and local polishing
 
-The 0.2.1 path uses deterministic cleanup and user vocabulary. A final-only
+The 0.2.x path uses deterministic cleanup and user vocabulary. A final-only
 punctuation adapter is fail-safe: after removing punctuation and spacing, every
 lexical character must be identical or VoiceFlow returns the unpunctuated
 source. No punctuation is predicted in the streaming capsule.

@@ -1,7 +1,8 @@
 # Resource profile — 2026-07-28
 
-This document records measurements from the current Windows 0.2.1 candidate.
-It is release evidence, not a claim about every computer.
+This document records historical measurements from the Windows 0.2.1
+candidate. It is a baseline for comparison, not current 0.2.2 evidence and not
+a claim about every computer.
 
 ## Same-machine measurements
 
@@ -19,9 +20,9 @@ main source of the installed-build overhead.
 
 ## Interpretation
 
-- The current preview model adds roughly 46 MB in the isolated source-runtime
-  comparison. Removing it is necessary for the public-license gate but is not
-  enough to reach the resource target on its own.
+- The former Chinese-only preview added roughly 46 MB in the isolated
+  source-runtime comparison. The 0.2.2 bilingual preview must be remeasured in
+  the same frozen-build profile before replacing this historical baseline.
 - Qt WebEngine contributes a visible child process, but that child accounts for
   only about 106.5 MB of the installed process tree. Replacing the capsule UI
   without first profiling PyInstaller and ONNX Runtime would be speculative.

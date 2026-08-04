@@ -50,11 +50,14 @@ engine:
 # 停止后的最终文本仍由上面的主引擎完整识别。
 streaming_preview:
   enabled: true
-  model_path: "models/streaming-preview/model.int8.onnx"
+  runtime_engine: "online-transducer"
+  encoder_path: "models/streaming-preview/encoder-epoch-99-avg-1.int8.onnx"
+  decoder_path: "models/streaming-preview/decoder-epoch-99-avg-1.onnx"
+  joiner_path: "models/streaming-preview/joiner-epoch-99-avg-1.int8.onnx"
   tokens_path: "models/streaming-preview/tokens.txt"
   provider: "cpu"
   num_threads: "auto"
-  stability_guard_chars: 1
+  stability_guard_chars: 0
 
 performance:
   # 默认自动按物理核心分档；manual 仅供维护者做受控基准。

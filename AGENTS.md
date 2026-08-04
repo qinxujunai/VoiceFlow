@@ -130,6 +130,9 @@ Use `wrong=correct` only in correction files.
   installer link before the matching versioned Release asset exists.
 - Never publish a macOS download, badge, or compatibility claim until a separately built,
   signed, notarized, and tested macOS artifact exists.
+- macOS public releases use separately named Apple Silicon and Intel disk images built from
+  the same version tag as Windows. Follow `docs/platform-release-contract.md`; update the
+  website only after each matching Release asset exists and its URL has been verified.
 
 ## Product Quality Gates
 
