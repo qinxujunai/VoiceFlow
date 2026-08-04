@@ -137,23 +137,34 @@ def _check_streaming_preview(root: Path, config: dict[str, Any]) -> list[dict[st
             "status": "warning",
             "detail": "disabled",
         }]
-    assets = {
-        "preview_model_path": preview.get(
-            "model_path",
-            "models/streaming-preview/model.int8.onnx",
-        ),
-        "preview_tokens_path": preview.get(
-            "tokens_path",
-            "models/streaming-preview/tokens.txt",
-        ),
-    }
+    runtime_engine = preview.get("runtime_engine", "online-zipformer-ctc")
+    if runtime_engine == "online-transducer":
+        assets = {
+            "preview_encoder_path": preview.get("encoder_path", ""),
+            "preview_decoder_path": preview.get("decoder_path", ""),
+            "preview_joiner_path": preview.get("joiner_path", ""),
+            "preview_tokens_path": preview.get("tokens_path", ""),
+        }
+    elif runtime_engine == "online-paraformer":
+        assets = {
+            "preview_encoder_path": preview.get("encoder_path", ""),
+            "preview_decoder_path": preview.get("decoder_path", ""),
+            "preview_tokens_path": preview.get("tokens_path", ""),
+        }
+    else:
+        assets = {
+            "preview_model_path": preview.get(
+                "model_path",
+                "models/streaming-preview/model.int8.onnx",
+            ),
+            "preview_tokens_path": preview.get(
+                "tokens_path",
+                "models/streaming-preview/tokens.txt",
+            ),
+        }
     packaged_without_preview = (
         (root / "VoiceFlow.exe").is_file()
         and all(not (root / raw_path).is_file() for raw_path in assets.values())
-        and set(assets.values()) == {
-            "models/streaming-preview/model.int8.onnx",
-            "models/streaming-preview/tokens.txt",
-        }
     )
     if packaged_without_preview:
         return [

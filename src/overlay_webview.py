@@ -169,7 +169,7 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setObjectName("statusBadge")
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
-        build_label = QLabel(f"0.2.1 · {platform_label()}")
+        build_label = QLabel(f"0.2.2 · {platform_label()}")
         build_label.setObjectName("sidebarVersion")
         sidebar_layout.addWidget(build_label)
         sidebar_panel.setFixedWidth(184)
@@ -573,7 +573,7 @@ class _SettingsWindow(QMainWindow):
         about_copy.setSpacing(2)
         about_title = QLabel("VoiceFlow")
         about_title.setObjectName("aboutTitle")
-        version = QLabel(f"版本 0.2.1 · {platform_label()}")
+        version = QLabel(f"版本 0.2.2 · {platform_label()}")
         version.setObjectName("aboutVersion")
         about_copy.addWidget(about_title)
         about_copy.addWidget(version)
@@ -1803,14 +1803,6 @@ class OverlayWindow:
     def append_streaming(self, delta, session_id):
         self._js(
             f"appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})"
-        )
-
-    def update_streaming(self, confirmed, provisional, session_id):
-        self._js(
-            "updateStreaming("
-            f"{json.dumps(confirmed, ensure_ascii=False)}, "
-            f"{json.dumps(provisional, ensure_ascii=False)}, "
-            f"{int(session_id)})"
         )
 
     def update_audio_level(self, levels, session_id):

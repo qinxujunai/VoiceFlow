@@ -47,15 +47,14 @@ def test_preview_speech_onset_is_measured_from_pcm_not_hotkey(monkeypatch):
     system._preview_update_count = 0
     system._preview_max_chunk_chars = 0
     system._preview_divergence_count = 0
-    system._preview_render_state = ("", "")
     silence = np.zeros(1600, dtype=np.int16)
     speech = np.full(2400, 5000, dtype=np.int16)
     system._audio_snapshot = lambda _start, _end: np.concatenate((silence, speech))
-    system._update_preview_state = VoiceInputSystem._update_preview_state.__get__(
+    system._append_preview_delta = VoiceInputSystem._append_preview_delta.__get__(
         system,
         VoiceInputSystem,
     )
-    system.overlay = SimpleNamespace(update_streaming=lambda *_args: None)
+    system.overlay = SimpleNamespace(append_streaming=lambda *_args: None)
     monkeypatch.setattr(main.time, "perf_counter", lambda: 100.4)
 
     VoiceInputSystem._feed_preview_audio(

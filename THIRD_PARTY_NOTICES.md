@@ -29,6 +29,7 @@ The packaged application includes these verbatim upstream license texts:
 - `licenses/Qt-LGPL-3.0-only.txt`
 - `licenses/GPL-3.0-only.txt`
 - `licenses/Chromium-BSD.txt`
+- `licenses/Apache-2.0.txt`
 
 These notices and Qt WebEngine's bundled credits resources must remain in every
 redistributed application.
@@ -49,11 +50,12 @@ upstream terms and pinned source information in `model-manifest.json`.
   `csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`,
   revision `2365baeacb507f821a0c8120fcee3d484dba7a07`, upstream model
   `FunAudioLLM/SenseVoiceSmall`.
-- The internal streaming-preview candidate originates from the official
+- The bundled Chinese-English streaming preview originates from the official
   sherpa-onnx release asset
-  `sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01`.
-  Its weight license is not explicitly declared, so it is blocked from public
-  redistribution. See `docs/streaming-preview-model-review.md`.
+  `sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16` and the
+  upstream `csukuangfj/k2fsa-zipformer-bilingual-zh-en-t` checkpoint under
+  Apache-2.0. Exact source and hashes are recorded in `model-manifest.json` and
+  `docs/streaming-preview-model-review.md`.
 
 This notice is an engineering inventory, not legal advice. Release owners must
 retain upstream copyright and license files in every public build.

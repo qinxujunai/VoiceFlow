@@ -1,45 +1,42 @@
 # Streaming preview model distribution review
 
-Status: **internal candidate; public redistribution blocked**
+Status: **approved as a bilingual first-pass preview**
 
-VoiceFlow evaluates
-`sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01`
-only as the low-latency capsule preview. SenseVoice remains the authoritative
-final recognizer.
+VoiceFlow bundles
+`sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16` only for
+low-latency capsule feedback. SenseVoice remains the authoritative recognizer
+and rechecks the complete stopped audio before clipboard output.
 
-The same restriction applies to the evaluated
-`sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` checkpoint: the
-official runtime documentation and archive identify its source, but the model
-weights do not carry an explicit license declaration.
+## Pinned source and license
 
-## Pinned source
+- Official sherpa-onnx release archive:
+  `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16.tar.bz2`
+- Upstream checkpoint: `csukuangfj/k2fsa-zipformer-bilingual-zh-en-t`
+- Weight license: Apache-2.0
+- Runtime: sherpa-onnx, Apache-2.0
 
-- Official sherpa-onnx model archive:
-  `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2`
-- Upstream checkpoint:
-  `https://huggingface.co/csukuangfj/icefall-streaming-zipformer-small-ctc-zh-2025-04-01`
-- Training project:
-  `https://github.com/k2-fsa/icefall`
+The archive revision, selected runtime files, byte sizes, and SHA-256 values
+are pinned in `model-manifest.json`. The installer includes only the int8
+encoder, decoder, joiner, and token table required at runtime.
 
-The archive, model, and token hashes are pinned in `model-manifest.json`.
+## Product decision
 
-## Decision
+The previous Chinese-only CTC preview exposed `<unk>` control tokens during
+English speech and could not be redistributed because its weight license was
+not declared. It is no longer a bundled default.
 
-The icefall source repository is Apache-2.0, but neither the upstream model
-card nor the downloaded model archive explicitly declares a license for the
-model weights. A source-code license alone is not sufficient evidence that the
-weights may be redistributed.
+The bilingual model was promoted because it:
 
-Therefore:
+- produces lexical Chinese and English instead of leaking model control tokens;
+- is a true streaming first pass that consumes each PCM sample once;
+- adds about 60.1 MB of runtime assets rather than another full final model;
+- has an explicit Apache-2.0 weight license and pinned hashes.
 
-- local evaluation and private installation testing may use the pinned files;
-- the public Release workflow must fail while
-  `distribution_review_required` is `true`;
-- no public installer may contain this model until the model owner or an
-  authoritative upstream notice explicitly confirms redistributable terms;
-- when confirmed, the exact evidence, attribution, license file, review date,
-  and reviewer decision must be recorded here before changing the manifest
-  gate.
+It is not described as final-quality ASR. Preview mistakes are never pasted as
+long as SenseVoice returns a valid complete result. The UI displays only
+append-only confirmed deltas; the stopped-audio transcript remains recoverable
+from the clipboard and local history.
 
-This review is about distribution only. It does not affect VoiceFlow's
-offline runtime behavior or the technical evaluation of the model.
+The same-machine smoke evidence is recorded in
+`streaming-preview-evaluation-2026-08-05.md`. A real, authorized bilingual
+holdout is still required before making a population-level accuracy claim.

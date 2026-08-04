@@ -10,44 +10,35 @@ if str(SRC) not in sys.path:
 
 def test_streaming_delta_queue_is_monotonic_and_uses_a_fixed_cadence():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    update_start = html.index(
-        "function updateStreaming(confirmedText, provisionalText, sessionId)"
-    )
-    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
+    append_start = html.index("function appendStreaming(delta, sessionId)")
+    append_block = html[append_start:html.index("function showProcessing()", append_start)]
     drain_start = html.index("function drainStreamingQueue()")
     drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
 
-    assert "const STREAM_APPEND_INTERVAL_MS = 80;" in html
-    assert "streamingTargetConfirmed = nextConfirmed;" in update_block
-    assert "streamingTargetProvisional = nextProvisional;" in update_block
-    assert "cancelStreamingQueue();" not in update_block
-    assert "drainStreamingQueue();" in update_block
+    assert "const STREAM_APPEND_INTERVAL_MS = 48;" in html
+    assert "streamingTargetConfirmed.push(...nextDelta);" in append_block
+    assert "splice(" not in append_block
+    assert "cancelStreamingQueue();" not in append_block
+    assert "drainStreamingQueue();" in append_block
     assert "displayedStreamingText.push(" in drain_block
     assert "setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS)" in drain_block
-    assert "Math.ceil(" not in update_block
-    assert "Math.max(0, 250 - queueDelayMs)" not in update_block
+    assert "Math.ceil(" not in append_block
+    assert "Math.max(0, 250 - queueDelayMs)" not in append_block
 
 
-def test_streaming_renders_confirmed_text_and_a_replaceable_provisional_tail():
+def test_streaming_renders_only_confirmed_append_only_text():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
-    update_start = html.index(
-        "function updateStreaming(confirmedText, provisionalText, sessionId)"
-    )
-    update_block = html[
-        update_start:html.index("function appendStreaming(", update_start)
-    ]
-
-    assert "provisionalNode.className = 'ticker-provisional';" in html
-    assert "streamingTargetConfirmed" in update_block
-    assert "streamingTargetProvisional" in update_block
-    assert "commonGraphemePrefix" in update_block
-    assert "txt.replaceChildren(confirmedNode, provisionalNode)" in html
+    assert "function updateStreaming(" not in html
+    assert "streamingTargetProvisional" not in html
+    assert "commonGraphemePrefix" not in html
+    assert "txt.textContent = tail.join('');" in html
     assert "innerHTML" not in html
-    assert "def update_streaming(self, confirmed, provisional, session_id):" in overlay
-    assert "self.overlay.update_streaming(" in main
+    assert "def append_streaming(self, delta, session_id):" in overlay
+    assert "self.overlay.append_streaming(delta, generation)" in main
+    assert "self.overlay.update_streaming(" not in main
 
 
 def test_streaming_text_uses_one_color_without_a_color_transition():
@@ -60,10 +51,8 @@ def test_streaming_text_uses_one_color_without_a_color_transition():
 
 def test_streaming_pill_grows_monotonically_with_each_visible_character():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    update_start = html.index(
-        "function updateStreaming(confirmedText, provisionalText, sessionId)"
-    )
-    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
+    append_start = html.index("function appendStreaming(delta, sessionId)")
+    append_block = html[append_start:html.index("function showProcessing()", append_start)]
     drain_start = html.index("function drainStreamingQueue()")
     drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
 
@@ -71,9 +60,9 @@ def test_streaming_pill_grows_monotonically_with_each_visible_character():
     assert "function growStreamingWidthTo(characterCount)" in html
     assert "Math.max(streamingTargetWidth, target)" in html
     assert "growStreamingWidthTo(displayedStreamingText.length);" in drain_block
-    assert "growStreamingWidthTo(displayedStreamingText.length);" in update_block
-    assert "if (!streamingExpanded)" not in update_block
-    assert "measureTextWidth(provisionalText)" not in update_block
+    assert "growStreamingWidthTo(displayedStreamingText.length);" in append_block
+    assert "if (!streamingExpanded)" not in append_block
+    assert "measureTextWidth(provisionalText)" not in append_block
 
 
 def test_streaming_tail_is_cropped_without_horizontal_translation():
@@ -107,14 +96,12 @@ def test_processing_and_final_summary_cancel_pending_characters():
 
 def test_reduced_motion_appends_the_confirmed_delta_immediately():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    update_start = html.index(
-        "function updateStreaming(confirmedText, provisionalText, sessionId)"
-    )
-    update_block = html[update_start:html.index("function appendStreaming(", update_start)]
+    append_start = html.index("function appendStreaming(delta, sessionId)")
+    append_block = html[append_start:html.index("function showProcessing()", append_start)]
 
-    assert "prefers-reduced-motion: reduce" in update_block
-    assert "displayedStreamingText = nextTarget.slice();" in update_block
-    assert "renderStreamingTail();" in update_block
+    assert "prefers-reduced-motion: reduce" in append_block
+    assert "displayedStreamingText.push(...nextDelta);" in append_block
+    assert "renderStreamingTail();" in append_block
 
 
 def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
@@ -165,10 +152,10 @@ def test_online_preview_uses_one_monotonic_append_path():
 
     assert "function updateCorrection" not in html
     assert "def update_correction" not in overlay
-    assert main.count("self._update_preview_state(") == 1
+    assert main.count("self._append_preview_delta(") == 1
     assert "_preview_accumulator" not in stream_block
     assert "_stream_preview_snapshot" not in stream_block
-    assert "self.overlay.update_streaming(confirmed, provisional, generation)" in main
+    assert "self.overlay.append_streaming(delta, generation)" in main
 
 
 def test_finalizing_and_final_summary_are_session_guarded():
