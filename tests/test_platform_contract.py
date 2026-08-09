@@ -80,6 +80,8 @@ def test_macos_bundle_covers_both_runtime_models_and_permissions():
 
     assert 'name="VoiceFlow.app"' in spec
     assert 'bundle_identifier="ai.voiceflow.app"' in spec
+    assert 'os.environ.get("VOICEFLOW_CODESIGN_IDENTITY")' in spec
+    assert "codesign_identity=CODESIGN_IDENTITY" in spec
     assert '"NSMicrophoneUsageDescription"' in spec
     assert '"models" / "sensevoice"' in spec
     assert '"models" / "streaming-preview"' in spec
@@ -101,6 +103,26 @@ def test_macos_quality_builds_apple_silicon_and_intel_without_publishing():
     assert "actions/upload-artifact@" in workflow
     assert "gh release" not in workflow
     assert "pip install -r requirements-macos.lock" in workflow
+
+
+def test_macos_release_requires_native_signing_and_notarization():
+    workflow = (
+        ROOT / ".github" / "workflows" / "macos-release.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in workflow
+    assert "runner: macos-15" in workflow
+    assert "runner: macos-15-intel" in workflow
+    assert "APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64" in workflow
+    assert "APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD" in workflow
+    assert "APPLE_ID" in workflow
+    assert "APPLE_APP_SPECIFIC_PASSWORD" in workflow
+    assert "APPLE_TEAM_ID" in workflow
+    assert "codesign --verify --deep --strict" in workflow
+    assert "xcrun notarytool submit" in workflow
+    assert "xcrun stapler staple" in workflow
+    assert "gh release upload" in workflow
+    assert "--clobber" not in workflow
 
 
 def test_macos_dependency_lock_excludes_windows_only_runtime_packages():
