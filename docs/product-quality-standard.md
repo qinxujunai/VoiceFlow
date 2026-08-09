@@ -37,8 +37,9 @@ a reason. The current closure matrix is
 
 ### Performance
 
-- recording trigger to actual first paint: P50 at most 50 ms, P95 below 100 ms;
-- up to 20-second stop-to-clipboard: P95 at most 700 ms;
+- recording trigger to actual first paint: P95 at most 50 ms on the release machine;
+- 0-10 second stop-to-clipboard: P95 at most 500 ms;
+- 10-60 second stop-to-clipboard: P95 at most 700 ms;
 - two-minute stop-to-clipboard: P95 at most 2.5 s;
 - at least 20 samples per published bucket;
 - no audio callback underrun in the release matrix;
@@ -62,6 +63,11 @@ a reason. The current closure matrix is
 - visible focus, readable contrast, reduced-motion behavior, and no clipped
   localized copy;
 - overlay motion communicates state and never fabricates recognition progress;
+- final work completing within 350 ms never flashes a spinner or text label;
+- verified paste dispatch shows a check plus `已完成`; clipboard-only and
+  durable-recovery states use `已复制` and `已保存` respectively;
+- recording text uses one color and the meter remains red throughout recording;
+- ordinary settings expose no model download, repair, selection, or switching;
 - website tested in the selected real browser at desktop and mobile widths.
 
 ### Delivery

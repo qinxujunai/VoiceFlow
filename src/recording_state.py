@@ -8,8 +8,14 @@ from enum import Enum
 
 class RecordingState(str, Enum):
     IDLE = "idle"
+    ARMING = "arming"
     RECORDING = "recording"
-    PROCESSING = "processing"
+    FINALIZING = "finalizing"
+    PROCESSING = "finalizing"
+    DELIVERING = "delivering"
+    COMPLETE = "complete"
+    RECOVERABLE = "recoverable"
+    ERROR = "error"
     SHUTDOWN = "shutdown"
 
 
@@ -28,26 +34,79 @@ class RecordingStateMachine:
         with self._lock:
             if self._state is not RecordingState.IDLE:
                 return False
+            self._state = RecordingState.ARMING
+            return True
+
+    def mark_recording(self) -> bool:
+        with self._lock:
+            if self._state is not RecordingState.ARMING:
+                return False
             self._state = RecordingState.RECORDING
             return True
 
     def abort_start(self) -> bool:
         with self._lock:
-            if self._state is not RecordingState.RECORDING:
+            if self._state not in {RecordingState.ARMING, RecordingState.RECORDING}:
                 return False
             self._state = RecordingState.IDLE
             return True
 
     def claim_stop(self) -> bool:
         with self._lock:
-            if self._state is not RecordingState.RECORDING:
+            if self._state not in {RecordingState.ARMING, RecordingState.RECORDING}:
                 return False
-            self._state = RecordingState.PROCESSING
+            self._state = RecordingState.FINALIZING
+            return True
+
+    def mark_delivering(self) -> bool:
+        with self._lock:
+            if self._state is not RecordingState.FINALIZING:
+                return False
+            self._state = RecordingState.DELIVERING
+            return True
+
+    def mark_complete(self) -> bool:
+        with self._lock:
+            if self._state is not RecordingState.DELIVERING:
+                return False
+            self._state = RecordingState.COMPLETE
+            return True
+
+    def mark_recoverable(self) -> bool:
+        with self._lock:
+            if self._state not in {
+                RecordingState.ARMING,
+                RecordingState.RECORDING,
+                RecordingState.FINALIZING,
+                RecordingState.DELIVERING,
+                RecordingState.ERROR,
+            }:
+                return False
+            self._state = RecordingState.RECOVERABLE
+            return True
+
+    def mark_error(self) -> bool:
+        with self._lock:
+            if self._state in {RecordingState.IDLE, RecordingState.SHUTDOWN}:
+                return False
+            self._state = RecordingState.ERROR
+            return True
+
+    def acknowledge_recovery(self) -> bool:
+        with self._lock:
+            if self._state is not RecordingState.RECOVERABLE:
+                return False
+            self._state = RecordingState.IDLE
             return True
 
     def complete_processing(self) -> bool:
         with self._lock:
-            if self._state is not RecordingState.PROCESSING:
+            if self._state not in {
+                RecordingState.FINALIZING,
+                RecordingState.DELIVERING,
+                RecordingState.COMPLETE,
+                RecordingState.ERROR,
+            }:
                 return False
             self._state = RecordingState.IDLE
             self.completed_cycles += 1
@@ -55,7 +114,7 @@ class RecordingStateMachine:
 
     def claim_cancel(self) -> bool:
         with self._lock:
-            if self._state is not RecordingState.RECORDING:
+            if self._state not in {RecordingState.ARMING, RecordingState.RECORDING}:
                 return False
             self._state = RecordingState.IDLE
             return True

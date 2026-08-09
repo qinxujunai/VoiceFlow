@@ -7,13 +7,15 @@ Output: dist\\VoiceFlow\\VoiceFlow.exe
 
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 PROJECT_ROOT = Path(SPECPATH)
+UIAUTOMATION_BINARIES = collect_dynamic_libs("uiautomation")
 
 a = Analysis(
     [str(PROJECT_ROOT / "src" / "main.py")],
     pathex=[str(PROJECT_ROOT / "src")],
-    binaries=[],
+    binaries=UIAUTOMATION_BINARIES,
     datas=[
         # Overlay UI.
         (str(PROJECT_ROOT / "src" / "overlay.html"), "src"),
@@ -57,6 +59,9 @@ a = Analysis(
         "PySide6.QtCore",
         "PySide6.QtGui",
         "PySide6.QtWidgets",
+        "uiautomation",
+        "comtypes",
+        "model_downloader",
     ],
     hookspath=[],
     hooksconfig={},

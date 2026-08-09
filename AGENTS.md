@@ -54,6 +54,10 @@ src/
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
+- Dispatch paste only when Windows UI Automation confirms the same editable
+  focus element at start and stop and UIPI integrity is compatible.
+- Recovery PCM is temporary local state. Delete it only after verified
+  clipboard delivery plus history, or after an explicit user delete action.
 - Final output must cover the complete stopped audio; streaming preview is only preview.
 - Streaming preview feeds each new PCM sample once to its own online recognizer.
 - Never restore rolling-window preview through the final SenseVoice recognizer:
@@ -139,10 +143,10 @@ Use `wrong=correct` only in correction files.
 - Do not expose a model to ordinary users merely because it loads. It must pass pinned-asset
   verification, pathological-output checks, fixed Chinese CER, fixed English WER, latency,
   memory, license, and clean-install gates.
-- Model names are implementation details. User-facing choices describe the outcome first,
-  such as `日常听写` or `多语言`, and show size, readiness, privacy, and expected speed.
-- Keep one reliable bundled default. Optional models are explicit downloads with visible size,
-  progress, cancel, integrity verification, failure recovery, and removal.
+- Model names are implementation details. Ordinary settings expose no model selection,
+  download, repair, or switching controls.
+- Keep one reliable bundled default. Alternative models remain internal benchmark inputs;
+  pinned download, integrity verification, and rollback code is engineering infrastructure.
 - Never call a model `更准确`, `高准确` or `最佳` without same-machine, same-corpus evidence.
 - Synthetic speech is useful for reproducible regression but cannot replace authorized,
   natural user speech in release accuracy claims.
@@ -173,21 +177,28 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Regression Guards
 
-- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop freezes audio, invalidates preview, optionally shows finalizing, writes final output/history, shows the compact final summary, and then hides/resets. Do not call `show_result(text)` for the normal recording stop path.
+- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop atomically freezes the sample boundary, invalidates preview without joining workers, keeps the existing text unchanged for 350 ms, optionally changes only the mark to a spinner, replaces the draft with authoritative final text in place, and then shows minimal delivery feedback. Do not call `show_result(text)` for the normal recording stop path.
 
 - **Streaming text replay and reverse motion.** The online recognizer owns one
   stream per recording and receives each new PCM sample exactly once. Its
   Python-to-JavaScript contract is `appendStreaming(delta, session_id)`:
-  characters are appended once at a fixed cadence and are never retracted or
-  replayed. Do not restore rolling-window SenseVoice preview, full-text
-  `updateStreaming`, common-prefix resets, horizontal transforms, or catch-up
-  acceleration.
+  characters are appended once and are never retracted or replayed. Cadence is
+  normally 48 ms, may smoothly accelerate under backlog, and must coalesce
+  stale animation after the 600 ms hard lag. Do not restore rolling-window
+  SenseVoice preview, full-text `updateStreaming`, common-prefix resets, or
+  horizontal transforms.
 
 - **Final text overwritten by streaming preview.** Stop freezes the microphone
   first, then invalidates the preview generation. `_stop_streaming()` may only
-  perform a bounded join; session guards prevent stale preview work from
-  updating processing or final states. The capsule shows a compact character
-  count after output rather than replaying the final transcript.
+  signal cancellation and transfer ownership; it must not join worker threads.
+  Session guards prevent stale preview work from updating settling, final, or
+  delivery states. The capsule replaces the draft with final text in place,
+  then shows a check with `已完成`, `已复制`, or `已保存` as appropriate. Never
+  restore the character-count summary or claim paste success.
+
+- **Recording color stability.** Draft and authoritative provenance remains internal.
+  Both render in one text color, and the three recording bars remain red until recording
+  actually ends. Do not couple recognition confidence to visible color changes.
 
 - **Long dictation preview cost and coverage.** The lightweight online preview
   and SenseVoice progressive final cache use separate workers. Active recording

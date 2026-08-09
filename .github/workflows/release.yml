@@ -192,6 +192,9 @@ jobs:
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
           gh release create $env:GITHUB_REF_NAME `
             "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
+            "release\$env:GITHUB_REF_NAME\SHA256SUMS.txt" `
+            "release\$env:GITHUB_REF_NAME\SBOM.cdx.json" `
+            "release\$env:GITHUB_REF_NAME\THIRD_PARTY_NOTICES.md" `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --title "VoiceFlow $version — Windows 离线语音输入" `

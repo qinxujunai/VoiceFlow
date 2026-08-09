@@ -65,6 +65,12 @@ def test_engine_capabilities_are_explicit_and_offline():
     assert fun_asr.capabilities.supports_hotwords is True
 
 
+def test_sensevoice_default_uses_automatic_bilingual_detection():
+    config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+
+    assert config["engine"]["sensevoice"]["language"] == "auto"
+
+
 def test_funasr_adapter_passes_quantized_assets_to_sherpa(tmp_path, monkeypatch):
     from transcriber import Transcriber
 

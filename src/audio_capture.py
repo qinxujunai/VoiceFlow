@@ -38,6 +38,7 @@ class AudioCapture:
 
         # 录音状态
         self._is_recording = False
+        self._is_frozen = False
         self._audio_buffer = []
         self._audio_buffer_ends = []
         self._buffer_start_sample = 0
@@ -51,6 +52,8 @@ class AudioCapture:
         self._analysis_stop = None
         self._analysis_thread = None
         self._callback_status_count = 0
+        self._recovery_sink = None
+        self._recovery_drop_count = 0
 
         # VAD 状态
         self._last_speech_time = None
@@ -70,9 +73,11 @@ class AudioCapture:
             self._last_buffer_start_sample = 0
             self._last_total_samples = 0
             self._is_recording = True
+            self._is_frozen = False
             self._recording_start_time = time.time()
             self._last_speech_time = time.time()
             self._callback_status_count = 0
+            self._recovery_drop_count = 0
 
         self._start_analysis_worker()
 
@@ -87,6 +92,9 @@ class AudioCapture:
                     self._audio_buffer.append(block)
                     self._total_samples += len(block)
                     self._audio_buffer_ends.append(self._total_samples)
+                recovery_sink = self._recovery_sink
+                if recovery_sink is not None and not recovery_sink.append_pcm(block):
+                    self._recovery_drop_count += 1
                 self._enqueue_analysis(block)
 
         try:
@@ -104,13 +112,23 @@ class AudioCapture:
             self._stop_analysis_worker()
             raise RuntimeError(f"麦克风打开失败: {e}")
 
-    def stop_recording(self):
-        """停止录音，返回音频数据 (numpy array, int16)"""
-        if not self._is_recording:
-            return np.array([], dtype=np.int16)
-
+    def freeze_recording(self):
+        """Atomically stop accepting PCM and latch the authoritative boundary."""
         with self._lock:
+            if not self._is_recording:
+                return self._last_total_samples if self._is_frozen else 0
             self._is_recording = False
+            self._is_frozen = True
+            self._last_buffer_start_sample = self._buffer_start_sample
+            self._last_total_samples = self._total_samples
+            return self._last_total_samples
+
+    def stop_recording(self):
+        """Close the device and return PCM captured through the frozen boundary."""
+        if not self._is_recording and not self._is_frozen:
+            return np.array([], dtype=np.int16)
+        if self._is_recording:
+            self.freeze_recording()
 
         if self._stream is not None:
             try:
@@ -129,6 +147,7 @@ class AudioCapture:
             self._audio_buffer_ends = []
             self._buffer_start_sample = 0
             self._total_samples = 0
+            self._is_frozen = False
         if not blocks:
             return np.array([], dtype=np.int16)
 
@@ -139,6 +158,7 @@ class AudioCapture:
         """取消录音，不返回数据"""
         with self._lock:
             self._is_recording = False
+            self._is_frozen = False
         if self._stream is not None:
             try:
                 self._stream.stop()
@@ -162,6 +182,10 @@ class AudioCapture:
         """Receive three real RMS samples for the compact recording meter."""
         self._on_level_callback = callback
 
+    def set_recovery_sink(self, sink):
+        """Attach a queue-backed recovery journal; the callback never writes disk."""
+        self._recovery_sink = sink
+
     def _start_analysis_worker(self):
         analysis_queue = queue.Queue(maxsize=1)
         stop_event = threading.Event()
@@ -174,6 +198,8 @@ class AudioCapture:
                     block = analysis_queue.get(timeout=0.1)
                 except queue.Empty:
                     continue
+                if block is None:
+                    break
                 self._process_analysis_block(block)
 
         self._analysis_thread = threading.Thread(target=run, daemon=True)
@@ -183,9 +209,19 @@ class AudioCapture:
         stop_event = self._analysis_stop
         if stop_event is not None:
             stop_event.set()
+        analysis_queue = self._analysis_queue
+        if analysis_queue is not None:
+            try:
+                analysis_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                analysis_queue.put_nowait(None)
+            except queue.Full:
+                pass
         thread = self._analysis_thread
         if thread is not None and thread is not threading.current_thread():
-            thread.join(timeout=0.5)
+            thread.join(timeout=0.05)
         self._analysis_thread = None
         self._analysis_stop = None
         self._analysis_queue = None
@@ -239,6 +275,10 @@ class AudioCapture:
         return self._is_recording
 
     @property
+    def is_frozen(self):
+        return self._is_frozen
+
+    @property
     def sample_count(self):
         with self._lock:
             return self._total_samples
@@ -261,6 +301,10 @@ class AudioCapture:
     @property
     def callback_status_count(self):
         return self._callback_status_count
+
+    @property
+    def recovery_drop_count(self):
+        return self._recovery_drop_count
 
     def snapshot_audio(self, start_sample=0, end_sample=None):
         """Copy only the requested mono PCM range from the growing recording."""

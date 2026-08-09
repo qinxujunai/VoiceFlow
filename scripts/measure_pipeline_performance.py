@@ -96,6 +96,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--short-seconds", type=int, default=10)
+    parser.add_argument("--medium-seconds", type=int, default=45)
     parser.add_argument("--long-seconds", type=int, default=120)
     parser.add_argument(
         "--sample",
@@ -117,6 +118,7 @@ def main() -> int:
 
     audio, sample_rate = _load_pcm(Path(args.sample))
     short_audio = _fit_duration(audio, sample_rate, args.short_seconds)
+    medium_audio = _fit_duration(audio, sample_rate, args.medium_seconds)
     long_audio = _fit_duration(audio, sample_rate, args.long_seconds)
     transcriber = Transcriber(
         str(config_path),
@@ -125,15 +127,21 @@ def main() -> int:
     transcriber.load_engine(engine_name)
     cleaner = TextCleaner(config, base_dir=str(ROOT))
     output = OutputHandler(str(config_path), base_dir=str(ROOT))
-    progressive_parts, finalized = _prepare_progressive_cache(
-        transcriber,
-        long_audio,
-        sample_rate,
-    )
     overlap_samples = int(
         sample_rate * VoiceInputSystem.FINAL_SEGMENT_OVERLAP_SECONDS
     )
-    long_tail = long_audio[max(0, finalized - overlap_samples):]
+    progressive_runs = []
+    for duration, pcm in (
+        (args.medium_seconds, medium_audio),
+        (args.long_seconds, long_audio),
+    ):
+        parts, finalized = _prepare_progressive_cache(
+            transcriber,
+            pcm,
+            sample_rate,
+        )
+        tail = pcm[max(0, finalized - overlap_samples):]
+        progressive_runs.append((duration, parts, tail))
     transcript_merger = object.__new__(VoiceInputSystem)
 
     original_copy = pyperclip.copy
@@ -162,26 +170,27 @@ def main() -> int:
                         "stop_to_paste_ms": round(elapsed_ms, 3),
                     }
                 )
-        for _ in range(args.samples):
-            started = time.perf_counter()
-            tail_text = transcriber.transcribe(long_tail, sample_rate)
-            raw_text = transcript_merger._join_transcript_parts(
-                [*progressive_parts, tail_text]
-            )
-            text = cleaner.clean(raw_text) if raw_text else ""
-            output.output(text or raw_text or "VoiceFlow")
-            elapsed_ms = (time.perf_counter() - started) * 1000
-            rows.append(
-                {
-                    "source": "deterministic_full_pipeline",
-                    "measured_at": measured_at,
-                    "engine": engine_name,
-                    "duration": float(args.long_seconds),
-                    "segment_count": len(progressive_parts),
-                    "tail_seconds": round(len(long_tail) / sample_rate, 3),
-                    "stop_to_paste_ms": round(elapsed_ms, 3),
-                }
-            )
+        for duration, progressive_parts, tail in progressive_runs:
+            for _ in range(args.samples):
+                started = time.perf_counter()
+                tail_text = transcriber.transcribe(tail, sample_rate)
+                raw_text = transcript_merger._join_transcript_parts(
+                    [*progressive_parts, tail_text]
+                )
+                text = cleaner.clean(raw_text) if raw_text else ""
+                output.output(text or raw_text or "VoiceFlow")
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                rows.append(
+                    {
+                        "source": "deterministic_full_pipeline",
+                        "measured_at": measured_at,
+                        "engine": engine_name,
+                        "duration": float(duration),
+                        "segment_count": len(progressive_parts),
+                        "tail_seconds": round(len(tail) / sample_rate, 3),
+                        "stop_to_paste_ms": round(elapsed_ms, 3),
+                    }
+                )
     finally:
         pyperclip.copy = original_copy
         pyautogui.hotkey = original_hotkey
@@ -192,7 +201,11 @@ def main() -> int:
         json.dumps(
             {
                 "samples_per_duration": args.samples,
-                "durations_seconds": [args.short_seconds, args.long_seconds],
+                "durations_seconds": [
+                    args.short_seconds,
+                    args.medium_seconds,
+                    args.long_seconds,
+                ],
                 "output": str(Path(args.output)),
             },
             ensure_ascii=False,

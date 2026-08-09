@@ -1,5 +1,5 @@
 param(
-    [string]$InstallerPath = "dist\installer\VoiceFlow-0.2.2-Windows-x64.exe",
+    [string]$InstallerPath = "dist\installer\VoiceFlow-0.3.0-Windows-x64.exe",
     [int]$StartupSeconds = 8,
     [switch]$RequireStreamingPreview
 )

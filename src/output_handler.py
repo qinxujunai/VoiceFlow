@@ -1,137 +1,152 @@
-"""
-文字输出模块
-将转写文字注入到当前活动窗口的光标位置。
-只使用剪贴板优先路径：复制完整文本，再发送 Ctrl+V。
-兜底：粘贴失败时自动存入剪贴板和本地历史文件。
-"""
+"""Verified clipboard-first delivery with conservative paste dispatch."""
+
+from __future__ import annotations
 
 import os
 import time
-import yaml
+import uuid
+from pathlib import Path
+
 import pyperclip
-import pyautogui
+import yaml
 
+from delivery import (
+    DeliveryCoordinator,
+    DeliveryResult,
+    TargetSnapshot,
+    VerifiedClipboard,
+    inspect_current_target,
+)
 from platform_utils import paste_modifier
-
-# 禁用 pyautogui 的安全暂停（我们自己控制）
-pyautogui.PAUSE = 0.01
-pyautogui.FAILSAFE = False
 
 
 class OutputHandler:
-    """文字输出到当前活动窗口，带兜底机制"""
+    """Store text first, verify it, then dispatch paste only to a stable target."""
 
     def __init__(self, config_path=None, base_dir=None, overlay=None):
         if config_path is None:
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "config.yaml",
+            )
+        with open(config_path, "r", encoding="utf-8") as stream:
+            config = yaml.safe_load(stream)
 
         out_cfg = config.get("output", {})
-        self.auto_space = out_cfg.get("auto_space", True)
-        self.auto_period = out_cfg.get("auto_period", False)
-
-        # 兜底
-        self.base_dir = base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.history_file = os.path.join(self.base_dir, "logs", "history.txt")
-        self.overlay = overlay  # 用于悬浮窗提示
+        self.auto_space = bool(out_cfg.get("auto_space", False))
+        self.auto_period = bool(out_cfg.get("auto_period", False))
+        self.base_dir = Path(
+            base_dir
+            or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        self.history_file = str(self.base_dir / "logs" / "history.txt")
+        self.overlay = overlay
         self.last_text = ""
-
-    def output(self, text):
-        """
-        将文字输出到当前活动窗口。
-
-        Args:
-            text: 要输出的文字
-        """
-        if not text:
-            return "empty"
-
-        text = self._prepare_text(text)
-        self.last_text = text
-
-        return "clipboard_copied_paste_sent" if self._paste(text) else "fallback"
-
-    def copy_only(self, text):
-        """完整性未确认时只保留文字，不向目标窗口发送粘贴。"""
-        if not text:
-            return "empty"
-
-        text = self._prepare_text(text)
-        self.last_text = text
+        self._coordinator = DeliveryCoordinator(
+            clipboard=VerifiedClipboard(copy=pyperclip.copy, paste=pyperclip.paste),
+            inspect_target=inspect_current_target,
+            dispatch_paste=self._dispatch_paste,
+            ledger_dir=self.base_dir / "delivery-pending",
+        )
+        # Import COM/UIA and build its first focus object during startup, not on
+        # the user's first recording trigger where it would delay feedback.
         try:
-            pyperclip.copy(text)
-            return "clipboard_copied_integrity_warning"
+            inspect_current_target()
         except Exception:
-            self._fallback(text)
-            return "fallback"
+            pass
 
-    def _prepare_text(self, text):
-        text = text.strip()
-        if self.auto_period:
-            if text and text[-1] not in "。！？.!?,，；;：:":
-                text += "。"
-        return text
+    def capture_target(self) -> TargetSnapshot:
+        return inspect_current_target()
+
+    def deliver(
+        self,
+        text,
+        *,
+        start_target: TargetSnapshot | None,
+        session_id: str,
+        allow_paste: bool = True,
+    ) -> DeliveryResult:
+        prepared = self._prepare_text(text)
+        self.last_text = prepared
+        return self._coordinator.deliver(
+            prepared,
+            start_target=start_target,
+            session_id=session_id,
+            allow_paste=allow_paste,
+        )
+
+    def output(self, text, *, start_target=None, session_id=None):
+        if not text:
+            return "empty"
+        delivery_id = session_id or f"legacy-{uuid.uuid4().hex}"
+        result = self.deliver(
+            text,
+            start_target=start_target or self.capture_target(),
+            session_id=delivery_id,
+        )
+        if result.clipboard_verified:
+            self.acknowledge_delivery(delivery_id)
+        return result.output_status
+
+    def copy_only(self, text, *, session_id=None):
+        if not text:
+            return "empty"
+        delivery_id = session_id or f"copy-{uuid.uuid4().hex}"
+        result = self.deliver(
+            text,
+            start_target=None,
+            session_id=delivery_id,
+            allow_paste=False,
+        )
+        if result.clipboard_verified:
+            self.acknowledge_delivery(delivery_id)
+        return result.output_status
+
+    def acknowledge_delivery(self, session_id):
+        return self._coordinator.acknowledge(str(session_id))
+
+    def recover_pending(self):
+        return self._coordinator.recover_pending_to_clipboard()
 
     def repeat_last(self):
-        """重新输出最近一次成功进入输出模块的文本"""
         if not self.last_text:
             return "empty"
         return self.output(self.last_text)
 
+    def _prepare_text(self, text):
+        prepared = str(text).strip()
+        if (
+            self.auto_period
+            and prepared
+            and prepared[-1] not in "。！？.!?,，；;：:"
+        ):
+            prepared += "。"
+        return prepared
+
+    def _dispatch_paste(self) -> bool:
+        # Import only when delivery needs it. PyAutoGUI changes process DPI
+        # awareness at import time, which otherwise races Qt's per-monitor setup.
+        import pyautogui
+
+        pyautogui.PAUSE = 0.01
+        pyautogui.FAILSAFE = False
+        pyautogui.hotkey(paste_modifier(), "v")
+        return True
+
     def _paste(self, text):
-        """通过剪贴板粘贴"""
-        result = False
-
-        try:
-
-            # 复制新内容到剪贴板
-            pyperclip.copy(text)
-            time.sleep(0.05)
-
-            # Windows uses Ctrl+V; macOS uses Command+V.
-            pyautogui.hotkey(paste_modifier(), "v")
-            time.sleep(0.1)
-
-            if self.auto_space:
-                pyautogui.press("space")
-
-            result = True
-
-
-        except Exception as e:
-            print(f"[OutputHandler] 粘贴失败: {e}")
-            result = False
-
-        if not result:
-            self._fallback(text)
-
-        return result
+        """Compatibility wrapper; status still means dispatched, never landed."""
+        target = self.capture_target()
+        return self.deliver(
+            text,
+            start_target=target,
+            session_id=f"legacy-{uuid.uuid4().hex}",
+        ).paste_dispatched
 
     def _fallback(self, text):
-        """兜底：粘贴失败时存入剪贴板 + 本地历史 + 悬浮窗提示"""
-        try:
-            pyperclip.copy(text)
-            print("[OutputHandler] 已存入剪贴板", flush=True)
-        except Exception:
-            print("[OutputHandler] 剪贴板存入失败", flush=True)
-
-        # 写入本地历史
-        try:
-            os.makedirs(os.path.dirname(self.history_file), exist_ok=True)
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            with open(self.history_file, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {text}\n")
-            print(f"[OutputHandler] 已存入历史: {self.history_file}", flush=True)
-        except Exception as e:
-            print(f"[OutputHandler] 历史写入失败: {e}", flush=True)
-
-        # 悬浮窗提示
-        if self.overlay:
-            try:
-                self.overlay.show_error("粘贴失败，已存入剪贴板")
-                self.overlay.hide_after(2000)
-            except Exception:
-                pass
-
+        """Persist legacy callers without claiming clipboard success."""
+        path = Path(self.history_file)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(f"[{timestamp}] {text}\n")
         return False
