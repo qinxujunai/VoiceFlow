@@ -2,6 +2,10 @@ const copy = {
   zh: {
     title: "VoiceFlow — 离线语音输入",
     description: "VoiceFlow 是 Windows 上的离线语音输入工具。按下 F2 说话，文字回到当前光标；不需要账户，也不上传录音。",
+    brandHome: "VoiceFlow 首页",
+    primaryNav: "主要导航",
+    languageSwitch: "语言",
+    valuesAria: "VoiceFlow 核心价值",
     skip: "跳到主要内容",
     navValues: "产品",
     navPrivacy: "隐私",
@@ -13,6 +17,8 @@ const copy = {
     viewGithub: "查看 GitHub",
     compatibility: "Windows 10 / 11 · x64 · v0.2.2",
     demoAlt: "VoiceFlow 胶囊从录音预览过渡到完成状态",
+    demoSrc: "assets/voiceflow-demo.svg",
+    privacyHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/README.md#隐私与联网",
     valueOfflineLabel: "声音不出电脑",
     valueOffline: "完全离线",
     valueOfflineBody: "无需账户，不上传录音；断开网络照常听写。",
@@ -34,6 +40,10 @@ const copy = {
   en: {
     title: "VoiceFlow — Offline dictation for Windows",
     description: "VoiceFlow is offline dictation for Windows. Press F2 to speak and return text to the cursor, with no account or audio upload.",
+    brandHome: "VoiceFlow home",
+    primaryNav: "Primary navigation",
+    languageSwitch: "Language",
+    valuesAria: "VoiceFlow core benefits",
     skip: "Skip to main content",
     navValues: "Product",
     navPrivacy: "Privacy",
@@ -45,6 +55,8 @@ const copy = {
     viewGithub: "View on GitHub",
     compatibility: "Windows 10 / 11 · x64 · v0.2.2",
     demoAlt: "The VoiceFlow capsule moves from live recording preview to completion",
+    demoSrc: "assets/voiceflow-demo.en.svg",
+    privacyHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/README.en.md#privacy-and-networking",
     valueOfflineLabel: "Audio stays on your PC",
     valueOffline: "Entirely offline",
     valueOfflineBody: "No account and no audio upload. Dictation keeps working without a network.",
@@ -68,6 +80,9 @@ const copy = {
 const languageButtons = document.querySelectorAll("[data-language]");
 const translatable = document.querySelectorAll("[data-i18n]");
 const translatedImages = document.querySelectorAll("[data-i18n-alt]");
+const translatedAriaLabels = document.querySelectorAll("[data-i18n-aria]");
+const translatedSources = document.querySelectorAll("[data-i18n-src]");
+const translatedLinks = document.querySelectorAll("[data-i18n-href]");
 
 function setLanguage(language) {
   const selected = copy[language] ? language : "zh";
@@ -91,6 +106,27 @@ function setLanguage(language) {
     const key = image.dataset.i18nAlt;
     if (copy[selected][key]) {
       image.alt = copy[selected][key];
+    }
+  });
+
+  translatedAriaLabels.forEach((element) => {
+    const key = element.dataset.i18nAria;
+    if (copy[selected][key]) {
+      element.setAttribute("aria-label", copy[selected][key]);
+    }
+  });
+
+  translatedSources.forEach((element) => {
+    const key = element.dataset.i18nSrc;
+    if (copy[selected][key]) {
+      element.src = copy[selected][key];
+    }
+  });
+
+  translatedLinks.forEach((element) => {
+    const key = element.dataset.i18nHref;
+    if (copy[selected][key]) {
+      element.href = copy[selected][key];
     }
   });
 

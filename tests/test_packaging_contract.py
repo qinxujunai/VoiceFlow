@@ -117,7 +117,9 @@ def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
     index = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
     copy = (ROOT / "site" / "app.js").read_text(encoding="utf-8")
 
-    html_keys = set(re.findall(r'data-i18n(?:-alt)?="([^"]+)"', index))
+    html_keys = set(
+        re.findall(r'data-i18n(?:-(?:alt|aria|href|src))?="([^"]+)"', index)
+    )
     zh_block, en_block = copy.split("  en: {", 1)
     zh_keys = set(re.findall(r"^\s{4}([A-Za-z]\w*):", zh_block, re.MULTILINE))
     en_keys = set(re.findall(r"^\s{4}([A-Za-z]\w*):", en_block, re.MULTILINE))
@@ -128,6 +130,23 @@ def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
     assert "voiceflow-demo.svg" in index
     assert "voiceflow-app-home" not in index
     assert "voiceflow-ambient" not in index
+
+
+def test_product_site_localizes_demo_links_and_accessibility_labels():
+    index = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
+    copy = (ROOT / "site" / "app.js").read_text(encoding="utf-8")
+    english_demo = (
+        ROOT / "site" / "assets" / "voiceflow-demo.en.svg"
+    ).read_text(encoding="utf-8")
+
+    for key in ("brandHome", "primaryNav", "languageSwitch", "valuesAria"):
+        assert f'data-i18n-aria="{key}"' in index
+    assert 'data-i18n-src="demoSrc"' in index
+    assert 'data-i18n-href="privacyHref"' in index
+    assert 'demoSrc: "assets/voiceflow-demo.en.svg"' in copy
+    assert "README.en.md#privacy-and-networking" in copy
+    assert "Press once to start, again to finish" in english_demo
+    assert "prefers-reduced-motion: reduce" in english_demo
 
 
 def test_ui_capture_uses_sanitized_product_fixtures_by_default():
