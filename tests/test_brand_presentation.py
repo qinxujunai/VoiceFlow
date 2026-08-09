@@ -40,7 +40,8 @@ def test_product_site_uses_only_the_real_demo():
 
     assert page.count("data-download") == 1
     assert "SenseVoice" in page
-    assert "Qwen3" in page
+    assert "Qwen3" not in page
+    assert "无需下载或切换模型" in page
     assert "开发预览" in page
     assert "不属于当前下载的 v0.2.2 安装包" in page
     assert 'class="download"' not in page

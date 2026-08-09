@@ -311,6 +311,9 @@ def test_existing_user_config_without_preview_section_uses_packaged_defaults(
     assert calls[0]["tokens"] == str(model_dir / "tokens.txt")
     assert calls[0]["num_threads"] >= 1
     assert calls[0]["enable_endpoint_detection"] is True
+    assert calls[0]["rule1_min_trailing_silence"] == 1.6
+    assert calls[0]["rule2_min_trailing_silence"] == 0.55
+    assert calls[0]["rule3_min_utterance_length"] == 18.0
 
 
 def test_online_preview_can_load_the_bilingual_paraformer_candidate(

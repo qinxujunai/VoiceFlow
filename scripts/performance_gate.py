@@ -36,7 +36,15 @@ def analyze_history(
     short = [
         float(row["stop_to_paste_ms"])
         for row in rows
-        if "stop_to_paste_ms" in row and float(row.get("duration", 0)) <= 20
+        if "stop_to_paste_ms" in row and float(row.get("duration", 0)) <= 10
+    ]
+    medium = [
+        float(row["stop_to_paste_ms"])
+        for row in rows
+        if (
+            "stop_to_paste_ms" in row
+            and 10 < float(row.get("duration", 0)) <= 60
+        )
     ]
     two_minute = [
         float(row["stop_to_paste_ms"])
@@ -71,6 +79,7 @@ def analyze_history(
     metrics = {
         "trigger_to_feedback_p95_ms": _p95(feedback),
         "short_stop_to_paste_p95_ms": _p95(short),
+        "medium_stop_to_paste_p95_ms": _p95(medium),
         "two_minute_stop_to_paste_p95_ms": _p95(two_minute),
         "preview_first_model_delta_p95_ms": _p95(preview_model),
         "preview_first_paint_p95_ms": _p95(preview_paint),
@@ -79,6 +88,7 @@ def analyze_history(
         "preview_chunk_chars_p95": _p95(preview_chunks),
         "feedback_samples": len(feedback),
         "short_samples": len(short),
+        "medium_samples": len(medium),
         "two_minute_samples": len(two_minute),
         "preview_samples": len(preview_paint),
     }
@@ -86,15 +96,18 @@ def analyze_history(
     for key, count in (
         ("feedback", len(feedback)),
         ("short", len(short)),
+        ("medium", len(medium)),
         ("two_minute", len(two_minute)),
         ("preview", len(preview_paint)),
     ):
         if count < minimum_samples:
             failures.append(f"{key}: requires {minimum_samples} samples, found {count}")
-    if metrics["trigger_to_feedback_p95_ms"] is not None and metrics["trigger_to_feedback_p95_ms"] >= 100:
-        failures.append("trigger-to-feedback P95 must be below 100 ms")
-    if metrics["short_stop_to_paste_p95_ms"] is not None and metrics["short_stop_to_paste_p95_ms"] > 700:
-        failures.append("short stop-to-paste P95 exceeds 700 ms")
+    if metrics["trigger_to_feedback_p95_ms"] is not None and metrics["trigger_to_feedback_p95_ms"] > 50:
+        failures.append("trigger-to-feedback P95 exceeds 50 ms")
+    if metrics["short_stop_to_paste_p95_ms"] is not None and metrics["short_stop_to_paste_p95_ms"] > 500:
+        failures.append("0-10 second stop-to-paste P95 exceeds 500 ms")
+    if metrics["medium_stop_to_paste_p95_ms"] is not None and metrics["medium_stop_to_paste_p95_ms"] > 700:
+        failures.append("10-60 second stop-to-paste P95 exceeds 700 ms")
     if metrics["two_minute_stop_to_paste_p95_ms"] is not None and metrics["two_minute_stop_to_paste_p95_ms"] > 2500:
         failures.append("two-minute stop-to-paste P95 exceeds 2.5 seconds")
     if metrics["preview_first_model_delta_p95_ms"] is not None and metrics["preview_first_model_delta_p95_ms"] > 900:

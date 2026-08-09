@@ -34,8 +34,12 @@ from qt_compat import (  # noqa: E402
 OVERLAY_STATES = {
     "recording": "prepareRecording(1); updateAudioLevel([0.018, 0.092, 0.044], 1)",
     "streaming": "prepareRecording(2); appendStreaming('正在稳定追加完整转写', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
-    "finalizing": "prepareRecording(4); showFinalizing(4)",
-    "completed": "prepareRecording(5); showFinalSummary(24, 5)",
+    "mixed": "prepareRecording(3); updateTranscriptState('明早十点，', '把方案同步给团队。', 3)",
+    "settling": "prepareRecording(4); updateTranscriptState('', '正在稳定追加完整转写', 4); showSettling(4)",
+    "final_text": "prepareRecording(5); updateTranscriptState('', '明早十点，把方案同步给团队。', 5); showAuthoritativeFinal('明早十点，把方案同步给团队。', 5)",
+    "completed": "prepareRecording(6); showAuthoritativeFinal('明早十点，把方案同步给团队。', 6); showDeliveryState('clipboard_verified_paste_dispatched', 6)",
+    "clipboard": "prepareRecording(7); showDeliveryState('clipboard_verified_only', 7)",
+    "saved": "prepareRecording(8); showDeliveryState('recovery_saved_clipboard_unavailable', 8)",
     "error": "showState('error', '麦克风不可用')",
     "canceled": "showState('canceled', '已取消')",
 }

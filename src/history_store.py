@@ -29,7 +29,11 @@ class HistoryStore:
         trigger_to_feedback_ms=None,
         stop_to_paste_ms=None,
         audio_frozen_ms=None,
+        audio_teardown_ms=None,
+        stream_handoff_ms=None,
         transcription_ms=None,
+        safe_text_ms=None,
+        delivery_ms=None,
         preview_first_text_ms=None,
         preview_speech_onset_sample=None,
         preview_first_model_delta_ms=None,
@@ -76,8 +80,16 @@ class HistoryStore:
             entry["stop_to_paste_ms"] = round(float(stop_to_paste_ms), 3)
         if audio_frozen_ms is not None:
             entry["audio_frozen_ms"] = round(float(audio_frozen_ms), 3)
+        if audio_teardown_ms is not None:
+            entry["audio_teardown_ms"] = round(float(audio_teardown_ms), 3)
+        if stream_handoff_ms is not None:
+            entry["stream_handoff_ms"] = round(float(stream_handoff_ms), 3)
         if transcription_ms is not None:
             entry["transcription_ms"] = round(float(transcription_ms), 3)
+        if safe_text_ms is not None:
+            entry["safe_text_ms"] = round(float(safe_text_ms), 3)
+        if delivery_ms is not None:
+            entry["delivery_ms"] = round(float(delivery_ms), 3)
         if preview_first_text_ms is not None:
             entry["preview_first_text_ms"] = round(float(preview_first_text_ms), 3)
         if preview_speech_onset_sample is not None:

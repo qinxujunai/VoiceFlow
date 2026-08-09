@@ -43,7 +43,11 @@ class HistoryStoreTests(unittest.TestCase):
                 trigger_to_feedback_ms=42.5,
                 stop_to_paste_ms=620.0,
                 audio_frozen_ms=8.0,
+                audio_teardown_ms=24.0,
+                stream_handoff_ms=0.3,
                 transcription_ms=410.0,
+                safe_text_ms=2.0,
+                delivery_ms=16.0,
                 preview_first_text_ms=520.0,
                 preview_update_count=18,
                 preview_max_chunk_chars=4,
@@ -62,7 +66,11 @@ class HistoryStoreTests(unittest.TestCase):
             self.assertEqual(last["trigger_to_feedback_ms"], 42.5)
             self.assertEqual(last["stop_to_paste_ms"], 620.0)
             self.assertEqual(last["audio_frozen_ms"], 8.0)
+            self.assertEqual(last["audio_teardown_ms"], 24.0)
+            self.assertEqual(last["stream_handoff_ms"], 0.3)
             self.assertEqual(last["transcription_ms"], 410.0)
+            self.assertEqual(last["safe_text_ms"], 2.0)
+            self.assertEqual(last["delivery_ms"], 16.0)
             self.assertEqual(last["preview_first_text_ms"], 520.0)
             self.assertEqual(last["preview_update_count"], 18)
             self.assertEqual(last["preview_max_chunk_chars"], 4)
@@ -265,6 +273,8 @@ class RecordingSessionTests(unittest.TestCase):
         class FakeAudio:
             sample_rate = 16000
             is_recording = False
+            last_buffer_start_sample = 0
+            last_total_samples = 3
 
             def start_recording(self):
                 self.is_recording = True
@@ -275,6 +285,11 @@ class RecordingSessionTests(unittest.TestCase):
                 events.append("stop")
                 return [1, 2, 3]
 
+            def freeze_recording(self):
+                self.is_recording = False
+                events.append("freeze")
+                return self.last_total_samples
+
             def cancel_recording(self):
                 self.is_recording = False
                 events.append("cancel")
@@ -284,13 +299,16 @@ class RecordingSessionTests(unittest.TestCase):
         self.assertTrue(session.is_active)
 
         session.clock = lambda: 12.5
+        self.assertEqual(session.freeze(), 3)
+        self.assertFalse(session.is_active)
+        session.clock = lambda: 20.0
         result = session.stop()
         self.assertFalse(session.is_active)
         self.assertEqual(result.audio_data, [1, 2, 3])
         self.assertEqual(result.duration, 2.5)
         self.assertEqual(result.start_sample, 0)
         self.assertEqual(result.total_samples, 3)
-        self.assertEqual(events, ["start", "stop"])
+        self.assertEqual(events, ["start", "freeze", "stop"])
 
 
 class HotkeyStateOwnershipTests(unittest.TestCase):
@@ -364,18 +382,14 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertEqual(clean, "")
         self.assertFalse(cached)
 
-    def test_stop_streaming_invalidates_generation_before_bounded_join(self):
+    def test_stop_streaming_invalidates_generation_without_waiting_for_workers(self):
         main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
         stop_idx = main.index("def _stop_streaming")
         stop_block = main[stop_idx:main.index("def _final_text_from_cache", stop_idx)]
 
         self.assertIn("self._stream_generation += 1", stop_block)
-        self.assertIn("stream_thread.join(timeout=0.15)", stop_block)
-        self.assertNotIn("stream_thread.join()", stop_block)
-        self.assertLess(
-            stop_block.index("self._stream_generation += 1"),
-            stop_block.index("stream_thread.join(timeout=0.15)"),
-        )
+        self.assertIn("stop_event.set()", stop_block)
+        self.assertNotIn(".join(", stop_block)
 
     def test_normalized_overlap_merge_keeps_punctuation_and_tail(self):
         from main import VoiceInputSystem
@@ -551,7 +565,8 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertIn("raw_text = final_result.text", stop_block)
         self.assertIn("buffer_start_sample=result.start_sample", stop_block)
         self.assertIn("total_samples=total_samples", stop_block)
-        self.assertIn("self.overlay.show_delivery_summary(", stop_block)
+        self.assertIn("self.overlay.show_authoritative_final(", stop_block)
+        self.assertIn("self.overlay.show_delivery_state(", stop_block)
 
     def test_next_final_segment_keeps_recent_tail_unfinalized(self):
         from main import VoiceInputSystem

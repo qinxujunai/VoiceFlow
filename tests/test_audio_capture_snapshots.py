@@ -108,3 +108,37 @@ def test_ten_minutes_of_pcm_stays_within_the_25_mb_recovery_budget():
 
     assert payload_bytes == 19_200_000
     assert payload_bytes <= 25 * 1024 * 1024
+
+
+def test_analysis_worker_is_woken_with_a_sentinel_instead_of_polling_on_stop():
+    source = (ROOT / "src" / "audio_capture.py").read_text(encoding="utf-8")
+    start = source.index("def _start_analysis_worker")
+    stop = source.index("def _stop_analysis_worker", start)
+    enqueue = source.index("def _enqueue_analysis", stop)
+
+    worker = source[start:stop]
+    shutdown = source[stop:enqueue]
+
+    assert "if block is None:" in worker
+    assert "analysis_queue.put_nowait(None)" in shutdown
+    assert "thread.join(timeout=0.05)" in shutdown
+
+
+def test_freeze_recording_atomically_latches_the_final_sample_boundary():
+    from audio_capture import AudioCapture
+
+    capture = object.__new__(AudioCapture)
+    capture._lock = threading.Lock()
+    capture._is_recording = True
+    capture._is_frozen = False
+    capture._buffer_start_sample = 0
+    capture._total_samples = 32000
+    capture._last_buffer_start_sample = 0
+    capture._last_total_samples = 0
+
+    frozen_at = capture.freeze_recording()
+
+    assert frozen_at == 32000
+    assert capture._is_recording is False
+    assert capture._is_frozen is True
+    assert capture.last_total_samples == 32000

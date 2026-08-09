@@ -11,10 +11,10 @@ fixed revision, and SHA-256 have passed the release gate.
 Alternative models remain engineering experiments and are not presented to
 normal users as “more accurate” or “enhanced”.
 
-This is a product decision, not a limitation hidden by the interface. A model
-may enter a future download center only after it improves a named user scenario
-on the same corpus without breaking latency, memory, reliability, licensing, or
-the offline contract.
+This is a product decision, not a limitation hidden by the interface. Candidate
+models stay in the internal evaluation lab even after they improve a named user
+scenario; ordinary settings continue to use one reviewed bundled default until
+a later product decision explicitly changes that contract.
 
 ## Same-machine evidence
 
@@ -111,17 +111,10 @@ Ollama or another local service may be supported later as an optional adapter,
 but it is not a lightweight built-in feature and must never become a hidden
 runtime dependency.
 
-## Download-center contract
+## Model distribution contract
 
-The download center is deferred until at least one alternative model passes the
-admission gate. When implemented, every model must expose:
-
-- user-facing scenario, size, language, expected speed, and hardware class;
-- explicit download action with progress, cancel, retry, and removal;
-- fixed revision, per-file size, SHA-256, and license;
-- `missing`, `downloading`, `verifying`, `ready`, `corrupt`, and `repairing`
-  states;
-- safe fallback to the bundled default.
-
-Shipping an unqualified menu would transfer model research to the user. VoiceFlow
-instead keeps the reliable default visible and the experiments honest.
+VoiceFlow ships one reviewed default and exposes no ordinary model center,
+download action, repair action, or switcher. Pinned downloads, integrity states,
+and rollback tools remain engineering infrastructure for evaluation and release
+preparation. Shipping a menu would transfer model research to the user;
+VoiceFlow keeps experiments internal and the product path singular.

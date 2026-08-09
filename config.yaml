@@ -51,6 +51,9 @@ engine:
 streaming_preview:
   enabled: true
   runtime_engine: "online-transducer"
+  rule1_min_trailing_silence: 1.6
+  rule2_min_trailing_silence: 0.55
+  rule3_min_utterance_length: 18.0
   encoder_path: "models/streaming-preview/encoder-epoch-99-avg-1.int8.onnx"
   decoder_path: "models/streaming-preview/decoder-epoch-99-avg-1.onnx"
   joiner_path: "models/streaming-preview/joiner-epoch-99-avg-1.int8.onnx"

@@ -85,7 +85,7 @@ body {
 }
 
 .pill.processing,
-.pill.finalizing {
+.pill.settling {
     border-color: rgba(100, 167, 255, 0.18);
 }
 
@@ -101,7 +101,7 @@ body {
 }
 
 .pill.success {
-    animation: confirm 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: confirm 160ms cubic-bezier(0.2, 0, 0, 1);
     border-color: rgba(50, 215, 75, 0.22);
 }
 
@@ -146,7 +146,8 @@ body {
 }
 
 .processing .mark span,
-.finalizing .mark span,
+.settling .mark span,
+.final_text .mark span,
 .done .mark span,
 .final_ready .mark span {
     opacity: 0;
@@ -154,7 +155,7 @@ body {
 }
 
 .processing .mark::before,
-.finalizing .mark::before {
+.settling .mark::before {
     content: "";
     position: absolute;
     inset: 2.5px;
@@ -208,17 +209,49 @@ body {
     color: var(--text);
 }
 
+.ticker-authoritative,
+.ticker-draft {
+    display: inline;
+}
+
+.ticker-authoritative {
+    color: var(--text);
+}
+
+.ticker-draft {
+    color: var(--text);
+}
+
 .pill.recovery {
     background: rgba(72, 52, 20, 0.96);
     border-color: rgba(245, 183, 72, 0.34);
     color: #ffd58a;
 }
 
+.recovery .mark span {
+    opacity: 0;
+}
+
+.recovery .mark::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+}
+
+.recovery .ticker-authoritative {
+    color: #ffd58a;
+}
+
 .canceled .ticker { color: var(--muted); }
 
-.processing .ticker,
-.finalizing .ticker {
+.processing .ticker {
     color: var(--text);
+}
+
+.settling .ticker {
+    color: var(--muted);
 }
 
 .error .ticker {
@@ -227,7 +260,7 @@ body {
 
 @keyframes confirm {
     0% { transform: scale(1); }
-    35% { transform: scale(1.028); }
+    45% { transform: scale(1.012); }
     100% { transform: scale(1); }
 }
 
@@ -258,7 +291,9 @@ body {
         <span></span><span></span><span></span>
     </div>
     <div id="ticker" class="ticker">
-        <span id="txt" class="ticker-text"></span>
+        <span id="txt" class="ticker-text">
+            <span id="authoritativeText" class="ticker-authoritative"></span><span id="draftText" class="ticker-draft"></span>
+        </span>
     </div>
 </div>
 
@@ -266,6 +301,8 @@ body {
 const pill = document.getElementById('pill');
 const ticker = document.getElementById('ticker');
 const txt = document.getElementById('txt');
+const authoritativeText = document.getElementById('authoritativeText');
+const draftText = document.getElementById('draftText');
 let nativeBridge = null;
 if (window.qt && window.qt.webChannelTransport && window.QWebChannel) {
     new QWebChannel(window.qt.webChannelTransport, channel => {
@@ -285,12 +322,15 @@ const STREAM_BASE_INTERVAL_MS = 48;
 const STREAM_MIN_INTERVAL_MS = 17;
 const STREAM_TARGET_LAG_MS = 180;
 const STREAM_HARD_LAG_MS = 600;
+const FINAL_REPLACEMENT_DWELL_MS = 140;
 let activeSession = 0;
 const streamingConfirmedQueue = [];
 const streamingVisibleTail = [];
 let streamingAppendTimer = 0;
+let deliveryStateTimer = 0;
 let streamingCharacterCount = 0;
 let streamingTargetWidth = MIN_WIDTH;
+let streamingAuthoritativeCount = 0;
 let previewPaintReportedSession = -1;
 
 function meterScale(level) {
@@ -335,7 +375,8 @@ function measureRenderedTextWidth(text) {
 }
 
 function setWidthForLabel(text) {
-    txt.textContent = text || '';
+    authoritativeText.textContent = text || '';
+    draftText.textContent = '';
     const width = text
         ? clamp(
             STREAM_CHROME_WIDTH
@@ -375,7 +416,14 @@ function renderStreamingTail() {
             - STREAM_TEXT_BREATHING_ROOM
     );
     const tail = fitStreamingTailToWidth(streamingVisibleTail, maxTextWidth);
-    txt.textContent = tail.join('');
+    const tailStart = streamingVisibleTail.length - tail.length;
+    const authoritativeCount = clamp(
+        streamingAuthoritativeCount - tailStart,
+        0,
+        tail.length
+    );
+    authoritativeText.textContent = tail.slice(0, authoritativeCount).join('');
+    draftText.textContent = tail.slice(authoritativeCount).join('');
 }
 
 function growStreamingWidthTo(graphemes) {
@@ -397,9 +445,11 @@ function appendVisibleGraphemes(graphemes) {
     if (!graphemes.length) return;
     streamingVisibleTail.push(...graphemes);
     if (streamingVisibleTail.length > STREAM_VISIBLE_BUFFER_LIMIT) {
-        streamingVisibleTail.splice(
+        const removed = streamingVisibleTail.length - STREAM_VISIBLE_BUFFER_LIMIT;
+        streamingVisibleTail.splice(0, removed);
+        streamingAuthoritativeCount = Math.max(
             0,
-            streamingVisibleTail.length - STREAM_VISIBLE_BUFFER_LIMIT
+            streamingAuthoritativeCount - removed
         );
     }
     streamingCharacterCount += graphemes.length;
@@ -468,11 +518,36 @@ function cancelStreamingQueue() {
     streamingConfirmedQueue.length = 0;
 }
 
+function cancelDeliveryStateTimer() {
+    clearTimeout(deliveryStateTimer);
+    deliveryStateTimer = 0;
+}
+
+function setTranscriptBuffers(authoritativePrefix, draftTail) {
+    const authoritative = splitGraphemes(authoritativePrefix || '');
+    const draft = splitGraphemes(draftTail || '');
+    const combined = authoritative.concat(draft);
+    const removed = Math.max(0, combined.length - STREAM_VISIBLE_BUFFER_LIMIT);
+    streamingVisibleTail.length = 0;
+    streamingVisibleTail.push(...combined.slice(removed));
+    streamingAuthoritativeCount = clamp(
+        authoritative.length - removed,
+        0,
+        streamingVisibleTail.length
+    );
+    streamingCharacterCount = combined.length;
+    streamingTargetWidth = MIN_WIDTH;
+    growStreamingWidthTo(streamingVisibleTail);
+    renderStreamingTail();
+}
+
 function resetTextMotion() {
     cancelStreamingQueue();
+    cancelDeliveryStateTimer();
     streamingVisibleTail.length = 0;
     streamingCharacterCount = 0;
     streamingTargetWidth = MIN_WIDTH;
+    streamingAuthoritativeCount = 0;
     resetAudioLevel();
 }
 
@@ -480,7 +555,9 @@ function resetHidden() {
     var keepNoTransition = pill.classList.contains('no-transition');
     var keepNoWidthTransition = pill.classList.contains('no-width-transition');
     resetTextMotion();
-    txt.textContent = '';
+    authoritativeText.textContent = '';
+    draftText.textContent = '';
+    pill.removeAttribute('aria-label');
     pill.style.setProperty('--target-width', MIN_WIDTH + 'px');
     pill.style.width = '';
     var classes = ['pill', 'idle'];
@@ -533,6 +610,30 @@ function appendStreaming(delta, sessionId) {
     }
 }
 
+function updateTranscriptState(authoritativePrefix, draftTail, sessionId) {
+    if (sessionId !== activeSession) return;
+    cancelStreamingQueue();
+    setTranscriptBuffers(authoritativePrefix, draftTail);
+    pill.className = 'pill streaming';
+    pill.setAttribute('aria-label', '实时文字');
+}
+
+function showAuthoritativeFinal(text, sessionId) {
+    if (sessionId < activeSession) return;
+    if (
+        sessionId === activeSession
+        && (
+            pill.classList.contains('final_ready')
+            || pill.classList.contains('recovery')
+        )
+    ) return;
+    activeSession = sessionId;
+    cancelStreamingQueue();
+    setTranscriptBuffers(text || '', '');
+    pill.className = 'pill final_text';
+    pill.setAttribute('aria-label', '最终文字已确认');
+}
+
 function showProcessing() {
     cancelStreamingQueue();
     activeSession += 1;
@@ -540,40 +641,52 @@ function showProcessing() {
     setWidthForLabel('处理中');
 }
 
-function showFinalizing(sessionId) {
+function showSettling(sessionId) {
     if (sessionId < activeSession) return;
+    if (
+        pill.classList.contains('final_text')
+        || pill.classList.contains('final_ready')
+        || pill.classList.contains('recovery')
+    ) return;
     cancelStreamingQueue();
     activeSession = sessionId;
-    pill.className = 'pill finalizing';
-    setWidthForLabel('整理中');
+    pill.className = 'pill settling';
+    pill.setAttribute('aria-label', '正在完成识别');
 }
 
 function showDone() {
     showState('done', '已完成');
 }
 
-function showFinalSummary(characterCount, sessionId) {
+function showDeliveryState(status, sessionId) {
     if (sessionId < activeSession) return;
     activeSession = sessionId;
-    resetTextMotion();
-    pill.className = 'pill final_ready success';
-    const count = Math.max(0, Number(characterCount) || 0);
-    setWidthForLabel(`已复制 · ${count}字`);
-}
-
-function showDeliverySummary(status, characterCount, sessionId) {
-    if (sessionId < activeSession) return;
-    activeSession = sessionId;
-    resetTextMotion();
-    const count = Math.max(0, Number(characterCount) || 0);
     const labels = {
-        clipboard_verified_paste_dispatched: '已复制并发送粘贴',
-        clipboard_verified_only: '已复制到剪贴板',
-        recovery_saved_clipboard_unavailable: '文字已安全保存'
+        clipboard_verified_paste_dispatched: '已完成',
+        clipboard_verified_only: '已复制',
+        recovery_saved_clipboard_unavailable: '已保存'
     };
-    const success = status !== 'recovery_saved_clipboard_unavailable';
-    pill.className = success ? 'pill final_ready success' : 'pill error';
-    setWidthForLabel(labels[status] || `已复制 · ${count}字`);
+    const accessible = {
+        clipboard_verified_paste_dispatched: '文字已复制，粘贴指令已发送',
+        clipboard_verified_only: '文字已复制到剪贴板',
+        recovery_saved_clipboard_unavailable: '文字已安全保存，剪贴板暂不可用'
+    };
+    const render = () => {
+        if (sessionId !== activeSession) return;
+        resetTextMotion();
+        const saved = status === 'recovery_saved_clipboard_unavailable';
+        pill.className = saved
+            ? 'pill recovery'
+            : 'pill final_ready success';
+        setWidthForLabel(labels[status] ?? '已复制');
+        pill.setAttribute('aria-label', accessible[status] || '文字已复制');
+    };
+    cancelDeliveryStateTimer();
+    if (pill.classList.contains('final_text')) {
+        deliveryStateTimer = setTimeout(render, FINAL_REPLACEMENT_DWELL_MS);
+    } else {
+        render();
+    }
 }
 
 function showResult(msg) {
