@@ -208,6 +208,12 @@ body {
     color: var(--text);
 }
 
+.pill.recovery {
+    background: rgba(72, 52, 20, 0.96);
+    border-color: rgba(245, 183, 72, 0.34);
+    color: #ffd58a;
+}
+
 .canceled .ticker { color: var(--muted); }
 
 .processing .ticker,
@@ -269,13 +275,19 @@ if (window.qt && window.qt.webChannelTransport && window.QWebChannel) {
 
 const MIN_WIDTH = 86;
 const MAX_WIDTH = 312;
-const STREAM_VISIBLE_GRAPHEMES = 20;
+const STREAM_VISIBLE_BUFFER_LIMIT = 64;
+const STREAM_QUEUE_LIMIT = 256;
+const STREAM_CATCH_UP_GRAPHEMES = 20;
 const STREAM_BASE_WIDTH = 96;
-const STREAM_GROWTH_PER_GRAPHEME = 10;
-const STREAM_APPEND_INTERVAL_MS = 48;
+const STREAM_CHROME_WIDTH = 50;
+const STREAM_TEXT_BREATHING_ROOM = 12;
+const STREAM_BASE_INTERVAL_MS = 48;
+const STREAM_MIN_INTERVAL_MS = 17;
+const STREAM_TARGET_LAG_MS = 180;
+const STREAM_HARD_LAG_MS = 600;
 let activeSession = 0;
-let streamingTargetConfirmed = [];
-let displayedStreamingText = [];
+const streamingConfirmedQueue = [];
+const streamingVisibleTail = [];
 let streamingAppendTimer = 0;
 let streamingCharacterCount = 0;
 let streamingTargetWidth = MIN_WIDTH;
@@ -307,27 +319,32 @@ function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
 }
 
-function measureTextWidth(text) {
-    var w = 0;
-    for (var i = 0; i < text.length; i++) {
-        var c = text.charCodeAt(i);
-        if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3400 && c <= 0x4dbf) ||
-            (c >= 0x3000 && c <= 0x303f) || (c >= 0xff00 && c <= 0xffef) ||
-            (c >= 0x2e80 && c <= 0x2eff) || (c >= 0x3300 && c <= 0x33bf) ||
-            (c >= 0xfe30 && c <= 0xfe4f) || (c >= 0xf900 && c <= 0xfaff)) {
-            w += 12;
-        } else if (c <= 0x7f) {
-            w += 6.8;
-        } else {
-            w += 8;
-        }
-    }
-    return w;
+const textMeasureCanvas = document.createElement('canvas');
+const textMeasureContext = textMeasureCanvas.getContext('2d');
+
+function measureRenderedTextWidth(text) {
+    if (!text || !textMeasureContext) return 0;
+    const style = window.getComputedStyle(txt);
+    textMeasureContext.font = [
+        style.fontStyle,
+        style.fontWeight,
+        style.fontSize,
+        style.fontFamily
+    ].join(' ');
+    return textMeasureContext.measureText(text).width;
 }
 
 function setWidthForLabel(text) {
     txt.textContent = text || '';
-    var width = text ? clamp(50 + measureTextWidth(text) + 36, MIN_WIDTH, MAX_WIDTH) : MIN_WIDTH;
+    const width = text
+        ? clamp(
+            STREAM_CHROME_WIDTH
+                + STREAM_TEXT_BREATHING_ROOM
+                + measureRenderedTextWidth(text),
+            MIN_WIDTH,
+            MAX_WIDTH
+        )
+        : MIN_WIDTH;
     pill.style.setProperty('--target-width', width + 'px');
     return width;
 }
@@ -340,40 +357,92 @@ function splitGraphemes(value) {
     return Array.from(value);
 }
 
-function currentStreamingTarget() {
-    return streamingTargetConfirmed;
+function fitStreamingTailToWidth(graphemes, maxTextWidth) {
+    let start = graphemes.length;
+    while (start > 0) {
+        const candidate = graphemes.slice(start - 1).join('');
+        if (measureRenderedTextWidth(candidate) > maxTextWidth) break;
+        start -= 1;
+    }
+    return graphemes.slice(start);
 }
 
 function renderStreamingTail() {
-    const start = Math.max(
+    const maxTextWidth = Math.max(
         0,
-        displayedStreamingText.length - STREAM_VISIBLE_GRAPHEMES
+        streamingTargetWidth
+            - STREAM_CHROME_WIDTH
+            - STREAM_TEXT_BREATHING_ROOM
     );
-    const tail = displayedStreamingText.slice(start);
+    const tail = fitStreamingTailToWidth(streamingVisibleTail, maxTextWidth);
     txt.textContent = tail.join('');
 }
 
-function growStreamingWidthTo(characterCount) {
-    streamingCharacterCount = Math.max(
-        streamingCharacterCount,
-        Math.max(0, Number(characterCount) || 0)
-    );
+function growStreamingWidthTo(graphemes) {
+    const measuredWidth = measureRenderedTextWidth(graphemes.join(''));
     const target = clamp(
-        STREAM_BASE_WIDTH + streamingCharacterCount * STREAM_GROWTH_PER_GRAPHEME,
+        STREAM_CHROME_WIDTH + STREAM_TEXT_BREATHING_ROOM + measuredWidth,
+        STREAM_BASE_WIDTH,
+        MAX_WIDTH
+    );
+    streamingTargetWidth = clamp(
+        Math.max(streamingTargetWidth, target),
         MIN_WIDTH,
         MAX_WIDTH
     );
-    streamingTargetWidth = Math.max(streamingTargetWidth, target);
     pill.style.setProperty('--target-width', streamingTargetWidth + 'px');
+}
+
+function appendVisibleGraphemes(graphemes) {
+    if (!graphemes.length) return;
+    streamingVisibleTail.push(...graphemes);
+    if (streamingVisibleTail.length > STREAM_VISIBLE_BUFFER_LIMIT) {
+        streamingVisibleTail.splice(
+            0,
+            streamingVisibleTail.length - STREAM_VISIBLE_BUFFER_LIMIT
+        );
+    }
+    streamingCharacterCount += graphemes.length;
+    growStreamingWidthTo(streamingVisibleTail);
+    renderStreamingTail();
+}
+
+function coalesceStreamingBacklog(now, forceBounded = false) {
+    if (!streamingConfirmedQueue.length) return;
+    const oldestAge = now - streamingConfirmedQueue[0].enqueuedAt;
+    const mustCatchUp = oldestAge > STREAM_HARD_LAG_MS;
+    const mustBound = streamingConfirmedQueue.length > STREAM_QUEUE_LIMIT;
+    if (!mustCatchUp && !mustBound && !forceBounded) return;
+    const keep = Math.min(STREAM_CATCH_UP_GRAPHEMES, streamingConfirmedQueue.length);
+    const skip = streamingConfirmedQueue.length - keep;
+    if (skip > 0) {
+        const skipped = streamingConfirmedQueue.splice(0, skip);
+        appendVisibleGraphemes(skipped.map(item => item.value));
+    }
+}
+
+function nextStreamingInterval(now) {
+    if (!streamingConfirmedQueue.length) return STREAM_BASE_INTERVAL_MS;
+    const age = Math.max(0, now - streamingConfirmedQueue[0].enqueuedAt);
+    const pressure = clamp(
+        Math.max(age / STREAM_TARGET_LAG_MS, streamingConfirmedQueue.length / 12),
+        0,
+        1
+    );
+    return Math.round(
+        STREAM_BASE_INTERVAL_MS
+        - (STREAM_BASE_INTERVAL_MS - STREAM_MIN_INTERVAL_MS) * pressure
+    );
 }
 
 function drainStreamingQueue() {
     streamingAppendTimer = 0;
-    const target = currentStreamingTarget();
-    if (displayedStreamingText.length >= target.length) return;
-    displayedStreamingText.push(target[displayedStreamingText.length]);
-    renderStreamingTail();
-    growStreamingWidthTo(displayedStreamingText.length);
+    if (!streamingConfirmedQueue.length) return;
+    const now = performance.now();
+    coalesceStreamingBacklog(now);
+    const next = streamingConfirmedQueue.shift();
+    if (!next) return;
+    appendVisibleGraphemes([next.value]);
     const paintedSession = activeSession;
     if (previewPaintReportedSession !== paintedSession) {
         previewPaintReportedSession = paintedSession;
@@ -385,20 +454,23 @@ function drainStreamingQueue() {
             });
         });
     }
-    if (displayedStreamingText.length < currentStreamingTarget().length) {
-        streamingAppendTimer = setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS);
+    if (streamingConfirmedQueue.length) {
+        streamingAppendTimer = setTimeout(
+            drainStreamingQueue,
+            nextStreamingInterval(now)
+        );
     }
 }
 
 function cancelStreamingQueue() {
     clearTimeout(streamingAppendTimer);
     streamingAppendTimer = 0;
-    streamingTargetConfirmed = [];
+    streamingConfirmedQueue.length = 0;
 }
 
 function resetTextMotion() {
     cancelStreamingQueue();
-    displayedStreamingText = [];
+    streamingVisibleTail.length = 0;
     streamingCharacterCount = 0;
     streamingTargetWidth = MIN_WIDTH;
     resetAudioLevel();
@@ -448,11 +520,12 @@ function appendStreaming(delta, sessionId) {
     if (!delta || sessionId !== activeSession) return;
     pill.className = 'pill streaming';
     const nextDelta = splitGraphemes(delta);
-    streamingTargetConfirmed.push(...nextDelta);
+    const enqueuedAt = performance.now();
+    nextDelta.forEach(value => streamingConfirmedQueue.push({value, enqueuedAt}));
+    coalesceStreamingBacklog(enqueuedAt, streamingConfirmedQueue.length > STREAM_QUEUE_LIMIT);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        displayedStreamingText.push(...nextDelta);
-        renderStreamingTail();
-        growStreamingWidthTo(displayedStreamingText.length);
+        const immediate = streamingConfirmedQueue.splice(0).map(item => item.value);
+        appendVisibleGraphemes(immediate);
         return;
     }
     if (!streamingAppendTimer) {
@@ -488,6 +561,21 @@ function showFinalSummary(characterCount, sessionId) {
     setWidthForLabel(`已复制 · ${count}字`);
 }
 
+function showDeliverySummary(status, characterCount, sessionId) {
+    if (sessionId < activeSession) return;
+    activeSession = sessionId;
+    resetTextMotion();
+    const count = Math.max(0, Number(characterCount) || 0);
+    const labels = {
+        clipboard_verified_paste_dispatched: '已复制并发送粘贴',
+        clipboard_verified_only: '已复制到剪贴板',
+        recovery_saved_clipboard_unavailable: '文字已安全保存'
+    };
+    const success = status !== 'recovery_saved_clipboard_unavailable';
+    pill.className = success ? 'pill final_ready success' : 'pill error';
+    setWidthForLabel(labels[status] || `已复制 · ${count}字`);
+}
+
 function showResult(msg) {
     activeSession += 1;
     resetTextMotion();
@@ -499,20 +587,29 @@ function showError(message) {
     showState('error', message || '出错了');
 }
 
+function showRecoveryAvailable(count) {
+    const total = Math.max(1, Number(count) || 1);
+    showState('recovery', `${total} 段录音可恢复`);
+}
+
 function getStreamingDebugState() {
     return {
         activeSession,
         queueLength: Math.max(
             0,
-            currentStreamingTarget().length - displayedStreamingText.length
+            streamingConfirmedQueue.length
         ),
-        visibleText: displayedStreamingText.join(''),
-        confirmedText: streamingTargetConfirmed.join(''),
+        visibleText: streamingVisibleTail.join(''),
+        confirmedText: streamingVisibleTail.join('')
+            + streamingConfirmedQueue.map(item => item.value).join(''),
         provisionalText: '',
         horizontalOffset: 0,
         expanded: streamingCharacterCount > 0,
         characterCount: streamingCharacterCount,
-        targetWidth: streamingTargetWidth
+        targetWidth: streamingTargetWidth,
+        renderedText: txt.textContent,
+        renderedTextWidth: measureRenderedTextWidth(txt.textContent),
+        tickerWidth: ticker.getBoundingClientRect().width
     };
 }
 </script>

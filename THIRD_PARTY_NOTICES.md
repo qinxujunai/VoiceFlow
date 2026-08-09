@@ -17,6 +17,8 @@ also contains third-party components under their own licenses.
 | keyboard | MIT | Suppressed F2 trigger handling |
 | PyAutoGUI | BSD-3-Clause | Paste and keyboard output |
 | pyperclip | BSD-3-Clause | Clipboard output |
+| Python-UIAutomation-for-Windows 2.0.29 | Apache-2.0 | Focused editable-element inspection on Windows |
+| comtypes 1.4.13 | MIT | COM binding used by Windows UI Automation |
 
 PySide6 and Qt remain dynamically linked libraries in the onedir distribution.
 Users may replace compatible LGPL builds. Nothing in the VoiceFlow license
@@ -30,6 +32,7 @@ The packaged application includes these verbatim upstream license texts:
 - `licenses/GPL-3.0-only.txt`
 - `licenses/Chromium-BSD.txt`
 - `licenses/Apache-2.0.txt`
+- `licenses/comtypes-MIT.txt`
 
 These notices and Qt WebEngine's bundled credits resources must remain in every
 redistributed application.
@@ -58,4 +61,6 @@ upstream terms and pinned source information in `model-manifest.json`.
   `docs/streaming-preview-model-review.md`.
 
 This notice is an engineering inventory, not legal advice. Release owners must
-retain upstream copyright and license files in every public build.
+retain upstream copyright and license files in every public build. The
+UIAutomation package is covered by the bundled Apache-2.0 text; the exact
+comtypes copyright and MIT terms are retained separately.

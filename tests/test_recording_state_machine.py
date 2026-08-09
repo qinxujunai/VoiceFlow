@@ -51,3 +51,21 @@ def test_cancel_returns_recording_to_idle_without_completed_cycle():
 
     assert state.current is RecordingState.IDLE
     assert state.completed_cycles == 0
+
+
+def test_flagship_state_machine_exposes_finalizing_delivering_and_recoverable_states():
+    from recording_state import RecordingState, RecordingStateMachine
+
+    state = RecordingStateMachine()
+
+    assert state.claim_start() is True
+    assert state.current is RecordingState.ARMING
+    assert state.mark_recording() is True
+    assert state.claim_stop() is True
+    assert state.current is RecordingState.FINALIZING
+    assert state.mark_delivering() is True
+    assert state.current is RecordingState.DELIVERING
+    assert state.mark_recoverable() is True
+    assert state.current is RecordingState.RECOVERABLE
+    assert state.acknowledge_recovery() is True
+    assert state.current is RecordingState.IDLE

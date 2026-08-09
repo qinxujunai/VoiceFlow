@@ -65,7 +65,10 @@ def test_final_punctuation_accepts_punctuation_only_changes():
 
 def test_output_handler_has_only_the_clipboard_first_delivery_path():
     source = (SRC / "output_handler.py").read_text(encoding="utf-8")
+    delivery = (SRC / "delivery.py").read_text(encoding="utf-8")
 
-    assert "return \"clipboard_copied_paste_sent\"" in source
+    assert "VerifiedClipboard" in source
+    assert "DeliveryCoordinator" in source
+    assert "clipboard_verified_paste_dispatched" in delivery
     assert "def _type(" not in source
     assert "pyautogui.write(" not in source

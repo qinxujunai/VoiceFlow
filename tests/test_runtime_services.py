@@ -53,7 +53,7 @@ def test_model_manager_uses_user_first_install_fallback_asset_resolution(tmp_pat
     assert status.missing == ()
 
 
-def test_frozen_model_choices_hide_unavailable_experimental_engines(tmp_path):
+def test_frozen_model_center_keeps_downloadable_lab_engine_visible(tmp_path):
     from runtime_paths import RuntimeMode
     from runtime_services import ModelManager
 
@@ -75,7 +75,10 @@ def test_frozen_model_choices_hide_unavailable_experimental_engines(tmp_path):
         }
     }
 
-    assert ModelManager(paths).selectable_engines(config) == ("sensevoice",)
+    assert ModelManager(paths).selectable_engines(config) == (
+        "sensevoice",
+        "qwen3-asr",
+    )
 
 
 def test_source_model_choices_keep_experimental_model_lab_engines(tmp_path):

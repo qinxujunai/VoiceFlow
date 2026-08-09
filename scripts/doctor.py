@@ -25,6 +25,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from performance_profile import final_thread_count
+from streaming_transcriber import DEFAULT_PREVIEW_ASSETS, DEFAULT_PREVIEW_ENGINE
 REQUIRED_IMPORTS = (
     "numpy",
     "sherpa_onnx",
@@ -137,13 +138,25 @@ def _check_streaming_preview(root: Path, config: dict[str, Any]) -> list[dict[st
             "status": "warning",
             "detail": "disabled",
         }]
-    runtime_engine = preview.get("runtime_engine", "online-zipformer-ctc")
+    runtime_engine = preview.get("runtime_engine", DEFAULT_PREVIEW_ENGINE)
     if runtime_engine == "online-transducer":
         assets = {
-            "preview_encoder_path": preview.get("encoder_path", ""),
-            "preview_decoder_path": preview.get("decoder_path", ""),
-            "preview_joiner_path": preview.get("joiner_path", ""),
-            "preview_tokens_path": preview.get("tokens_path", ""),
+            "preview_encoder_path": preview.get(
+                "encoder_path",
+                DEFAULT_PREVIEW_ASSETS["encoder_path"],
+            ),
+            "preview_decoder_path": preview.get(
+                "decoder_path",
+                DEFAULT_PREVIEW_ASSETS["decoder_path"],
+            ),
+            "preview_joiner_path": preview.get(
+                "joiner_path",
+                DEFAULT_PREVIEW_ASSETS["joiner_path"],
+            ),
+            "preview_tokens_path": preview.get(
+                "tokens_path",
+                DEFAULT_PREVIEW_ASSETS["tokens_path"],
+            ),
         }
     elif runtime_engine == "online-paraformer":
         assets = {

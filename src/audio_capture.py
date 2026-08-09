@@ -51,6 +51,8 @@ class AudioCapture:
         self._analysis_stop = None
         self._analysis_thread = None
         self._callback_status_count = 0
+        self._recovery_sink = None
+        self._recovery_drop_count = 0
 
         # VAD 状态
         self._last_speech_time = None
@@ -73,6 +75,7 @@ class AudioCapture:
             self._recording_start_time = time.time()
             self._last_speech_time = time.time()
             self._callback_status_count = 0
+            self._recovery_drop_count = 0
 
         self._start_analysis_worker()
 
@@ -87,6 +90,9 @@ class AudioCapture:
                     self._audio_buffer.append(block)
                     self._total_samples += len(block)
                     self._audio_buffer_ends.append(self._total_samples)
+                recovery_sink = self._recovery_sink
+                if recovery_sink is not None and not recovery_sink.append_pcm(block):
+                    self._recovery_drop_count += 1
                 self._enqueue_analysis(block)
 
         try:
@@ -161,6 +167,10 @@ class AudioCapture:
     def set_level_callback(self, callback):
         """Receive three real RMS samples for the compact recording meter."""
         self._on_level_callback = callback
+
+    def set_recovery_sink(self, sink):
+        """Attach a queue-backed recovery journal; the callback never writes disk."""
+        self._recovery_sink = sink
 
     def _start_analysis_worker(self):
         analysis_queue = queue.Queue(maxsize=1)
@@ -261,6 +271,10 @@ class AudioCapture:
     @property
     def callback_status_count(self):
         return self._callback_status_count
+
+    @property
+    def recovery_drop_count(self):
+        return self._recovery_drop_count
 
     def snapshot_audio(self, start_sample=0, end_sample=None):
         """Copy only the requested mono PCM range from the growing recording."""

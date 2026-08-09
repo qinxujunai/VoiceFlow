@@ -126,6 +126,53 @@ def test_runtime_migration_is_non_destructive_idempotent_and_does_not_copy_model
     assert state["install_dir"] == str(install_dir.resolve())
 
 
+def test_v3_migration_changes_the_legacy_sensevoice_default_to_auto_once(tmp_path):
+    from runtime_paths import DATA_SCHEMA_VERSION, AppPaths, RuntimeMode, prepare_runtime_layout
+
+    install_dir = tmp_path / "install"
+    data_dir = tmp_path / "data"
+    install_dir.mkdir()
+    data_dir.mkdir()
+    (install_dir / "config.yaml").write_text(
+        'engine:\n  active: "sensevoice"\n  sensevoice:\n    language: "auto"\n',
+        encoding="utf-8",
+    )
+    (data_dir / "config.yaml").write_text(
+        '# user settings\nengine:\n  active: "sensevoice"\n  sensevoice:\n'
+        '    language: "zh"              # legacy default\n',
+        encoding="utf-8",
+    )
+    (data_dir / "runtime-state.json").write_text(
+        json.dumps({"schema_version": 2}),
+        encoding="utf-8",
+    )
+    paths = AppPaths(
+        mode=RuntimeMode.FROZEN,
+        install_dir=install_dir,
+        data_dir=data_dir,
+        executable=install_dir / "VoiceFlow.exe",
+    )
+
+    report = prepare_runtime_layout(paths)
+
+    assert DATA_SCHEMA_VERSION == 3
+    assert 'language: "auto"              # legacy default' in paths.config_file.read_text(
+        encoding="utf-8"
+    )
+    assert "config.yaml: sensevoice language auto" in report.sanitized
+
+    paths.config_file.write_text(
+        paths.config_file.read_text(encoding="utf-8").replace(
+            'language: "auto"', 'language: "zh"'
+        ),
+        encoding="utf-8",
+    )
+    second = prepare_runtime_layout(paths)
+
+    assert 'language: "zh"' in paths.config_file.read_text(encoding="utf-8")
+    assert "config.yaml: sensevoice language auto" not in second.sanitized
+
+
 def test_explicit_config_keeps_test_and_maintainer_workflows_isolated(tmp_path):
     from runtime_paths import AppPaths
 

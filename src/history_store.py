@@ -39,6 +39,11 @@ class HistoryStore:
         preview_divergence_count=None,
         preview_update_count=None,
         preview_max_chunk_chars=None,
+        session_id=None,
+        clipboard_verified=None,
+        paste_dispatched=None,
+        recovery_saved=None,
+        safe_text_reasons=None,
     ):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
@@ -100,6 +105,16 @@ class HistoryStore:
             entry["preview_update_count"] = int(preview_update_count)
         if preview_max_chunk_chars is not None:
             entry["preview_max_chunk_chars"] = int(preview_max_chunk_chars)
+        if session_id is not None:
+            entry["session_id"] = str(session_id)
+        if clipboard_verified is not None:
+            entry["clipboard_verified"] = bool(clipboard_verified)
+        if paste_dispatched is not None:
+            entry["paste_dispatched"] = bool(paste_dispatched)
+        if recovery_saved is not None:
+            entry["recovery_saved"] = bool(recovery_saved)
+        if safe_text_reasons is not None:
+            entry["safe_text_reasons"] = list(safe_text_reasons)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry
@@ -111,3 +126,15 @@ class HistoryStore:
         if not lines:
             return None
         return json.loads(lines[-1])
+
+    def has_session_id(self, session_id):
+        expected = str(session_id)
+        if not self.path.exists():
+            return False
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            try:
+                if str(json.loads(line).get("session_id", "")) == expected:
+                    return True
+            except (json.JSONDecodeError, AttributeError):
+                continue
+        return False
