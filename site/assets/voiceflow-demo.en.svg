@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+  <title id="title">VoiceFlow product demo</title>
+  <desc id="desc">A single VoiceFlow capsule expands with live English text, completes with a green check, and returns the final sentence to the cursor.</desc>
+  <defs>
+    <filter id="pillShadow" x="-30%" y="-140%" width="160%" height="380%">
+      <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#000000" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <style>
+      .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
+      #capsule { animation: capsuleState 6.8s ease-in-out infinite; }
+      #demo-pill { animation: pillState 6.8s ease-in-out infinite; }
+      #wave { animation: waveState 6.8s ease-in-out infinite; }
+      #check { animation: checkState 6.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      #liveText { animation: liveTextState 6.8s ease-in-out infinite; }
+      #finalText { animation: finalTextState 6.8s ease-in-out infinite; }
+      #outputText, #outputCaret { animation: outputState 6.8s ease-in-out infinite; }
+      .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
+      .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
+      #outputCaret { animation-name: outputState, caretBlink; animation-duration: 6.8s, 900ms; animation-timing-function: ease-in-out, steps(1); animation-iteration-count: infinite, infinite; }
+      @keyframes capsuleState {
+        0%, 12%, 96%, 100% { transform: translate(552px, 168px); opacity: 1; }
+        22%, 64% { transform: translate(410px, 168px); opacity: 1; }
+        72%, 88% { transform: translate(515px, 168px); opacity: 1; }
+        92% { transform: translate(552px, 168px); opacity: 0; }
+      }
+      @keyframes pillState {
+        0%, 12%, 96%, 100% { width: 96px; }
+        22%, 64% { width: 380px; }
+        72%, 88% { width: 170px; }
+      }
+      @keyframes waveState { 0%, 64% { opacity: 1; } 70%, 100% { opacity: 0; } }
+      @keyframes checkState { 0%, 66%, 100% { opacity: 0; } 72%, 88% { opacity: 1; } }
+      @keyframes liveTextState { 0%, 18%, 68%, 100% { opacity: 0; } 25%, 64% { opacity: 1; } }
+      @keyframes finalTextState { 0%, 67%, 100% { opacity: 0; } 73%, 88% { opacity: 1; } }
+      @keyframes outputState {
+        0%, 68%, 100% { opacity: 0; transform: translateY(5px); }
+        75%, 88% { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes caretBlink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
+      @keyframes barA { 0%, 100% { transform: scaleY(0.55); opacity: 0.55; } 50% { transform: scaleY(1.22); opacity: 1; } }
+      @keyframes barB { 0%, 100% { transform: scaleY(0.60); opacity: 0.50; } 55% { transform: scaleY(1.15); opacity: 1; } }
+      @keyframes barC { 0%, 100% { transform: scaleY(0.50); opacity: 0.60; } 45% { transform: scaleY(1.28); opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        #capsule { animation: none; transform: translate(515px, 168px); }
+        #demo-pill { animation: none; width: 170px; }
+        #wave, #liveText { opacity: 0; }
+        #check, #finalText, #outputText, #outputCaret { opacity: 1; }
+        #wave, #check, #liveText, #finalText, #outputText, #outputCaret,
+        .bar-a, .bar-b, .bar-c { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1198" height="438" rx="48" fill="#f5f5f7"/>
+
+  <g class="ui">
+    <rect x="545" y="72" width="42" height="28" rx="8" fill="#ffffff"/>
+    <rect x="545.5" y="72.5" width="41" height="27" rx="7.5" fill="none" stroke="#d2d2d7"/>
+    <text x="566" y="91" text-anchor="middle" font-size="12" font-weight="650" fill="#1d1d1f">F2</text>
+    <text x="600" y="123" text-anchor="middle" font-size="15" font-weight="500" fill="#6e6e73">Press once to start, again to finish</text>
+  </g>
+
+  <g id="capsule" transform="translate(552 168)" filter="url(#pillShadow)">
+    <rect id="demo-pill" x="0" y="0" width="96" height="52" rx="26" fill="#1c1c1e"/>
+    <g id="wave" transform="translate(22 16)">
+      <rect class="bar-a" x="0" y="5.5" width="2.4" height="9" rx="1.2" fill="#ff453a"/>
+      <rect class="bar-b" x="7" y="2.5" width="2.4" height="15" rx="1.2" fill="#ff453a"/>
+      <rect class="bar-c" x="14" y="5" width="2.4" height="10" rx="1.2" fill="#ff453a"/>
+    </g>
+    <g id="check" transform="translate(22 16)" opacity="0">
+      <path d="M1.5 10 L6.5 15 L16.5 4.5" fill="none" stroke="#30d158" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text id="liveText" class="ui" x="66" y="33" font-size="18" font-weight="500" fill="#f5f5f7" opacity="0">Send the plan by ten.</text>
+    <text id="finalText" class="ui" x="58" y="33" font-size="16" font-weight="520" fill="#f5f5f7" opacity="0">Copied · 21</text>
+  </g>
+
+  <g class="ui" fill="#1d1d1f">
+    <text id="outputText" x="600" y="304" text-anchor="middle" font-size="30" font-weight="620" letter-spacing="-0.6" opacity="0">Send the plan by ten.</text>
+    <rect id="outputCaret" x="754" y="278" width="2.5" height="32" rx="1.25" fill="#0071e3" opacity="0"/>
+  </g>
+</svg>
