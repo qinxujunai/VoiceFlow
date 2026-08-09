@@ -1,0 +1,224 @@
+name: macOS Release
+
+env:
+  PYTHONUTF8: "1"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Signed release tag, for example v0.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-notarized-dmg:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon
+            runner: macos-15
+            suffix: Apple-Silicon
+          - name: Intel
+            runner: macos-15-intel
+            suffix: Intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify tag, version, and existing Windows release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          case "$RELEASE_TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Invalid release tag: $RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          git verify-tag "$RELEASE_TAG"
+          version="${RELEASE_TAG#v}"
+          grep -Fq "\"CFBundleShortVersionString\": \"$version\"" VoiceFlow.macOS.spec
+          windows_asset="VoiceFlow-$version-Windows-x64.exe"
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name' | grep -Fxq "$windows_asset"
+          echo "VOICEFLOW_VERSION=$version" >> "$GITHUB_ENV"
+          echo "ARTIFACT_BASENAME=VoiceFlow-$version-macOS-${{ matrix.suffix }}" >> "$GITHUB_ENV"
+      - name: Require Apple release credentials
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64 }}
+          APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in \
+            APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64 \
+            APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD \
+            APPLE_ID \
+            APPLE_APP_SPECIFIC_PASSWORD \
+            APPLE_TEAM_ID
+          do
+            test -n "$(printenv "$name")" || {
+              echo "Missing required secret: $name" >&2
+              exit 1
+            }
+          done
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements-macos.lock
+      - name: Restore runtime model cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            models/sensevoice
+            models/streaming-preview
+          key: voiceflow-macos-${{ runner.arch }}-${{ hashFiles('model-manifest.json') }}
+      - name: Download and verify pinned runtime models
+        run: |
+          python scripts/download_models.py --engine sensevoice
+          python scripts/download_models.py --engine streaming-preview
+      - name: Test release contracts
+        run: |
+          python -m pytest tests -q
+          python scripts/stability_gate.py --cycles 500
+      - name: Import Developer ID Application certificate
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64 }}
+          APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/voiceflow-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          certificate="$RUNNER_TEMP/voiceflow-developer-id.p12"
+          printf '%s' "$APPLE_DEVELOPER_ID_APPLICATION_CERT_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" \
+            -k "$keychain" \
+            -P "$APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain"
+          security list-keychains -d user -s "$keychain"
+          identity="$(security find-identity -v -p codesigning "$keychain" | awk -F '"' '/Developer ID Application/ {print $2; exit}')"
+          test -n "$identity" || {
+            echo "Developer ID Application identity was not found" >&2
+            exit 1
+          }
+          rm -f "$certificate"
+          echo "VOICEFLOW_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "VOICEFLOW_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+      - name: Generate platform icons and build signed application
+        run: |
+          python scripts/generate_icon.py
+          python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
+      - name: Smoke signed application bundle
+        env:
+          QT_QPA_PLATFORM: offscreen
+          VOICEFLOW_DATA_DIR: ${{ runner.temp }}/voiceflow-data
+        run: dist/VoiceFlow.app/Contents/MacOS/VoiceFlow --runtime-smoke
+      - name: Sign and notarize application bundle
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/VoiceFlow.app
+          ditto -c -k --keepParent dist/VoiceFlow.app "$RUNNER_TEMP/VoiceFlow-notary.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/VoiceFlow-notary.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple dist/VoiceFlow.app
+          xcrun stapler validate dist/VoiceFlow.app
+          spctl --assess --type execute --verbose=4 dist/VoiceFlow.app
+      - name: Build, sign, and notarize disk image
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          mkdir -p dist/dmg
+          ditto dist/VoiceFlow.app dist/dmg/VoiceFlow.app
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create \
+            -volname VoiceFlow \
+            -srcfolder dist/dmg \
+            -ov \
+            -format UDZO \
+            "dist/$ARTIFACT_BASENAME.dmg"
+          codesign --force \
+            --timestamp \
+            --sign "$VOICEFLOW_SIGNING_IDENTITY" \
+            "dist/$ARTIFACT_BASENAME.dmg"
+          xcrun notarytool submit "dist/$ARTIFACT_BASENAME.dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "dist/$ARTIFACT_BASENAME.dmg"
+          xcrun stapler validate "dist/$ARTIFACT_BASENAME.dmg"
+          codesign --verify --strict --verbose=2 "dist/$ARTIFACT_BASENAME.dmg"
+          hdiutil verify "dist/$ARTIFACT_BASENAME.dmg"
+          shasum -a 256 "dist/$ARTIFACT_BASENAME.dmg"
+      - name: Remove temporary signing keychain
+        if: always()
+        run: |
+          if test -n "${VOICEFLOW_KEYCHAIN:-}" && test -f "$VOICEFLOW_KEYCHAIN"; then
+            security delete-keychain "$VOICEFLOW_KEYCHAIN"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ env.ARTIFACT_BASENAME }}
+          path: dist/${{ env.ARTIFACT_BASENAME }}.dmg
+          if-no-files-found: error
+
+  publish:
+    name: Publish macOS assets
+    needs: build-notarized-dmg
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: VoiceFlow-*-macOS-*
+          path: dist
+          merge-multiple: true
+      - name: Append both native disk images to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          apple_silicon="dist/VoiceFlow-$version-macOS-Apple-Silicon.dmg"
+          intel="dist/VoiceFlow-$version-macOS-Intel.dmg"
+          test -f "$apple_silicon"
+          test -f "$intel"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$RELEASE_TAG" \
+            "$apple_silicon" \
+            "$intel" \
+            --repo "$GITHUB_REPOSITORY"
