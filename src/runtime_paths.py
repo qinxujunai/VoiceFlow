@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import re
 import shutil
 import sys
 from collections.abc import Mapping
@@ -15,7 +16,7 @@ from pathlib import Path
 from platform_utils import default_data_dir
 
 
-DATA_SCHEMA_VERSION = 2
+DATA_SCHEMA_VERSION = 3
 
 LEGACY_VOCABULARY_FILES = (
     "ai-terms.txt",
@@ -179,6 +180,18 @@ class AppPaths:
         return self.data_dir / "models"
 
     @property
+    def recovery_dir(self) -> Path:
+        return self.data_dir / "recovery"
+
+    @property
+    def delivery_dir(self) -> Path:
+        return self.data_dir / "delivery-pending"
+
+    @property
+    def model_switch_dir(self) -> Path:
+        return self.data_dir / "model-switch"
+
+    @property
     def schema_file(self) -> Path:
         return self.data_dir / "runtime-state.json"
 
@@ -331,6 +344,43 @@ def _remove_legacy_config_entries(path: Path) -> bool:
     return True
 
 
+def _stored_schema_version(path: Path) -> int:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return int(payload.get("schema_version", 0))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return 0
+
+
+def _migrate_v3_sensevoice_language(path: Path, previous_schema: int) -> bool:
+    """Move the old implicit Chinese-first default to automatic bilingual mode.
+
+    The migration runs only from the released v2 schema. Once v3 has been
+    recorded, a user who deliberately selects Chinese-first keeps that choice.
+    """
+    if previous_schema != 2 or not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8")
+    section = re.search(r"(?m)^  sensevoice:\s*$", text)
+    if section is None:
+        return False
+    following = re.search(r"(?m)^  \S[^:]*:\s*$", text[section.end():])
+    end = section.end() + following.start() if following else len(text)
+    block = text[section.end():end]
+    updated, count = re.subn(
+        r'(?m)^(    language:\s*)["\']?zh["\']?(?P<comment>\s*(?:#.*)?)$',
+        lambda match: f'{match.group(1)}"auto"{match.group("comment")}',
+        block,
+        count=1,
+    )
+    if count != 1:
+        return False
+    temporary = path.with_name(f".{path.name}.language-v3.tmp")
+    temporary.write_text(text[:section.end()] + updated + text[end:], encoding="utf-8")
+    os.replace(temporary, path)
+    return True
+
+
 def prepare_runtime_layout(
     paths: AppPaths,
     *,
@@ -345,10 +395,13 @@ def prepare_runtime_layout(
     """
 
     legacy = Path(legacy_root).resolve() if legacy_root else paths.install_dir
+    previous_schema = _stored_schema_version(paths.schema_file)
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.logs_dir.mkdir(parents=True, exist_ok=True)
     paths.knowledge_dir.mkdir(parents=True, exist_ok=True)
     paths.models_dir.mkdir(parents=True, exist_ok=True)
+    paths.recovery_dir.mkdir(parents=True, exist_ok=True)
+    paths.delivery_dir.mkdir(parents=True, exist_ok=True)
     copied: list[str] = []
     sanitized: list[str] = []
     removed_legacy: list[str] = []
@@ -385,6 +438,8 @@ def prepare_runtime_layout(
     removed_legacy.extend(legacy_removed)
     if _remove_legacy_config_entries(paths.config_file):
         sanitized.append("config.yaml")
+    if _migrate_v3_sensevoice_language(paths.config_file, previous_schema):
+        sanitized.append("config.yaml: sensevoice language auto")
 
     for filename in ("history.jsonl", "history.txt"):
         source = legacy / "logs" / filename

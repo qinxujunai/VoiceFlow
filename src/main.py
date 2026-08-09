@@ -10,6 +10,7 @@ import time
 import argparse
 import logging
 import threading
+import uuid
 import yaml
 import numpy as np
 from dataclasses import dataclass
@@ -36,6 +37,9 @@ from runtime_paths import AppPaths, prepare_runtime_layout
 from streaming_transcriber import OnlinePreviewTranscriber
 from punctuation import FinalPunctuationRestorer
 from platform_utils import open_path
+from recovery_session import RecoverySessionStore
+from safe_text import SafeTextBoundary
+from model_switch import ModelSwitchCoordinator
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -80,6 +84,7 @@ class VoiceInputSystem:
     FINAL_SEGMENT_HOLD_SECONDS = 2.0
     SEGMENTED_FINAL_MIN_SECONDS = 45.0
     FINALIZING_VISIBLE_AFTER_SECONDS = 20.0
+    FINALIZING_DELAY_SECONDS = 0.18
     FINAL_TEXT_HOLD_SHORT_MS = 700
     FINAL_TEXT_HOLD_LONG_MS = 1400
 
@@ -118,6 +123,17 @@ class VoiceInputSystem:
         self._finalized_audio_len = 0
         self._final_cache_lock = threading.Lock()
         self._transcribe_lock = threading.Lock()
+        recovery_config = self.config.get("recovery", {})
+        self._recovery_enabled = bool(recovery_config.get("enabled", True))
+        self._recovery_store = RecoverySessionStore(
+            self.paths.recovery_dir,
+            retention_hours=float(recovery_config.get("retention_hours", 24)),
+        )
+        self._recovery_store.purge_expired()
+        self._recovery_journal = None
+        self._active_session_id = None
+        self._target_snapshot = None
+        self._safe_text = SafeTextBoundary()
         vad_config = self.config.get("vad", {})
         self._speech_gate_enabled = bool(vad_config.get("enabled", True))
         self._speech_rms_threshold = float(vad_config.get("asr_energy_floor", 0.002))
@@ -148,12 +164,37 @@ class VoiceInputSystem:
 
         print("[启动] ASR...", flush=True)
         self.overlay.show_processing()
+        engine = self.config.get("engine", {}).get("active", "sensevoice")
+        switch = ModelSwitchCoordinator(
+            self.paths.model_switch_dir,
+            self.paths.config_file,
+        )
+        pending_switch = switch.pending()
         self.transcriber = Transcriber(
             self.config_path,
             asset_roots=self.paths.asset_roots,
         )
-        engine = self.config.get("engine", {}).get("active", "sensevoice")
-        self.transcriber.load_engine(engine)
+        try:
+            self.transcriber.load_engine(engine)
+        except Exception as candidate_error:
+            if not pending_switch or pending_switch.get("candidate_engine") != engine:
+                raise
+            previous = switch.rollback(str(candidate_error))
+            logger.exception(
+                "candidate model failed startup validation; rolling back to %s",
+                previous,
+            )
+            with open(self.config_path, "r", encoding="utf-8") as stream:
+                self.config = yaml.safe_load(stream) or {}
+            engine = self.config.get("engine", {}).get("active", previous or "sensevoice")
+            self.transcriber = Transcriber(
+                self.config_path,
+                asset_roots=self.paths.asset_roots,
+            )
+            self.transcriber.load_engine(engine)
+        else:
+            if pending_switch and pending_switch.get("candidate_engine") == engine:
+                switch.commit(engine)
         print(f"[启动] {engine}", flush=True)
 
         try:
@@ -173,6 +214,22 @@ class VoiceInputSystem:
         self.output_handler = OutputHandler(
             self.config_path, base_dir=self.base_dir, overlay=self.overlay
         )
+        for pending in self.output_handler.recover_pending():
+            session_id = pending["session_id"]
+            if not self.history.has_session_id(session_id):
+                self.history.append(
+                    raw_text=pending["text"],
+                    clean_text=pending["text"],
+                    corrected_text=pending["text"],
+                    output_status="clipboard_verified_only",
+                    model=engine,
+                    final_source="pending_delivery_recovery",
+                    session_id=session_id,
+                    clipboard_verified=True,
+                    paste_dispatched=False,
+                    recovery_saved=False,
+                )
+            self.output_handler.acknowledge_delivery(session_id)
         self.overlay.set_actions(
             on_record_toggle=self._on_record_toggle,
             on_copy_last=self._copy_last_text,
@@ -182,6 +239,8 @@ class VoiceInputSystem:
             on_quit=self.shutdown,
             on_recording_painted=self._on_recording_painted,
             on_preview_painted=self._on_preview_painted,
+            on_recover_session=self._recover_session,
+            on_delete_recovery=self._recovery_store.delete,
         )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
@@ -227,9 +286,23 @@ class VoiceInputSystem:
         try:
             self._stream_generation += 1
             generation = self._stream_generation
+            self._active_session_id = uuid.uuid4().hex
+            self._target_snapshot = self.output_handler.capture_target()
+            if self._recovery_enabled:
+                self._recovery_journal = self._recovery_store.start_session(
+                    session_id=self._active_session_id,
+                    sample_rate=self.audio.sample_rate,
+                    channels=getattr(self.audio, "channels", 1),
+                    dtype=getattr(self.audio, "dtype", "int16"),
+                    model=self._active_engine_name(),
+                )
+                self.audio.set_recovery_sink(self._recovery_journal)
             self._last_trigger_to_feedback_ms = None
             self.overlay.show_recording(generation, triggered_at)
             self.session.start()
+            self._recording_state.mark_recording()
+            if self._recovery_journal is not None:
+                self._recovery_journal.mark_state("recording")
             self._latest_text = ""
             self._preview_started_at = time.perf_counter()
             self._preview_first_text_ms = None
@@ -248,6 +321,10 @@ class VoiceInputSystem:
             self._start_streaming(generation)
             print("[录音] 开始", flush=True)
         except Exception as e:
+            self.audio.set_recovery_sink(None)
+            if self._recovery_journal is not None:
+                self._recovery_journal.close_interrupted()
+                self._recovery_journal = None
             self._recording_state.abort_start()
             self.overlay.show_error(str(e))
             logger.exception("recording start failed")
@@ -255,6 +332,8 @@ class VoiceInputSystem:
 
     def _on_record_stop(self, triggered_at=None):
         stop_started = triggered_at if triggered_at is not None else time.perf_counter()
+        finalizing_done = threading.Event()
+        finalizing_timer = None
         if not self._recording_state.claim_stop():
             return
 
@@ -263,18 +342,35 @@ class VoiceInputSystem:
             try:
                 result = self.session.stop()
             finally:
+                self.audio.set_recovery_sink(None)
                 audio_frozen_ms = (time.perf_counter() - freeze_started) * 1000
                 final_generation = self._stop_streaming()
             data = result.audio_data
             if len(data) == 0:
+                if self._recovery_journal is not None:
+                    self._recovery_journal.close_without_recovery()
+                    self._recovery_journal = None
                 self.overlay.show_error("无音频")
                 self.overlay.hide_after(2000)
                 return
 
             total_samples = result.total_samples or len(data)
             duration = result.duration or (total_samples / self.audio.sample_rate)
-            if self._should_show_finalizing(duration):
-                self.overlay.show_finalizing(final_generation)
+            finalizing_timer = threading.Timer(
+                self.FINALIZING_DELAY_SECONDS,
+                lambda: (
+                    self.overlay.show_finalizing(final_generation)
+                    if not finalizing_done.is_set()
+                    else None
+                ),
+            )
+            finalizing_timer.daemon = True
+            finalizing_timer.start()
+            if self._recovery_journal is not None:
+                self._recovery_journal.mark_state(
+                    "finalizing",
+                    preview_text=self._latest_text,
+                )
 
             transcription_started = time.perf_counter()
             final_result = self._transcribe_final_result(
@@ -283,7 +379,8 @@ class VoiceInputSystem:
                 total_samples=total_samples,
             )
             raw_text = final_result.text
-            text = self.cleaner.clean(raw_text) if raw_text else ""
+            safe_result = self._safe_text.sanitize(raw_text)
+            text = self.cleaner.clean(safe_result.text) if safe_result.text else ""
             text = self.punctuation.restore(text)
             if text and not has_lexical_content(text):
                 text = ""
@@ -291,9 +388,11 @@ class VoiceInputSystem:
 
             # Safety: if final transcription empty but streaming had text, use streaming text
             if not text and self._latest_text:
-                preview_text = self.cleaner.clean(self._latest_text)
+                preview_safe = self._safe_text.sanitize(self._latest_text)
+                preview_text = self.cleaner.clean(preview_safe.text)
                 text = preview_text if has_lexical_content(preview_text) else ""
                 if text:
+                    safe_result = preview_safe
                     final_result = FinalTranscriptionResult(
                         text=text,
                         captured_samples=total_samples,
@@ -304,10 +403,14 @@ class VoiceInputSystem:
 
             if text:
                 print(f"[转写] {text} ({duration:.1f}s)", flush=True)
-                if final_result.coverage_ok:
-                    output_status = self.output_handler.output(text)
-                else:
-                    output_status = self.output_handler.copy_only(text)
+                self._recording_state.mark_delivering()
+                delivery = self.output_handler.deliver(
+                    text,
+                    start_target=self._target_snapshot,
+                    session_id=self._active_session_id or uuid.uuid4().hex,
+                    allow_paste=final_result.coverage_ok,
+                )
+                output_status = delivery.output_status
                 stop_to_paste_ms = (time.perf_counter() - stop_started) * 1000
                 segment_count = len(self._snapshot_final_cache()[0])
                 self.history.append(
@@ -336,25 +439,72 @@ class VoiceInputSystem:
                     preview_divergence_count=self._preview_divergence_count,
                     preview_update_count=self._preview_update_count,
                     preview_max_chunk_chars=self._preview_max_chunk_chars,
+                    session_id=self._active_session_id,
+                    clipboard_verified=delivery.clipboard_verified,
+                    paste_dispatched=delivery.paste_dispatched,
+                    recovery_saved=delivery.recovery_saved,
+                    safe_text_reasons=safe_result.reasons,
                 )
+                self.output_handler.acknowledge_delivery(self._active_session_id)
                 self.overlay.complete_onboarding()
-                if final_result.coverage_ok:
-                    self.overlay.show_final_summary(len(text), final_generation)
+                delivered_completely = (
+                    final_result.coverage_ok
+                    and delivery.clipboard_verified
+                    and not delivery.recovery_saved
+                )
+                if delivered_completely and self._recovery_journal is not None:
+                    self._recovery_journal.mark_delivered(delivery.text_sha256)
+                    self._recovery_journal = None
+                elif self._recovery_journal is not None:
+                    self._recovery_journal.close_interrupted()
+                    self._recovery_journal = None
+                if delivery.clipboard_verified:
+                    finalizing_done.set()
+                    self.overlay.show_delivery_summary(
+                        output_status,
+                        len(text),
+                        final_generation,
+                    )
                     self.overlay.hide_after(self._final_text_hold_ms(duration))
                 else:
-                    self.overlay.show_error("完整识别失败，预览文字已保留")
+                    finalizing_done.set()
+                    self.overlay.show_error("文字已安全保存，剪贴板暂不可用")
                     self.overlay.hide_after(2400)
+                if delivered_completely:
+                    self._recording_state.mark_complete()
+                else:
+                    self._recording_state.mark_recoverable()
+                    self._recording_state.acknowledge_recovery()
             else:
+                finalizing_done.set()
+                if self._recovery_journal is not None:
+                    self._recovery_journal.close_interrupted()
+                    self._recovery_journal = None
+                self._recording_state.mark_recoverable()
+                self._recording_state.acknowledge_recovery()
                 self.overlay.hide_after(0)
 
         except Exception as e:
+            finalizing_done.set()
+            self.audio.set_recovery_sink(None)
+            if self._recovery_journal is not None:
+                self._recovery_journal.close_interrupted()
+                self._recovery_journal = None
+            self._recording_state.mark_error()
+            self._recording_state.mark_recoverable()
+            self._recording_state.acknowledge_recovery()
             self.overlay.show_error(str(e))
             self.history.append(output_status="error", error=str(e))
             logger.exception("recording finalization failed")
             import traceback
             traceback.print_exc()
         finally:
+            finalizing_done.set()
+            if finalizing_timer is not None:
+                finalizing_timer.cancel()
             self._recording_state.complete_processing()
+            self._active_session_id = None
+            self._target_snapshot = None
 
     def _audio_sample_count(self):
         sample_count = getattr(self.audio, "sample_count", None)
@@ -818,6 +968,12 @@ class VoiceInputSystem:
         if should_cancel:
             self._stop_streaming()
             self.session.cancel()
+            self.audio.set_recovery_sink(None)
+            if self._recovery_journal is not None:
+                self._recovery_journal.close_without_recovery()
+                self._recovery_journal = None
+            self._active_session_id = None
+            self._target_snapshot = None
             self.overlay.show_canceled()
             self.overlay.hide_after(800)
         print("[录音] 已取消", flush=True)
@@ -839,6 +995,45 @@ class VoiceInputSystem:
     def _output_text(self, text):
         if text and hasattr(self, "output_handler"):
             self.output_handler.output(text)
+
+    def _recover_session(self, session_id):
+        if self._recording_state.current is not RecordingState.IDLE:
+            return {"ok": False, "error": "请先结束当前听写"}
+        audio = self._recovery_store.read_pcm(session_id)
+        if not len(audio):
+            return {"ok": False, "error": "恢复录音不存在或为空"}
+        raw_text = self._transcribe_audio(audio, activity_checked=False)
+        safe = self._safe_text.sanitize(raw_text or "")
+        if safe.rejected or not safe.text:
+            return {"ok": False, "error": "没有得到可信文字，录音已继续保留"}
+        text = self.cleaner.clean(safe.text)
+        delivery = self.output_handler.deliver(
+            text,
+            start_target=None,
+            session_id=f"recovered-{session_id}",
+            allow_paste=False,
+        )
+        if not delivery.clipboard_verified:
+            return {"ok": False, "error": "剪贴板暂时不可用，录音已继续保留"}
+        self.history.append(
+            raw_text=raw_text,
+            clean_text=text,
+            corrected_text=text,
+            output_status=delivery.output_status,
+            model=self._active_engine_name(),
+            captured_samples=len(audio),
+            covered_samples=len(audio),
+            coverage_ok=True,
+            final_source="recovered_pcm",
+            session_id=session_id,
+            clipboard_verified=True,
+            paste_dispatched=False,
+            recovery_saved=False,
+            safe_text_reasons=safe.reasons,
+        )
+        self.output_handler.acknowledge_delivery(f"recovered-{session_id}")
+        self._recovery_store.delete(session_id)
+        return {"ok": True, "text": text, "output_status": delivery.output_status}
 
     def _open_dictionary(self):
         open_path(self.paths.knowledge_dir)
@@ -883,7 +1078,11 @@ class VoiceInputSystem:
         def on_done():
             try:
                 self._start_hotkeys()
-                self.overlay.show_idle()
+                recoverable = self._recovery_store.list_recoverable()
+                if recoverable:
+                    self.overlay.show_recovery_available(len(recoverable))
+                else:
+                    self.overlay.show_idle()
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)

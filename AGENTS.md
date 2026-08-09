@@ -54,6 +54,10 @@ src/
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
+- Dispatch paste only when Windows UI Automation confirms the same editable
+  focus element at start and stop and UIPI integrity is compatible.
+- Recovery PCM is temporary local state. Delete it only after verified
+  clipboard delivery plus history, or after an explicit user delete action.
 - Final output must cover the complete stopped audio; streaming preview is only preview.
 - Streaming preview feeds each new PCM sample once to its own online recognizer.
 - Never restore rolling-window preview through the final SenseVoice recognizer:
@@ -143,6 +147,8 @@ Use `wrong=correct` only in correction files.
   such as `日常听写` or `多语言`, and show size, readiness, privacy, and expected speed.
 - Keep one reliable bundled default. Optional models are explicit downloads with visible size,
   progress, cancel, integrity verification, failure recovery, and removal.
+- Model switching is staged. The next startup must load the candidate or atomically
+  restore the complete previous configuration and default model.
 - Never call a model `更准确`, `高准确` or `最佳` without same-machine, same-corpus evidence.
 - Synthetic speech is useful for reproducible regression but cannot replace authorized,
   natural user speech in release accuracy claims.

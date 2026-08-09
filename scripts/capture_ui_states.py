@@ -73,16 +73,19 @@ def _capture_settings(
     window.refresh()
     window.show()
     captures = []
-    names = (
-        "home",
-        "history",
-        "dictation",
-        "dictionary",
-        "diagnostics",
-        "about",
+    primary_pages = (
+        (0, "home"),
+        (1, "dictation"),
+        (2, "dictionary"),
+        (3, "history"),
     )
-    for index, name in enumerate(names):
-        window.sidebar.setCurrentRow(index)
+    for row, name in primary_pages:
+        window.sidebar.setCurrentRow(row)
+        for _ in range(5):
+            app.processEvents()
+        captures.append(_save_widget(window, output_dir / f"settings-{name}.png"))
+    for index, name in ((4, "diagnostics"), (5, "about")):
+        window._show_aux_page(index)
         if name == "diagnostics":
             window._finish_doctor(run_runtime_diagnostics(window.paths))
         for _ in range(5):

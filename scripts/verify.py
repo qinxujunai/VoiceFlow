@@ -69,6 +69,11 @@ def main() -> int:
         action="store_true",
         help="Also enforce recorded P95 performance evidence for a public build.",
     )
+    parser.add_argument(
+        "--flagship",
+        action="store_true",
+        help="Add one-hour recovery, fault injection, Unicode fuzz, motion, and DPI gates.",
+    )
     args = parser.parse_args()
 
     commands = [
@@ -87,8 +92,12 @@ def main() -> int:
             ],
         ),
     ]
-    if args.release:
+    if args.release or args.flagship:
         commands.append(("ui-quality", [sys.executable, "scripts/ui_quality_gate.py"]))
+    if args.release or args.flagship:
+        commands.append(("overlay-motion", [sys.executable, "scripts/measure_overlay_motion.py"]))
+        commands.append(("flagship-stress", [sys.executable, "scripts/stress_flagship.py"]))
+    if args.release:
         commands.append(("performance", [sys.executable, "scripts/performance_gate.py"]))
     if not args.quick:
         commands.append(("integration", [sys.executable, "test_integration.py"]))

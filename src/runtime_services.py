@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -12,6 +13,9 @@ from typing import Any
 
 import yaml
 
+from model_catalog import profile_for_engine, user_model_profiles
+from model_registry import load_model_manifest, verify_model_assets
+from model_downloader import DownloadCancelled, PinnedModelDownloader
 from runtime_paths import AppPaths, RuntimeMode
 
 
@@ -36,6 +40,11 @@ ENGINE_ASSET_KEYS = {
 class ModelState(Enum):
     READY = "ready"
     MISSING = "missing"
+    CORRUPT = "corrupt"
+    DOWNLOADING = "downloading"
+    VERIFYING = "verifying"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass(frozen=True)
@@ -49,7 +58,13 @@ class ModelManager:
     def __init__(self, paths: AppPaths):
         self.paths = paths
 
-    def status(self, engine: str, config: dict[str, Any]) -> ModelStatus:
+    def status(
+        self,
+        engine: str,
+        config: dict[str, Any],
+        *,
+        verify: bool = False,
+    ) -> ModelStatus:
         engine_config = config.get("engine", {}).get(engine, {})
         missing: list[str] = []
         for key in ENGINE_ASSET_KEYS.get(engine, ()):
@@ -58,27 +73,30 @@ class ModelManager:
             if not raw_path or resolved is None or not resolved.exists():
                 missing.append(key)
         state = ModelState.READY if engine_config and not missing else ModelState.MISSING
+        if state is ModelState.READY and verify:
+            try:
+                profile = profile_for_engine(engine)
+                manifest = load_model_manifest(self.paths.manifest_file)
+                model = manifest["models"][profile.model_id]
+                model_dir = self.paths.data_dir / profile.target_dir
+                if not model_dir.exists():
+                    model_dir = self.paths.install_dir / profile.target_dir
+                errors = verify_model_assets(model_dir, model)
+                if errors:
+                    state = ModelState.CORRUPT
+                    missing.extend(errors)
+            except (KeyError, OSError, ValueError) as error:
+                state = ModelState.CORRUPT
+                missing.append(str(error))
         return ModelStatus(engine=engine, state=state, missing=tuple(missing))
 
     def selectable_engines(self, config: dict[str, Any]) -> tuple[str, ...]:
-        engine_config = config.get("engine", {})
-        configured = tuple(
-            name
-            for name, value in engine_config.items()
-            if name != "active" and isinstance(value, dict)
+        configured = config.get("engine", {})
+        return tuple(
+            profile.engine
+            for profile in user_model_profiles()
+            if isinstance(configured.get(profile.engine), dict)
         )
-        if self.paths.mode is RuntimeMode.SOURCE:
-            return configured
-
-        ready = tuple(
-            name
-            for name in configured
-            if self.status(name, config).state is ModelState.READY
-        )
-        if ready:
-            return ready
-        active = str(engine_config.get("active", "sensevoice"))
-        return (active,) if active in configured else ()
 
     def setup_command(self, engine: str) -> tuple[str, ...] | None:
         if self.paths.mode is RuntimeMode.FROZEN:
@@ -117,6 +135,84 @@ class ModelManager:
             creationflags=creationflags,
         )
         return "模型管理已打开"
+
+    def start_download(self, engine: str, on_update) -> "ModelDownloadTask":
+        task = ModelDownloadTask(self, engine, on_update)
+        task.start()
+        return task
+
+
+def downloaded_model_bytes(base_dir: str | Path, target_dir: str) -> int:
+    base = Path(base_dir)
+    target = base / target_dir
+    partial = target.with_name(f"{target.name}.partial")
+    archive = partial.with_suffix(".tar.bz2")
+    total = archive.stat().st_size if archive.is_file() else 0
+    if partial.is_dir():
+        total += sum(
+            path.stat().st_size
+            for path in partial.rglob("*")
+            if path.is_file()
+        )
+    return total
+
+
+class ModelDownloadTask:
+    """Background pinned download with bounded progress and cancellation."""
+
+    def __init__(self, manager: ModelManager, engine: str, on_update):
+        self.manager = manager
+        self.engine = str(engine)
+        self.on_update = on_update
+        self._cancelled = threading.Event()
+        self._process = None
+        self._thread = None
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def cancel(self):
+        self._cancelled.set()
+        process = self._process
+        if process is not None and process.poll() is None:
+            process.terminate()
+
+    def _emit(self, state: ModelState, progress: int, detail: str):
+        self.on_update(
+            {
+                "engine": self.engine,
+                "state": state.value,
+                "progress": max(0, min(100, int(progress))),
+                "detail": str(detail),
+            }
+        )
+
+    def _run(self):
+        try:
+            self._emit(ModelState.DOWNLOADING, 0, "正在下载固定版本")
+            downloader = PinnedModelDownloader(
+                self.manager.paths,
+                cancelled=self._cancelled,
+                on_progress=lambda progress, detail: self._emit(
+                    ModelState.VERIFYING if progress >= 94 else ModelState.DOWNLOADING,
+                    progress,
+                    detail,
+                ),
+            )
+            downloader.download(self.engine)
+            config = yaml.safe_load(
+                self.manager.paths.config_file.read_text(encoding="utf-8")
+            ) or {}
+            status = self.manager.status(self.engine, config, verify=True)
+            if status.state is not ModelState.READY:
+                self._emit(ModelState.FAILED, 0, "完整性校验未通过")
+                return
+            self._emit(ModelState.READY, 100, "下载并校验完成")
+        except DownloadCancelled:
+            self._emit(ModelState.CANCELLED, 0, "下载已取消，可稍后继续")
+        except Exception as error:
+            self._emit(ModelState.FAILED, 0, f"模型下载失败：{error}")
 
 
 def _check(name: str, ok: bool, detail: str) -> dict[str, str]:

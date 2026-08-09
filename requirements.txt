@@ -16,6 +16,10 @@ pynput==1.8.2
 pyautogui==0.9.54
 pyperclip==1.11.0
 
+# Windows UI Automation（确认真实焦点与可编辑能力；失败时只复制不粘贴）
+uiautomation==2.0.29
+comtypes==1.4.13
+
 # 配置文件
 pyyaml==6.0.3
 

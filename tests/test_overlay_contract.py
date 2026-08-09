@@ -8,22 +8,37 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 
-def test_streaming_delta_queue_is_monotonic_and_uses_a_fixed_cadence():
+def test_streaming_delta_queue_is_monotonic_and_uses_an_adaptive_cadence():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     append_start = html.index("function appendStreaming(delta, sessionId)")
     append_block = html[append_start:html.index("function showProcessing()", append_start)]
     drain_start = html.index("function drainStreamingQueue()")
     drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
 
-    assert "const STREAM_APPEND_INTERVAL_MS = 48;" in html
-    assert "streamingTargetConfirmed.push(...nextDelta);" in append_block
-    assert "splice(" not in append_block
-    assert "cancelStreamingQueue();" not in append_block
-    assert "drainStreamingQueue();" in append_block
-    assert "displayedStreamingText.push(" in drain_block
-    assert "setTimeout(drainStreamingQueue, STREAM_APPEND_INTERVAL_MS)" in drain_block
-    assert "Math.ceil(" not in append_block
-    assert "Math.max(0, 250 - queueDelayMs)" not in append_block
+    assert "const STREAM_BASE_INTERVAL_MS = 48;" in html
+    assert "const STREAM_MIN_INTERVAL_MS = 17;" in html
+    assert "streamingConfirmedQueue.push({value, enqueuedAt})" in append_block
+    assert "streamingConfirmedQueue.shift()" in drain_block
+
+
+def test_streaming_queue_is_bounded_and_catches_up_without_unbounded_transcript_arrays():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "STREAM_HARD_LAG_MS = 600" in html
+    assert "STREAM_VISIBLE_BUFFER_LIMIT" in html
+    assert "coalesceStreamingBacklog" in html
+    assert "streamingTargetConfirmed = [];" not in html
+    assert "displayedStreamingText = [];" not in html
+
+
+def test_final_summary_uses_truthful_delivery_copy():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert "function showDeliverySummary(" in html
+    assert "已复制到剪贴板" in html
+    assert "已复制并发送粘贴" in html
+    assert "def show_delivery_summary(" in overlay
 
 
 def test_streaming_renders_only_confirmed_append_only_text():
@@ -55,24 +70,28 @@ def test_streaming_pill_grows_monotonically_with_each_visible_character():
     append_block = html[append_start:html.index("function showProcessing()", append_start)]
     drain_start = html.index("function drainStreamingQueue()")
     drain_block = html[drain_start:html.index("function cancelStreamingQueue()", drain_start)]
+    visible_start = html.index("function appendVisibleGraphemes(")
+    visible_block = html[visible_start:drain_start]
 
-    assert "const STREAM_GROWTH_PER_GRAPHEME = 10;" in html
-    assert "function growStreamingWidthTo(characterCount)" in html
+    assert "function measureRenderedTextWidth(text)" in html
+    assert "textMeasureContext.measureText(text).width" in html
+    assert "function growStreamingWidthTo(graphemes)" in html
     assert "Math.max(streamingTargetWidth, target)" in html
-    assert "growStreamingWidthTo(displayedStreamingText.length);" in drain_block
-    assert "growStreamingWidthTo(displayedStreamingText.length);" in append_block
+    assert "growStreamingWidthTo(streamingVisibleTail);" in visible_block
+    assert "appendVisibleGraphemes([next.value]);" in drain_block
     assert "if (!streamingExpanded)" not in append_block
     assert "measureTextWidth(provisionalText)" not in append_block
 
 
 def test_streaming_tail_is_cropped_without_horizontal_translation():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    render_start = html.index("function renderStreamingTail()")
+    render_start = html.index("function fitStreamingTailToWidth(")
     render_block = html[render_start:html.index("function drainStreamingQueue()", render_start)]
 
-    assert "const STREAM_VISIBLE_GRAPHEMES = 20;" in html
-    assert "displayedStreamingText.length - STREAM_VISIBLE_GRAPHEMES" in render_block
-    assert "displayedStreamingText.slice(start)" in render_block
+    assert "function fitStreamingTailToWidth(graphemes, maxTextWidth)" in render_block
+    assert "measureRenderedTextWidth(candidate) > maxTextWidth" in render_block
+    assert "fitStreamingTailToWidth(streamingVisibleTail, maxTextWidth)" in render_block
+    assert "STREAM_VISIBLE_GRAPHEMES" not in html
     assert "translateX" not in html
     assert "--ticker-offset" not in html
     assert "horizontalOffset: 0" in html
@@ -100,8 +119,7 @@ def test_reduced_motion_appends_the_confirmed_delta_immediately():
     append_block = html[append_start:html.index("function showProcessing()", append_start)]
 
     assert "prefers-reduced-motion: reduce" in append_block
-    assert "displayedStreamingText.push(...nextDelta);" in append_block
-    assert "renderStreamingTail();" in append_block
+    assert "appendVisibleGraphemes(immediate);" in append_block
 
 
 def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
@@ -189,10 +207,7 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert (
-        'for label in ("首页", "历史", "听写", "词典", "诊断", "关于")'
-        in overlay
-    )
+    assert 'for label in ("状态", "听写", "词典", "历史")' in overlay
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
     assert 'self.model_combo.setAccessibleName("识别模型")' in overlay
@@ -205,7 +220,8 @@ def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
 def test_history_does_not_expose_internal_output_status_codes():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert '"clipboard_copied_paste_sent": "已复制并发送粘贴"' in overlay
+    assert '"clipboard_verified_paste_dispatched": "已复制并发送粘贴"' in overlay
+    assert '"clipboard_verified_only": "已复制到剪贴板"' in overlay
     assert 'status = self._output_status_label' in overlay
 
 
@@ -352,7 +368,8 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "QStackedWidget" in overlay
     assert "self.sidebar = QListWidget()" in settings_block
     assert "self.stack = QStackedWidget()" in settings_block
-    assert "self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)" in settings_block
+    assert "self.sidebar.currentRowChanged.connect(self._show_primary_page)" in settings_block
+    assert "page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}" in settings_block
     assert "QTabWidget" not in overlay
     assert "QLabel#sectionTitle" in settings_block
 
@@ -368,11 +385,20 @@ def test_settings_status_page_exposes_language_and_model_setup_action():
     assert "self.model_combo = QComboBox()" in settings_block
     assert "def _save_settings(self):" in settings_block
     assert '"验证完整性"' in settings_block
-    assert '"模型实验"' in settings_block
-    assert "self.model_manager.selectable_engines(config)" in settings_block
-    assert "download.clicked.connect(self._open_model_setup)" in settings_block
+    assert '"实验室"' in (ROOT / "src" / "model_catalog.py").read_text(encoding="utf-8")
+    assert "for profile in user_model_profiles()" in settings_block
+    assert "self.model_download_button.clicked.connect(self._open_model_setup)" in settings_block
+    assert "self.model_cancel_button.clicked.connect(self._cancel_model_download)" in settings_block
+    assert "self.model_progress = QProgressBar()" in settings_block
     assert "def _open_model_setup(self):" in settings_block
-    assert "self.model_manager.open_setup" in settings_block
+    assert "self.model_manager.start_download" in settings_block
+
+
+def test_sensevoice_language_copy_recommends_automatic_bilingual_detection():
+    source = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert '("自动中英（推荐）", "auto")' in source
+    assert '("自动检测（实验）", "auto")' not in source
 
 
 def test_settings_merges_static_hotkey_help_into_dictation():
@@ -432,6 +458,71 @@ def test_overlay_enforces_single_instance_and_focuses_existing_window():
     assert "self._show_settings()" in overlay[overlay.index("def _handle_instance_message"):overlay.index("def _setup_tray")]
 
 
+def test_existing_instance_connection_opens_settings_without_waiting_for_payload():
+    from overlay_webview import OverlayWindow
+
+    class FakeSocket:
+        def __init__(self):
+            self.reads = 0
+            self.disconnects = 0
+            self.writes = []
+            self.flushes = 0
+
+        def readAll(self):
+            self.reads += 1
+
+        def disconnectFromServer(self):
+            self.disconnects += 1
+
+        def write(self, payload):
+            self.writes.append(payload)
+
+        def flush(self):
+            self.flushes += 1
+
+    class FakeServer:
+        def __init__(self, socket):
+            self.socket = socket
+            self.pending = True
+
+        def hasPendingConnections(self):
+            return self.pending
+
+        def nextPendingConnection(self):
+            self.pending = False
+            return self.socket
+
+    socket = FakeSocket()
+    overlay = object.__new__(OverlayWindow)
+    overlay._single_instance_server = FakeServer(socket)
+    shown = []
+    overlay._show_settings = lambda: shown.append(True)
+
+    overlay._on_instance_message()
+
+    assert shown == [True]
+    assert socket.reads == 1
+    assert socket.writes == [b"shown\n"]
+    assert socket.flushes == 1
+    assert socket.disconnects == 1
+
+
+def test_existing_instance_file_fallback_opens_settings_once(tmp_path):
+    from overlay_webview import OverlayWindow
+
+    overlay = object.__new__(OverlayWindow)
+    overlay._instance_request_path = tmp_path / "show-settings.request"
+    shown = []
+    overlay._show_settings = lambda: shown.append(True)
+
+    overlay._write_instance_request()
+    overlay._consume_instance_request()
+    overlay._consume_instance_request()
+
+    assert shown == [True]
+    assert not overlay._instance_request_path.exists()
+
+
 def test_hide_path_hides_window_before_resetting_dom():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     hide_idx = overlay.index("def _hide_and_idle")
@@ -468,9 +559,9 @@ def test_stop_flow_outputs_before_final_summary_feedback():
 
     assert "final_generation = self._stop_streaming()" in stop_block
     assert "self.overlay.show_finalizing(final_generation)" in stop_block
-    assert "self.overlay.show_final_summary(len(text), final_generation)" in stop_block
-    assert "self.output_handler.copy_only(text)" in stop_block
-    assert stop_block.index("output_status = self.output_handler.output(text)") < stop_block.index("self.overlay.show_final_summary(len(text), final_generation)")
+    assert "delivery = self.output_handler.deliver(" in stop_block
+    assert "self.overlay.show_delivery_summary(" in stop_block
+    assert stop_block.index("delivery = self.output_handler.deliver(") < stop_block.index("self.overlay.show_delivery_summary(")
     assert "self.overlay.show_done()" not in stop_block
     assert "self.overlay.show_result(text)" not in stop_block
 

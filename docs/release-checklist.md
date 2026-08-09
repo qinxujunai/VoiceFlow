@@ -38,7 +38,7 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 ```bat
 venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
 "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
-venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.2.2-Windows-x64.exe --output-dir release\v0.2.2 --version 0.2.2
+venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-0.3.0-Windows-x64.exe --output-dir release\v0.3.0 --version 0.3.0
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
@@ -64,7 +64,7 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
 - The tag-driven Release workflow publishes the installer, checksums, SBOM,
   notices, and GitHub build-provenance attestation from the same commit.
 
-## Current 0.2.2 blockers
+## Current 0.3.0 blockers
 
 Do not create a public tag while any item remains open:
 

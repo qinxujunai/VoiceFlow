@@ -13,7 +13,7 @@ engine:
   sensevoice:
     model_path: "models/sensevoice/model.int8.onnx"
     tokens_path: "models/sensevoice/tokens.txt"
-    language: "zh"              # 主要语言: zh / en / auto
+    language: "auto"            # 推荐自动中英；也可在设置中固定 zh / en / yue
     use_itn: true               # 逆文本正则化（数字、日期等标准化）
     provider: "cpu"             # sherpa-onnx provider；默认 CPU 最稳
     num_threads: "auto"         # 按物理核心自动选择，给音频和界面留出余量
@@ -109,8 +109,8 @@ output:
   # 完整文本先进入剪贴板，再发送 Ctrl+V；不模拟中文逐字键入。
   mode: "clipboard"
 
-  # 是否在输出后自动加空格
-  auto_space: true
+  # 不在用户原话后追加隐藏字符；完整终稿逐字符进入剪贴板。
+  auto_space: false
 
   # 是否在输出后自动加句号（Toggle 模式下）
   auto_period: false
@@ -121,6 +121,11 @@ output:
     to_clipboard: true
     # 同时写入本地历史文件（防止剪贴板被覆盖）
     to_history: true
+
+# 本地崩溃恢复：只保留尚未成功交付的临时 PCM。
+recovery:
+  enabled: true
+  retention_hours: 24
 
 # ============================================================
 # 热词知识库配置

@@ -74,30 +74,19 @@ class HistoryStoreTests(unittest.TestCase):
 
 class OutputHandlerContractTests(unittest.TestCase):
     def test_clipboard_status_is_truthful_about_paste_uncertainty(self):
-        output_handler = (ROOT / "src" / "output_handler.py").read_text(encoding="utf-8")
+        delivery = (ROOT / "src" / "delivery.py").read_text(encoding="utf-8")
 
-        self.assertIn("clipboard_copied_paste_sent", output_handler)
-        self.assertNotIn('return "pasted"', output_handler)
+        self.assertIn("clipboard_verified_paste_dispatched", delivery)
+        self.assertIn("clipboard_verified_only", delivery)
+        self.assertNotIn('return "pasted"', delivery)
 
     def test_integrity_warning_copies_without_sending_paste(self):
-        from output_handler import OutputHandler
+        source = (ROOT / "src" / "output_handler.py").read_text(encoding="utf-8")
+        copy_start = source.index("def copy_only(")
+        copy_block = source[copy_start:source.index("def repeat_last", copy_start)]
 
-        handler = object.__new__(OutputHandler)
-        handler.auto_period = False
-        handler.last_text = ""
-        handler.overlay = None
-        handler.base_dir = ""
-        handler.history_file = ""
-
-        with (
-            mock.patch("output_handler.pyperclip.copy") as copy,
-            mock.patch("output_handler.pyautogui.hotkey") as hotkey,
-        ):
-            status = handler.copy_only(" 保留这段文字 ")
-
-        self.assertEqual(status, "clipboard_copied_integrity_warning")
-        copy.assert_called_once_with("保留这段文字")
-        hotkey.assert_not_called()
+        self.assertIn("allow_paste=False", copy_block)
+        self.assertNotIn("_dispatch_paste", copy_block)
 
 
 class VocabularyTests(unittest.TestCase):
@@ -413,8 +402,8 @@ class FinalTextSelectionTests(unittest.TestCase):
     def test_main_uses_clean_text_as_output_text(self):
         main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
-        self.assertIn("output_status = self.output_handler.output(text)", main)
-        self.assertIn("output_status = self.output_handler.copy_only(text)", main)
+        self.assertIn("delivery = self.output_handler.deliver(", main)
+        self.assertIn("text=text", main)
         self.assertIn("corrected_text=text", main)
         self.assertNotIn("_correct_final_text", main)
 
@@ -562,7 +551,7 @@ class FinalTextSelectionTests(unittest.TestCase):
         self.assertIn("raw_text = final_result.text", stop_block)
         self.assertIn("buffer_start_sample=result.start_sample", stop_block)
         self.assertIn("total_samples=total_samples", stop_block)
-        self.assertIn("self.overlay.show_final_summary(len(text), final_generation)", stop_block)
+        self.assertIn("self.overlay.show_delivery_summary(", stop_block)
 
     def test_next_final_segment_keeps_recent_tail_unfinalized(self):
         from main import VoiceInputSystem

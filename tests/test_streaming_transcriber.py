@@ -274,13 +274,15 @@ def test_existing_user_config_without_preview_section_uses_packaged_defaults(
 
     model_dir = tmp_path / "models" / "streaming-preview"
     model_dir.mkdir(parents=True)
-    (model_dir / "model.int8.onnx").write_bytes(b"model")
+    (model_dir / "encoder-epoch-99-avg-1.int8.onnx").write_bytes(b"encoder")
+    (model_dir / "decoder-epoch-99-avg-1.onnx").write_bytes(b"decoder")
+    (model_dir / "joiner-epoch-99-avg-1.int8.onnx").write_bytes(b"joiner")
     (model_dir / "tokens.txt").write_text("tokens", encoding="utf-8")
     calls = []
 
     class FakeOnlineRecognizer:
         @staticmethod
-        def from_zipformer2_ctc(**kwargs):
+        def from_transducer(**kwargs):
             calls.append(kwargs)
             return FakeRecognizer([""])
 
@@ -297,7 +299,15 @@ def test_existing_user_config_without_preview_section_uses_packaged_defaults(
     )
 
     assert transcriber.sample_rate == 16000
-    assert calls[0]["model"] == str(model_dir / "model.int8.onnx")
+    assert calls[0]["encoder"] == str(
+        model_dir / "encoder-epoch-99-avg-1.int8.onnx"
+    )
+    assert calls[0]["decoder"] == str(
+        model_dir / "decoder-epoch-99-avg-1.onnx"
+    )
+    assert calls[0]["joiner"] == str(
+        model_dir / "joiner-epoch-99-avg-1.int8.onnx"
+    )
     assert calls[0]["tokens"] == str(model_dir / "tokens.txt")
     assert calls[0]["num_threads"] >= 1
     assert calls[0]["enable_endpoint_detection"] is True

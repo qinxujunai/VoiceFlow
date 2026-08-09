@@ -115,8 +115,8 @@ app = BUNDLE(
     bundle_identifier="ai.voiceflow.app",
     info_plist={
         "CFBundleDisplayName": "VoiceFlow",
-        "CFBundleShortVersionString": "0.2.2",
-        "CFBundleVersion": "0.2.2",
+        "CFBundleShortVersionString": "0.3.0",
+        "CFBundleVersion": "0.3.0",
         "LSMinimumSystemVersion": "13.0",
         "LSUIElement": True,
         "NSHighResolutionCapable": True,

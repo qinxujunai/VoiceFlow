@@ -8,13 +8,14 @@ import json
 import time
 import threading
 from datetime import datetime
+from pathlib import Path
 
 from qt_compat import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QSystemTrayIcon, QMenu, QLabel, QPushButton,
     QPlainTextEdit, QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
-    QCheckBox, QComboBox,
+    QCheckBox, QComboBox, QProgressBar, QMessageBox,
     QWebChannel, QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket,
 )
@@ -50,6 +51,10 @@ from platform_utils import (
     trigger_instruction,
     trigger_summary,
 )
+from model_catalog import profile_for_engine, user_model_profiles
+from model_switch import ModelSwitchCoordinator
+from recovery_session import RecoverySessionStore
+from delivery import VerifiedClipboard
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
@@ -101,8 +106,17 @@ class _PreviewPaintReporter(QObject):
 
 class _SettingsWindow(QMainWindow):
     doctor_finished = Signal(object)
+    model_download_updated = Signal(object)
+    model_switch_finished = Signal(object)
+    recovery_finished = Signal(object)
 
-    def __init__(self, on_repaste_text=None, paths=None):
+    def __init__(
+        self,
+        on_repaste_text=None,
+        on_recover_session=None,
+        on_delete_recovery=None,
+        paths=None,
+    ):
         super().__init__()
         if paths is None:
             project_root = os.path.dirname(os.path.dirname(__file__))
@@ -113,9 +127,14 @@ class _SettingsWindow(QMainWindow):
         self.root = str(self.paths.data_dir)
         self.model_manager = ModelManager(self.paths)
         self._on_repaste_text = on_repaste_text
+        self._on_recover_session = on_recover_session
+        self._on_delete_recovery = on_delete_recovery
+        self.recovery_store = RecoverySessionStore(self.paths.recovery_dir)
         self._history_rows = []
         self._last_diagnostics = None
         self._microphone_detected = False
+        self._download_task = None
+        self._switch_in_progress = False
         self.setWindowTitle("VoiceFlow")
         self.setMinimumSize(1000, 680)
 
@@ -159,7 +178,7 @@ class _SettingsWindow(QMainWindow):
 
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
-        for label in ("首页", "历史", "听写", "词典", "诊断", "关于"):
+        for label in ("状态", "听写", "词典", "历史"):
             self.sidebar.addItem(QListWidgetItem(label))
         self.sidebar.setCurrentRow(0)
         self.sidebar.setAccessibleName("设置导航")
@@ -169,7 +188,16 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setObjectName("statusBadge")
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
-        build_label = QLabel(f"0.2.2 · {platform_label()}")
+        help_menu = QMenu(self)
+        diagnostics_action = help_menu.addAction("运行诊断")
+        diagnostics_action.triggered.connect(lambda: self._show_aux_page(4))
+        about_action = help_menu.addAction("帮助与关于")
+        about_action.triggered.connect(lambda: self._show_aux_page(5))
+        self.help_button = QPushButton("帮助与关于")
+        self.help_button.setMenu(help_menu)
+        self.help_button.setAccessibleName("帮助、诊断与关于")
+        sidebar_layout.addWidget(self.help_button)
+        build_label = QLabel(f"0.3.0 · {platform_label()}")
         build_label.setObjectName("sidebarVersion")
         sidebar_layout.addWidget(build_label)
         sidebar_panel.setFixedWidth(184)
@@ -182,7 +210,7 @@ class _SettingsWindow(QMainWindow):
         self.stack.addWidget(self._dictionary_page())
         self.stack.addWidget(self._diagnostics_page())
         self.stack.addWidget(self._about_page())
-        self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.sidebar.currentRowChanged.connect(self._show_primary_page)
 
         body.addWidget(sidebar_panel)
         body.addWidget(self.stack, 1)
@@ -191,6 +219,20 @@ class _SettingsWindow(QMainWindow):
         if not self._high_contrast_enabled():
             self.setStyleSheet(self._style())
         self.doctor_finished.connect(self._finish_doctor)
+        self.model_download_updated.connect(self._finish_model_download_update)
+        self.model_switch_finished.connect(self._finish_model_switch)
+        self.recovery_finished.connect(self._finish_recovery)
+
+    def _show_primary_page(self, row):
+        page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}
+        if row in page_by_row:
+            self.stack.setCurrentIndex(page_by_row[row])
+
+    def _show_aux_page(self, index):
+        self.sidebar.clearSelection()
+        self.stack.setCurrentIndex(index)
+        if index == 4:
+            self._run_doctor()
 
     def _section_header(self, title, subtitle):
         block = QVBoxLayout()
@@ -231,7 +273,7 @@ class _SettingsWindow(QMainWindow):
         self.trial_button.setAccessibleName("开始一次试说")
         self.trial_button.clicked.connect(self._start_trial)
         history = QPushButton("查看历史")
-        history.clicked.connect(lambda: self.sidebar.setCurrentRow(1))
+        history.clicked.connect(lambda: self.sidebar.setCurrentRow(3))
         hero_actions.addWidget(self.trial_button)
         hero_actions.addWidget(history)
         hero_actions.addStretch(1)
@@ -284,7 +326,7 @@ class _SettingsWindow(QMainWindow):
         recent_title.setObjectName("subsectionTitle")
         view_all = QPushButton("查看全部")
         view_all.setObjectName("textButton")
-        view_all.clicked.connect(lambda: self.sidebar.setCurrentRow(1))
+        view_all.clicked.connect(lambda: self.sidebar.setCurrentRow(3))
         recent_header.addWidget(recent_title)
         recent_header.addStretch(1)
         recent_header.addWidget(view_all)
@@ -304,6 +346,36 @@ class _SettingsWindow(QMainWindow):
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
         layout.addLayout(self._section_header("最近转录", "查看、复制或重新送达最近结果"))
+
+        self.recovery_panel = QWidget()
+        self.recovery_panel.setObjectName("recoveryPanel")
+        recovery_layout = QVBoxLayout(self.recovery_panel)
+        recovery_layout.setContentsMargins(14, 12, 14, 12)
+        recovery_layout.setSpacing(8)
+        self.recovery_summary = QLabel("")
+        self.recovery_summary.setObjectName("recoveryTitle")
+        self.recovery_detail = QLabel("录音只保留 24 小时。恢复成功并写入历史后会立即删除。")
+        self.recovery_detail.setObjectName("sectionSubtitle")
+        self.recovery_detail.setWordWrap(True)
+        self.recovery_combo = QComboBox()
+        self.recovery_combo.setAccessibleName("可恢复录音")
+        recovery_actions = QHBoxLayout()
+        self.recover_button = QPushButton("重新识别并复制")
+        self.recover_button.setObjectName("primaryButton")
+        self.recover_button.clicked.connect(self._recover_selected_session)
+        copy_preview = QPushButton("复制已有预览")
+        copy_preview.clicked.connect(self._copy_recovery_preview)
+        delete_recovery = QPushButton("删除录音")
+        delete_recovery.clicked.connect(self._delete_recovery)
+        recovery_actions.addWidget(self.recover_button)
+        recovery_actions.addWidget(copy_preview)
+        recovery_actions.addWidget(delete_recovery)
+        recovery_actions.addStretch(1)
+        recovery_layout.addWidget(self.recovery_summary)
+        recovery_layout.addWidget(self.recovery_detail)
+        recovery_layout.addWidget(self.recovery_combo)
+        recovery_layout.addLayout(recovery_actions)
+        layout.addWidget(self.recovery_panel)
 
         toolbar = QHBoxLayout()
         self.search_box = QLineEdit()
@@ -358,15 +430,19 @@ class _SettingsWindow(QMainWindow):
         self.model_profile_title = QLabel("日常听写")
         self.model_profile_title.setObjectName("modelProfileTitle")
         self.model_profile_description = QLabel(
-            "中文优先，适合日常输入和中英混说。"
+            "自动判断中文、英文和中英混说，低配置也能快速完成。"
         )
         self.model_profile_description.setObjectName("modelProfileDescription")
         self.model_profile_description.setWordWrap(True)
         self.model_profile_meta = QLabel("SenseVoice Small · CPU · 约 240 MB")
         self.model_profile_meta.setObjectName("modelProfileMeta")
+        self.model_profile_evidence = QLabel("")
+        self.model_profile_evidence.setObjectName("modelProfileEvidence")
+        self.model_profile_evidence.setWordWrap(True)
         model_layout.addWidget(self.model_profile_title)
         model_layout.addWidget(self.model_profile_description)
         model_layout.addWidget(self.model_profile_meta)
+        model_layout.addWidget(self.model_profile_evidence)
         layout.addWidget(model_panel)
 
         grid = QGridLayout()
@@ -420,21 +496,32 @@ class _SettingsWindow(QMainWindow):
         layout.addWidget(hotkey_panel)
 
         actions = QHBoxLayout()
-        save = QPushButton("保存设置")
-        save.setObjectName("primaryButton")
-        save.setAccessibleName("保存听写设置")
-        save.clicked.connect(self._save_settings)
-        model_action = (
-            "验证完整性"
-            if self.paths.mode is RuntimeMode.FROZEN
-            else "模型实验"
-        )
-        download = QPushButton(model_action)
-        download.clicked.connect(self._open_model_setup)
-        actions.addWidget(save)
-        actions.addWidget(download)
+        self.save_settings_button = QPushButton("保存设置")
+        self.save_settings_button.setObjectName("primaryButton")
+        self.save_settings_button.setAccessibleName("保存听写设置")
+        self.save_settings_button.clicked.connect(self._save_settings)
+        self.model_download_button = QPushButton("检查模型")
+        self.model_download_button.clicked.connect(self._open_model_setup)
+        self.model_cancel_button = QPushButton("取消下载")
+        self.model_cancel_button.clicked.connect(self._cancel_model_download)
+        self.model_cancel_button.hide()
+        actions.addWidget(self.save_settings_button)
+        actions.addWidget(self.model_download_button)
+        actions.addWidget(self.model_cancel_button)
         actions.addStretch(1)
         layout.addLayout(actions)
+        self.model_progress = QProgressBar()
+        self.model_progress.setObjectName("modelProgress")
+        self.model_progress.setRange(0, 100)
+        self.model_progress.setValue(0)
+        self.model_progress.setTextVisible(True)
+        self.model_progress.hide()
+        self.model_progress_detail = QLabel("")
+        self.model_progress_detail.setObjectName("sectionSubtitle")
+        self.model_progress_detail.hide()
+        layout.addWidget(self.model_progress)
+        layout.addWidget(self.model_progress_detail)
+        self.model_combo.currentIndexChanged.connect(self._render_model_profile)
         layout.addStretch(1)
         return page
 
@@ -573,7 +660,7 @@ class _SettingsWindow(QMainWindow):
         about_copy.setSpacing(2)
         about_title = QLabel("VoiceFlow")
         about_title.setObjectName("aboutTitle")
-        version = QLabel(f"版本 0.2.2 · {platform_label()}")
+        version = QLabel(f"版本 0.3.0 · {platform_label()}")
         version.setObjectName("aboutVersion")
         about_copy.addWidget(about_title)
         about_copy.addWidget(version)
@@ -631,6 +718,7 @@ class _SettingsWindow(QMainWindow):
         self._refresh_history()
         self._refresh_home(config)
         self._load_dictionary()
+        self._refresh_recovery()
 
     def _set_status_badge(self, text, attention=None):
         if attention is None:
@@ -740,60 +828,25 @@ class _SettingsWindow(QMainWindow):
     def _refresh_settings_controls(self, config):
         engine = config.get("engine", {})
         active = engine.get("active", "sensevoice")
-        labels = {
-            "sensevoice": "日常听写 · SenseVoice",
-            "qwen3-asr": "实验 · Qwen3-ASR 0.6B",
-            "fun-asr-nano": "实验 · Fun-ASR Nano",
-            "whisper-turbo": "实验 · Whisper Turbo",
-        }
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
-        for name in self.model_manager.selectable_engines(config):
-            label = labels.get(name, name)
-            suffix = "" if self._engine_ready(name, config) else "（未安装）"
-            self.model_combo.addItem(label + suffix, name)
+        for profile in user_model_profiles():
+            state = self.model_manager.status(profile.engine, config).state
+            suffix = "" if state is ModelState.READY else " · 未安装"
+            self.model_combo.addItem(
+                f"{profile.title} · {profile.badge}{suffix}",
+                profile.engine,
+            )
         index = self.model_combo.findData(active)
         self.model_combo.setCurrentIndex(max(0, index))
         self.model_combo.blockSignals(False)
-        profiles = {
-            "sensevoice": (
-                "日常听写",
-                "中文优先，支持英语混说。当前同机公开样本中速度和准确率均领先。",
-                "SenseVoice Small · CPU · 约 240 MB",
-            ),
-            "qwen3-asr": (
-                "模型实验",
-                "多语言候选。当前基准更慢，尚未达到默认发布门槛。",
-                "Qwen3-ASR 0.6B · CPU · 约 987 MB",
-            ),
-            "fun-asr-nano": (
-                "模型实验",
-                "中文热词候选。当前存在异常输出，不用于正式听写。",
-                "Fun-ASR Nano · CPU · 约 1.0 GB",
-            ),
-            "whisper-turbo": (
-                "模型实验",
-                "多语言对照模型。当前速度和英文准确率未超过默认模型。",
-                "Whisper Large v3 Turbo · CPU · 约 1.0 GB",
-            ),
-        }
-        title, description, meta = profiles.get(
-            active,
-            ("本地模型", "识别在这台电脑上完成。", active),
-        )
-        self.model_profile_title.setText(title)
-        self.model_profile_description.setText(description)
-        self.model_profile_meta.setText(meta)
+        self._render_model_profile()
         threads = final_thread_count(
             (engine.get(active) or {}).get("num_threads", "auto")
         )
         self.performance_status.setText(f"自动平衡 · {threads} 个最终识别线程")
 
-        self.language_combo.clear()
-        for label, value in (("中文", "zh"), ("自动检测", "auto"), ("English", "en"), ("粤语", "yue")):
-            self.language_combo.addItem(label, value)
-        language = (engine.get(active) or {}).get("language", "zh")
-        self.language_combo.setCurrentIndex(max(0, self.language_combo.findData(language)))
+        self._populate_language_options(active, config)
 
         self.microphone_combo.clear()
         self.microphone_combo.addItem("系统默认麦克风", None)
@@ -814,22 +867,68 @@ class _SettingsWindow(QMainWindow):
     def _save_settings(self):
         engine = self.model_combo.currentData()
         config = self._load_config()
-        if not self._engine_ready(engine, config):
+        if self._switch_in_progress:
+            return
+        if self.model_manager.status(engine, config).state is not ModelState.READY:
             self._set_status_badge("请先安装所选模型")
             return
+        self._switch_in_progress = True
+        self.save_settings_button.setEnabled(False)
+        self._set_status_badge("正在验证模型完整性")
+        payload = {
+            "engine": engine,
+            "language": self.language_combo.currentData(),
+            "device_index": self.microphone_combo.currentData(),
+            "autostart": self.autostart_check.isChecked(),
+            "previous_engine": config.get("engine", {}).get("active", "sensevoice"),
+        }
+
+        def run():
+            try:
+                status = self.model_manager.status(engine, config, verify=True)
+                if status.state is not ModelState.READY:
+                    raise RuntimeError("模型 SHA-256 完整性校验未通过")
+                switch = ModelSwitchCoordinator(
+                    self.paths.model_switch_dir,
+                    self.paths.config_file,
+                )
+                apply = lambda: update_runtime_settings(
+                    self.paths.config_file,
+                    engine=engine,
+                    language=payload["language"],
+                    device_index=payload["device_index"],
+                )
+                if engine != payload["previous_engine"]:
+                    switch.stage(engine=engine, apply=apply)
+                    payload["staged"] = True
+                else:
+                    apply()
+                    payload["staged"] = False
+                payload["ok"] = True
+            except Exception as error:
+                payload["ok"] = False
+                payload["error"] = str(error)
+            self.model_switch_finished.emit(payload)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @Slot(object)
+    def _finish_model_switch(self, payload):
+        self._switch_in_progress = False
+        self.save_settings_button.setEnabled(True)
+        if not payload.get("ok"):
+            self._set_status_badge(f"切换失败：{payload.get('error', '未知错误')}")
+            return
         try:
-            update_runtime_settings(
-                self.paths.config_file,
-                engine=engine,
-                language=self.language_combo.currentData(),
-                device_index=self.microphone_combo.currentData(),
-            )
-            set_autostart(self.paths, self.autostart_check.isChecked())
-            self._set_status_badge("已保存，重启后生效")
+            set_autostart(self.paths, bool(payload.get("autostart")))
         except Exception as error:
-            self._set_status_badge("保存失败")
-            self.sidebar.setCurrentRow(4)
-            self.doctor_summary.setText(f"设置保存失败：{error}")
+            self._set_status_badge(f"模型已保存；自动启动设置失败：{error}")
+            return
+        self._set_status_badge(
+            "已安全切换，重启时验证；失败会自动回滚"
+            if payload.get("staged")
+            else "设置已保存，重启后生效"
+        )
 
     def _current_language_label(self):
         try:
@@ -838,14 +937,17 @@ class _SettingsWindow(QMainWindow):
                 config = yaml.safe_load(f) or {}
             engine = config.get("engine", {})
             active = engine.get("active", "sensevoice")
-            language = (engine.get(active) or {}).get("language", "zh")
-            labels = {"zh": "中文", "en": "English", "auto": "自动检测"}
+            language = (engine.get(active) or {}).get("language", "auto")
+            labels = {"zh": "中文优先", "en": "English 优先", "auto": "自动中英"}
             return f"{labels.get(language, language)} ({active})"
         except Exception:
             return "配置读取失败"
 
     def _output_status_label(self, status):
         return {
+            "clipboard_verified_paste_dispatched": "已复制并发送粘贴",
+            "clipboard_verified_only": "已复制到剪贴板",
+            "recovery_saved_clipboard_unavailable": "文字已安全保存，等待复制",
             "clipboard_copied_paste_sent": "已复制并发送粘贴",
             "clipboard_copied_integrity_warning": "完整性未确认，仅保留到剪贴板",
             "fallback": "已保留在剪贴板",
@@ -1007,6 +1109,80 @@ class _SettingsWindow(QMainWindow):
             self._on_repaste_text(text)
             self._set_status_badge("已粘贴")
 
+    def _refresh_recovery(self):
+        sessions = self.recovery_store.list_recoverable()
+        self.recovery_combo.clear()
+        for session in sessions:
+            minutes = session.sample_count / max(1, session.sample_rate) / 60
+            created = datetime.fromtimestamp(session.created_at).strftime("%m月%d日 %H:%M")
+            self.recovery_combo.addItem(
+                f"{created} · {minutes:.1f} 分钟 · {session.model}",
+                session.session_id,
+            )
+            index = self.recovery_combo.count() - 1
+            self.recovery_combo.setItemData(
+                index,
+                session.preview_text,
+                int(Qt.ItemDataRole.UserRole) + 1,
+            )
+        self.recovery_summary.setText(f"有 {len(sessions)} 段录音可以恢复")
+        self.recovery_panel.setVisible(bool(sessions))
+
+    def _recover_selected_session(self):
+        session_id = self.recovery_combo.currentData()
+        if not session_id or not self._on_recover_session:
+            return
+        self.recover_button.setEnabled(False)
+        self._set_status_badge("正在从本地录音恢复文字")
+
+        def run():
+            try:
+                result = self._on_recover_session(str(session_id))
+            except Exception as error:
+                result = {"ok": False, "error": str(error)}
+            self.recovery_finished.emit(result)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    @Slot(object)
+    def _finish_recovery(self, result):
+        self.recover_button.setEnabled(True)
+        if result.get("ok"):
+            self._set_status_badge("恢复完成，文字已复制到剪贴板")
+            self._refresh_history()
+            self._refresh_recovery()
+        else:
+            self._set_status_badge(f"恢复未完成：{result.get('error', '录音仍已保留')}")
+
+    def _copy_recovery_preview(self):
+        preview = self.recovery_combo.currentData(int(Qt.ItemDataRole.UserRole) + 1) or ""
+        if not preview:
+            self._set_status_badge("这段录音还没有可复制的预览文字")
+            return
+        import pyperclip
+
+        result = VerifiedClipboard(copy=pyperclip.copy, paste=pyperclip.paste).write_verified(preview)
+        self._set_status_badge(
+            "预览文字已复制" if result.verified else "预览文字仍在恢复记录中"
+        )
+
+    def _delete_recovery(self):
+        session_id = self.recovery_combo.currentData()
+        if not session_id or not self._on_delete_recovery:
+            return
+        answer = QMessageBox.question(
+            self,
+            "删除恢复录音",
+            "这段本地恢复录音将被永久删除。继续吗？",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        if self._on_delete_recovery(str(session_id)):
+            self._set_status_badge("恢复录音已删除")
+            self._refresh_recovery()
+        else:
+            self._set_status_badge("没有找到这段恢复录音")
+
     def _copy_all_visible(self):
         texts = []
         for i in range(self.history_list.count()):
@@ -1026,9 +1202,86 @@ class _SettingsWindow(QMainWindow):
             "active",
             "sensevoice",
         )
-        self._set_status_badge(
-            self.model_manager.open_setup(engine, config)
+        if self._download_task is not None:
+            return
+        status = self.model_manager.status(engine, config, verify=True)
+        if status.state is ModelState.READY:
+            self._set_status_badge("模型 SHA-256 完整性校验通过")
+            return
+        self.model_progress.setValue(0)
+        self.model_progress.show()
+        self.model_progress_detail.setText("正在准备固定版本下载…")
+        self.model_progress_detail.show()
+        self.model_download_button.setEnabled(False)
+        self.model_cancel_button.show()
+        self._download_task = self.model_manager.start_download(
+            engine,
+            self.model_download_updated.emit,
         )
+
+    def _cancel_model_download(self):
+        if self._download_task is not None:
+            self._download_task.cancel()
+
+    @Slot(object)
+    def _finish_model_download_update(self, update):
+        state = update.get("state")
+        self.model_progress.setValue(int(update.get("progress", 0)))
+        self.model_progress_detail.setText(str(update.get("detail", "")))
+        self._set_status_badge(str(update.get("detail", "")))
+        if state not in {"ready", "failed", "cancelled"}:
+            return
+        self._download_task = None
+        self.model_download_button.setEnabled(True)
+        self.model_cancel_button.hide()
+        if state == "ready":
+            self.model_progress.setValue(100)
+            self.refresh()
+
+    def _render_model_profile(self, *_args):
+        engine = self.model_combo.currentData()
+        if not engine:
+            return
+        profile = profile_for_engine(engine)
+        config = self._load_config()
+        self._populate_language_options(engine, config)
+        state = self.model_manager.status(engine, config).state
+        self.model_profile_title.setText(f"{profile.title} · {profile.badge}")
+        self.model_profile_description.setText(profile.summary)
+        self.model_profile_meta.setText(
+            f"{profile.languages}　·　{profile.hardware}　·　下载 {profile.download_size_label}"
+        )
+        self.model_profile_evidence.setText(profile.evidence_note)
+        if state is ModelState.READY:
+            self.model_download_button.setText("验证完整性")
+        elif state is ModelState.CORRUPT:
+            self.model_download_button.setText("修复模型")
+        else:
+            self.model_download_button.setText(f"下载 {profile.download_size_label}")
+
+    def _populate_language_options(self, engine, config):
+        configured = (
+            config.get("engine", {}).get(engine, {}).get("language")
+            or "auto"
+        )
+        options = (
+            (("自动检测", "auto"),)
+            if engine == "qwen3-asr"
+            else (
+                ("自动中英（推荐）", "auto"),
+                ("中文优先", "zh"),
+                ("English 优先", "en"),
+                ("粤语", "yue"),
+            )
+        )
+        self.language_combo.blockSignals(True)
+        self.language_combo.clear()
+        for label, value in options:
+            self.language_combo.addItem(label, value)
+        self.language_combo.setCurrentIndex(
+            max(0, self.language_combo.findData(configured))
+        )
+        self.language_combo.blockSignals(False)
 
     def _run_doctor(self):
         self.doctor_summary.setText("正在检查 VoiceFlow…")
@@ -1256,7 +1509,7 @@ class _SettingsWindow(QMainWindow):
             border: 1px solid #ececf0;
             border-radius: 12px;
         }
-        QWidget#modelPanel, QWidget#hotkeyPanel,
+        QWidget#modelPanel, QWidget#hotkeyPanel, QWidget#recoveryPanel,
         QWidget#aboutHero, QWidget#privacyPanel {
             background: #ffffff;
             border: 1px solid #ececf0;
@@ -1274,6 +1527,28 @@ class _SettingsWindow(QMainWindow):
         QLabel#modelProfileMeta {
             color: #86868b;
             font-size: 12px;
+        }
+        QLabel#modelProfileEvidence {
+            color: #5f5f64;
+            font-size: 12px;
+            padding-top: 5px;
+        }
+        QLabel#recoveryTitle {
+            color: #8a5600;
+            font-size: 14px;
+            font-weight: 650;
+        }
+        QProgressBar#modelProgress {
+            min-height: 8px;
+            max-height: 8px;
+            border: none;
+            border-radius: 4px;
+            background: #e8e8ed;
+            color: transparent;
+        }
+        QProgressBar#modelProgress::chunk {
+            border-radius: 4px;
+            background: #007aff;
         }
         QLabel#readinessName {
             color: #6e6e73;
@@ -1453,6 +1728,8 @@ class OverlayWindow:
         self._on_quit = None
         self._on_recording_painted = None
         self._on_preview_painted = None
+        self._on_recover_session = None
+        self._on_delete_recovery = None
         self._recording_feedback_lock = threading.Lock()
         self._pending_recording_feedback = None
         self._html_path = str(self.paths.install_resource("src/overlay.html"))
@@ -1464,6 +1741,8 @@ class OverlayWindow:
         self._hide_timer = None
         self._settings_window = None
         self._single_instance_server = None
+        self._instance_request_timer = None
+        self._instance_request_path = Path(self.paths.data_dir) / "show-settings.request"
         self._preview_paint_reporter = None
         self._web_channel = None
 
@@ -1477,6 +1756,8 @@ class OverlayWindow:
         on_quit=None,
         on_recording_painted=None,
         on_preview_painted=None,
+        on_recover_session=None,
+        on_delete_recovery=None,
     ):
         self._on_record_toggle = on_record_toggle
         self._on_copy_last = on_copy_last
@@ -1486,6 +1767,8 @@ class OverlayWindow:
         self._on_quit = on_quit
         self._on_recording_painted = on_recording_painted
         self._on_preview_painted = on_preview_painted
+        self._on_recover_session = on_recover_session
+        self._on_delete_recovery = on_delete_recovery
 
     def start(self, on_ready=None):
         self._on_ready = on_ready
@@ -1496,6 +1779,7 @@ class OverlayWindow:
         if self._notify_existing_instance():
             return
         self._start_single_instance_server()
+        self._start_instance_request_polling()
 
         # ---- 主窗口 ----
         self.window = _PaintAwareWindow()
@@ -1567,10 +1851,12 @@ class OverlayWindow:
         if not socket.waitForConnected(120):
             socket.abort()
             return False
+        self._write_instance_request()
         socket.write(b"show\n")
         socket.flush()
-        socket.waitForBytesWritten(120)
-        socket.disconnectFromServer()
+        socket.waitForBytesWritten(1000)
+        socket.waitForReadyRead(1500)
+        socket.abort()
         return True
 
     def _start_single_instance_server(self):
@@ -1582,19 +1868,54 @@ class OverlayWindow:
         server.newConnection.connect(self._on_instance_message)
         self._single_instance_server = server
 
+    def _write_instance_request(self):
+        request_path = self._instance_request_path
+        temporary = request_path.with_name(
+            f"{request_path.name}.{os.getpid()}.tmp"
+        )
+        try:
+            request_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(f"{time.time():.6f}\n", encoding="utf-8")
+            os.replace(temporary, request_path)
+        except OSError:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _start_instance_request_polling(self):
+        timer = QTimer()
+        timer.setInterval(200)
+        timer.timeout.connect(self._consume_instance_request)
+        timer.start()
+        self._instance_request_timer = timer
+
+    def _consume_instance_request(self):
+        request_path = self._instance_request_path
+        try:
+            requested_at = float(request_path.read_text(encoding="utf-8").strip())
+        except (FileNotFoundError, OSError, ValueError):
+            return
+        try:
+            request_path.unlink(missing_ok=True)
+        except OSError:
+            return
+        if 0 <= time.time() - requested_at <= 10:
+            self._show_settings()
+
     def _on_instance_message(self):
         if not self._single_instance_server:
             return
         while self._single_instance_server.hasPendingConnections():
             socket = self._single_instance_server.nextPendingConnection()
-            socket.readyRead.connect(lambda sock=socket: self._handle_instance_message(sock))
-            if socket.bytesAvailable():
-                self._handle_instance_message(socket)
+            self._handle_instance_message(socket)
 
     def _handle_instance_message(self, socket):
         socket.readAll()
-        socket.disconnectFromServer()
         self._show_settings()
+        socket.write(b"shown\n")
+        socket.flush()
+        socket.disconnectFromServer()
 
     # ============================================================
     # 托盘
@@ -1694,6 +2015,8 @@ class OverlayWindow:
         if self._settings_window is None:
             self._settings_window = _SettingsWindow(
                 on_repaste_text=self._on_output_text,
+                on_recover_session=self._on_recover_session,
+                on_delete_recovery=self._on_delete_recovery,
                 paths=self.paths,
             )
         return self._settings_window
@@ -1829,6 +2152,14 @@ class OverlayWindow:
         self._tray_state(TRAY_ICON_IDLE)
         self._js(f"showFinalSummary({int(character_count)}, {int(session_id)})")
 
+    def show_delivery_summary(self, status, character_count, session_id):
+        self._tray_state(TRAY_ICON_IDLE)
+        self._js(
+            "showDeliverySummary("
+            f"{json.dumps(str(status))}, "
+            f"{int(character_count)}, {int(session_id)})"
+        )
+
 
     def show_result(self, text):
         self._js(f"showResult({json.dumps(text, ensure_ascii=False)})")
@@ -1837,6 +2168,12 @@ class OverlayWindow:
     def show_error(self, msg):
         self._tray_state(TRAY_ICON_ERROR)
         self._js(f"showState('error', {json.dumps(msg, ensure_ascii=False)})")
+
+    def show_recovery_available(self, count):
+        self._tray_state(TRAY_ICON_IDLE)
+        self._js(f"showRecoveryAvailable({int(count)})")
+        self.show_window()
+        self.hide_after(3600)
 
     def show_canceled(self):
         self._tray_state(TRAY_ICON_IDLE)

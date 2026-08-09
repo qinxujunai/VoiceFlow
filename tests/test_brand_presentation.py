@@ -31,8 +31,6 @@ def test_product_site_uses_only_the_real_demo():
         "455 ms",
         "500×",
         "不把“模型更多”",
-        "SenseVoice",
-        "Qwen3-ASR",
         "Fun-ASR Nano",
         "Whisper",
         "macOS",
@@ -41,6 +39,10 @@ def test_product_site_uses_only_the_real_demo():
         assert phrase not in page
 
     assert page.count("data-download") == 1
+    assert "SenseVoice" in page
+    assert "Qwen3" in page
+    assert "开发预览" in page
+    assert "不属于当前下载的 v0.2.2 安装包" in page
     assert 'class="download"' not in page
     assert "尚未代码签名" not in page
 
@@ -66,13 +68,13 @@ def test_removed_composite_assets_stay_removed():
         assert not (PROJECT_ROOT / relative_path).exists()
 
 
-def test_public_release_uploads_only_the_installer():
+def test_public_release_uploads_installer_and_verification_assets():
     workflow = _read(".github/workflows/release.yml")
     publish_command = workflow.split(
         "gh release create $env:GITHUB_REF_NAME", maxsplit=1
     )[1]
 
     assert "VoiceFlow-$version-Windows-x64.exe" in publish_command
-    assert "SHA256SUMS.txt" not in publish_command
-    assert "SBOM.cdx.json" not in publish_command
-    assert "THIRD_PARTY_NOTICES.md" not in publish_command
+    assert "SHA256SUMS.txt" in publish_command
+    assert "SBOM.cdx.json" in publish_command
+    assert "THIRD_PARTY_NOTICES.md" in publish_command
