@@ -5,10 +5,12 @@ Build on the target architecture:
     python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
 """
 
+import os
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(SPECPATH)
+CODESIGN_IDENTITY = os.environ.get("VOICEFLOW_CODESIGN_IDENTITY") or None
 
 a = Analysis(
     [str(PROJECT_ROOT / "src" / "main.py")],
@@ -91,7 +93,7 @@ exe = EXE(
     exclude_binaries=True,
     argv_emulation=False,
     target_arch=None,
-    codesign_identity=None,
+    codesign_identity=CODESIGN_IDENTITY,
     entitlements_file=str(
         PROJECT_ROOT / "installer" / "macos" / "entitlements.plist"
     ),
