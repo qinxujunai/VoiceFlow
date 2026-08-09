@@ -29,8 +29,8 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
     for _ in range(20):
         rows.append({
             "duration": 10,
-            "trigger_to_feedback_ms": 80,
-            "stop_to_paste_ms": 650,
+            "trigger_to_feedback_ms": 40,
+            "stop_to_paste_ms": 450,
             "preview_first_model_delta_ms": 700,
             "preview_first_paint_ms": 780,
             "preview_update_gap_ms": 420,
@@ -38,8 +38,12 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
             "preview_max_chunk_chars": 2,
         })
         rows.append({
+            "duration": 45,
+            "stop_to_paste_ms": 650,
+        })
+        rows.append({
             "duration": 120,
-            "trigger_to_feedback_ms": 90,
+            "trigger_to_feedback_ms": 45,
             "stop_to_paste_ms": 2400,
         })
     history.write_text(
@@ -50,7 +54,7 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
     result = performance_gate.analyze_history(history, minimum_samples=20)
 
     assert result["passed"] is True
-    assert result["metrics"]["trigger_to_feedback_p95_ms"] == 90
+    assert result["metrics"]["trigger_to_feedback_p95_ms"] == 45
 
 
 def test_performance_gate_rejects_missing_release_evidence(tmp_path):
@@ -59,7 +63,7 @@ def test_performance_gate_rejects_missing_release_evidence(tmp_path):
     result = performance_gate.analyze_history(tmp_path / "missing.jsonl", minimum_samples=20)
 
     assert result["passed"] is False
-    assert len(result["failures"]) == 4
+    assert len(result["failures"]) == 5
 
 
 def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
@@ -93,6 +97,7 @@ def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
                     "preview_queue_delay_ms": 80,
                     "preview_max_chunk_chars": 2,
                 },
+                {"stop_to_paste_ms": 650, "duration": 45},
                 {"stop_to_paste_ms": 2200, "duration": 120},
             )
         )
@@ -110,6 +115,7 @@ def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
     assert result["passed"] is True
     assert result["metrics"]["feedback_samples"] == 20
     assert result["metrics"]["short_samples"] == 20
+    assert result["metrics"]["medium_samples"] == 20
     assert result["metrics"]["two_minute_samples"] == 20
     assert result["metrics"]["preview_samples"] == 20
 
@@ -132,6 +138,7 @@ def test_performance_gate_rejects_slow_or_chunky_preview(tmp_path):
                 "preview_max_chunk_chars": 5,
             }
         )
+        rows.append({"duration": 45, "stop_to_paste_ms": 650})
         rows.append({"duration": 120, "stop_to_paste_ms": 2200})
     history.write_text(
         "".join(json.dumps(row) + "\n" for row in rows),
@@ -144,3 +151,12 @@ def test_performance_gate_rejects_slow_or_chunky_preview(tmp_path):
     assert any("preview first paint" in item for item in result["failures"])
     assert any("preview update gap" in item for item in result["failures"])
     assert any("preview chunk" in item for item in result["failures"])
+
+
+def test_pipeline_evidence_covers_short_medium_and_two_minute_buckets():
+    source = (ROOT / "scripts" / "measure_pipeline_performance.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'parser.add_argument("--medium-seconds", type=int, default=45)' in source
+    assert "args.medium_seconds" in source

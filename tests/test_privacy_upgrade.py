@@ -72,8 +72,8 @@ def test_v1_vocabulary_migration_removes_seed_and_preserves_user_content(tmp_pat
     assert "legacy-user-added" in user_dictionary
     assert custom_correction in corrections
     assert not (data_knowledge / "company-terms.txt").exists()
-    assert first.schema_version == 2
-    assert second.schema_version == 2
+    assert first.schema_version == 3
+    assert second.schema_version == 3
     assert user_dictionary == (data_knowledge / "user-dictionary.txt").read_text(
         encoding="utf-8"
     )

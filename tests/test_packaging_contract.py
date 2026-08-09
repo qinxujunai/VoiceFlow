@@ -45,6 +45,9 @@ def test_public_release_bundles_reviewed_preview_and_requires_signing():
     assert "WINDOWS_CERTIFICATE_BASE64" in release
     assert "signtool" in release.lower()
     assert "Get-AuthenticodeSignature" in release
+    assert 'release\\$env:GITHUB_REF_NAME\\SHA256SUMS.txt' in release
+    assert 'release\\$env:GITHUB_REF_NAME\\SBOM.cdx.json' in release
+    assert 'release\\$env:GITHUB_REF_NAME\\THIRD_PARTY_NOTICES.md' in release
 
 
 def test_windows_ci_pins_third_party_actions_to_reviewed_commits():
@@ -166,10 +169,27 @@ def test_release_spec_bundles_runtime_assets():
     assert '(str(PROJECT_ROOT / "knowledge-base"), "knowledge-base")' in spec
     assert '(str(PROJECT_ROOT / "model-manifest.json"), ".")' in spec
     assert 'icon=str(PROJECT_ROOT / "assets" / "voiceflow.ico")' in spec
+
+
+def test_release_spec_bundles_uiautomation_native_clients():
+    spec = (ROOT / "VoiceFlow.spec").read_text(encoding="utf-8")
+
+    assert 'collect_dynamic_libs("uiautomation")' in spec
+    assert "binaries=UIAUTOMATION_BINARIES" in spec
     assert 'version=str(PROJECT_ROOT / "assets" / "version_info.txt")' in spec
     assert "COLLECT(" in spec
     assert '(str(PROJECT_ROOT / "licenses"), "licenses")' in spec
     assert "streaming-preview-model-review.md" in spec
+
+
+def test_release_lock_and_notices_cover_windows_ui_automation_dependencies():
+    lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+    assert "uiautomation==2.0.29" in lock
+    assert "comtypes==1.4.13" in lock
+    assert "comtypes-MIT.txt" in notices
+    assert (ROOT / "licenses" / "comtypes-MIT.txt").is_file()
 
 
 def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_model():
@@ -217,9 +237,9 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 2, 2, 0)" in version
-    assert "StringStruct('FileVersion', '0.2.2')" in version
-    assert "StringStruct('ProductVersion', '0.2.2')" in version
+    assert "filevers=(0, 3, 0, 0)" in version
+    assert "StringStruct('FileVersion', '0.3.0')" in version
+    assert "StringStruct('ProductVersion', '0.3.0')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 

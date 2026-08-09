@@ -11,6 +11,15 @@ import numpy as np
 from performance_profile import preview_thread_count
 
 
+DEFAULT_PREVIEW_ENGINE = "online-transducer"
+DEFAULT_PREVIEW_ASSETS = {
+    "encoder_path": "models/streaming-preview/encoder-epoch-99-avg-1.int8.onnx",
+    "decoder_path": "models/streaming-preview/decoder-epoch-99-avg-1.onnx",
+    "joiner_path": "models/streaming-preview/joiner-epoch-99-avg-1.int8.onnx",
+    "tokens_path": "models/streaming-preview/tokens.txt",
+}
+
+
 @dataclass(frozen=True)
 class PreviewEvent:
     text: str
@@ -93,17 +102,29 @@ class OnlinePreviewTranscriber:
         if not preview.get("enabled", True):
             raise RuntimeError("streaming preview is disabled")
 
-        tokens = Path(
-            resolve_asset(
-                preview.get("tokens_path", "models/streaming-preview/tokens.txt")
-            )
-        )
-        runtime_engine = preview.get("runtime_engine", "online-zipformer-ctc")
+        tokens = Path(resolve_asset(preview.get(
+            "tokens_path",
+            DEFAULT_PREVIEW_ASSETS["tokens_path"],
+        )))
+        runtime_engine = preview.get("runtime_engine", DEFAULT_PREVIEW_ENGINE)
         if runtime_engine in {"online-paraformer", "online-transducer"}:
-            encoder = Path(resolve_asset(preview.get("encoder_path", "")))
-            decoder = Path(resolve_asset(preview.get("decoder_path", "")))
+            encoder = Path(resolve_asset(preview.get(
+                "encoder_path",
+                DEFAULT_PREVIEW_ASSETS["encoder_path"]
+                if runtime_engine == "online-transducer"
+                else "",
+            )))
+            decoder = Path(resolve_asset(preview.get(
+                "decoder_path",
+                DEFAULT_PREVIEW_ASSETS["decoder_path"]
+                if runtime_engine == "online-transducer"
+                else "",
+            )))
             if runtime_engine == "online-transducer":
-                joiner = Path(resolve_asset(preview.get("joiner_path", "")))
+                joiner = Path(resolve_asset(preview.get(
+                    "joiner_path",
+                    DEFAULT_PREVIEW_ASSETS["joiner_path"],
+                )))
                 assets = (encoder, decoder, joiner, tokens)
             else:
                 assets = (encoder, decoder, tokens)
@@ -140,6 +161,15 @@ class OnlinePreviewTranscriber:
             "num_threads": preview_thread_count(requested_threads),
             "sample_rate": int(sample_rate),
             "enable_endpoint_detection": True,
+            "rule1_min_trailing_silence": float(
+                preview.get("rule1_min_trailing_silence", 1.6)
+            ),
+            "rule2_min_trailing_silence": float(
+                preview.get("rule2_min_trailing_silence", 0.55)
+            ),
+            "rule3_min_utterance_length": float(
+                preview.get("rule3_min_utterance_length", 18.0)
+            ),
             "provider": preview.get("provider", "cpu"),
         }
         if runtime_engine == "online-paraformer":

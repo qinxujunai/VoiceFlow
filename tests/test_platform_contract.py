@@ -96,8 +96,8 @@ def test_macos_quality_builds_apple_silicon_and_intel_without_publishing():
 
     assert "runner: macos-15" in workflow
     assert "runner: macos-15-intel" in workflow
-    assert "VoiceFlow-0.2.2-macOS-Apple-Silicon" in workflow
-    assert "VoiceFlow-0.2.2-macOS-Intel" in workflow
+    assert "VoiceFlow-0.3.0-macOS-Apple-Silicon" in workflow
+    assert "VoiceFlow-0.3.0-macOS-Intel" in workflow
     assert "--runtime-smoke" in workflow
     assert "hdiutil verify" in workflow
     assert "actions/upload-artifact@" in workflow
