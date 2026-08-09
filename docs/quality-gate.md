@@ -28,8 +28,9 @@ venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
 ```
 
 Release mode also requires at least 20 reproducible measurements in each
-responsiveness bucket and rejects trigger-to-feedback P95 >= 100 ms, short
-stop-to-paste P95 > 700 ms, or two-minute P95 > 2.5 seconds. Generate the
+responsiveness bucket and rejects trigger-to-feedback P95 > 50 ms, 0-10 second
+stop-to-paste P95 > 500 ms, 10-60 second P95 > 700 ms, or two-minute P95 >
+2.5 seconds. Generate the
 evidence on the release machine first:
 
 ```bat
@@ -48,13 +49,17 @@ capture covers 100%, 125%, 150%, and 200% scale.
 - Final output is copied before paste is attempted.
 - Streaming preview is never treated as the final source of truth unless final
   transcription is empty and preview is the only safe fallback.
-- Preview text is append-only, unpunctuated, fixed at a 48 ms display cadence,
-  and resumes after a divergent segment reaches an endpoint.
+- Preview text is append-only and unpunctuated. Its bounded cadence targets
+  48 ms per grapheme, accelerates under backlog, and coalesces stale animation
+  after a 600 ms hard lag.
+- Live draft and authoritative text use one visual color; provenance remains an
+  internal state distinction. Recording bars stay red until recording ends.
 - Long recording output must include the final tail.
 - The previous clipboard is not restored after dictation.
 - Default triggers stay single-key: `F2`, `Right Ctrl`, `xbutton1`, `xbutton2`.
 - The tray `退出` action must remain functional.
-- Model downloads must be visible and user-confirmed.
+- Ordinary settings must not expose model selection, download, repair, or
+  switching. Candidate models remain internal quality-gate inputs.
 
 ## Review Checklist
 

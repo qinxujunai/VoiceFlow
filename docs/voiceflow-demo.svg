@@ -13,7 +13,6 @@
       #wave { animation: waveState 6.8s ease-in-out infinite; }
       #check { animation: checkState 6.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       #liveText { animation: liveTextState 6.8s ease-in-out infinite; }
-      #finalText { animation: finalTextState 6.8s ease-in-out infinite; }
       #outputText, #outputCaret { animation: outputState 6.8s ease-in-out infinite; }
       .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
@@ -22,13 +21,13 @@
       @keyframes capsuleState {
         0%, 12%, 96%, 100% { transform: translate(552px, 168px); opacity: 1; }
         22%, 64% { transform: translate(410px, 168px); opacity: 1; }
-        72%, 88% { transform: translate(515px, 168px); opacity: 1; }
+        72%, 88% { transform: translate(552px, 168px); opacity: 1; }
         92% { transform: translate(552px, 168px); opacity: 0; }
       }
       @keyframes pillState {
         0%, 12%, 96%, 100% { width: 96px; }
         22%, 64% { width: 380px; }
-        72%, 88% { width: 170px; }
+        72%, 88% { width: 96px; }
       }
       @keyframes waveState {
         0%, 64% { opacity: 1; }
@@ -41,10 +40,6 @@
       @keyframes liveTextState {
         0%, 18%, 68%, 100% { opacity: 0; }
         25%, 64% { opacity: 1; }
-      }
-      @keyframes finalTextState {
-        0%, 67%, 100% { opacity: 0; }
-        73%, 88% { opacity: 1; }
       }
       @keyframes outputState {
         0%, 68%, 100% { opacity: 0; transform: translateY(5px); }
@@ -67,11 +62,11 @@
         45% { transform: scaleY(1.28); opacity: 1; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #capsule { animation: none; transform: translate(515px, 168px); }
-        #demo-pill { animation: none; width: 170px; }
+        #capsule { animation: none; transform: translate(552px, 168px); }
+        #demo-pill { animation: none; width: 96px; }
         #wave, #liveText { opacity: 0; }
-        #check, #finalText, #outputText, #outputCaret { opacity: 1; }
-        #wave, #check, #liveText, #finalText, #outputText, #outputCaret,
+        #check, #outputText, #outputCaret { opacity: 1; }
+        #wave, #check, #liveText, #outputText, #outputCaret,
         .bar-a, .bar-b, .bar-c { animation: none; }
       }
     </style>
@@ -100,7 +95,6 @@
     </g>
 
     <text id="liveText" class="ui" x="66" y="33" font-size="18" font-weight="500" fill="#f5f5f7" opacity="0">明早十点，把方案同步给团队。</text>
-    <text id="finalText" class="ui" x="58" y="33" font-size="16" font-weight="520" fill="#f5f5f7" opacity="0">已复制 · 14字</text>
   </g>
 
   <g class="ui" fill="#1d1d1f">

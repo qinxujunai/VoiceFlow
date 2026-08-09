@@ -15,7 +15,7 @@ from qt_compat import (
     QSystemTrayIcon, QMenu, QLabel, QPushButton,
     QPlainTextEdit, QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
-    QCheckBox, QComboBox, QProgressBar, QMessageBox,
+    QCheckBox, QComboBox, QMessageBox,
     QWebChannel, QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket,
 )
@@ -51,8 +51,6 @@ from platform_utils import (
     trigger_instruction,
     trigger_summary,
 )
-from model_catalog import profile_for_engine, user_model_profiles
-from model_switch import ModelSwitchCoordinator
 from recovery_session import RecoverySessionStore
 from delivery import VerifiedClipboard
 
@@ -106,7 +104,6 @@ class _PreviewPaintReporter(QObject):
 
 class _SettingsWindow(QMainWindow):
     doctor_finished = Signal(object)
-    model_download_updated = Signal(object)
     model_switch_finished = Signal(object)
     recovery_finished = Signal(object)
 
@@ -133,7 +130,6 @@ class _SettingsWindow(QMainWindow):
         self._history_rows = []
         self._last_diagnostics = None
         self._microphone_detected = False
-        self._download_task = None
         self._switch_in_progress = False
         self.setWindowTitle("VoiceFlow")
         self.setMinimumSize(1000, 680)
@@ -219,7 +215,6 @@ class _SettingsWindow(QMainWindow):
         if not self._high_contrast_enabled():
             self.setStyleSheet(self._style())
         self.doctor_finished.connect(self._finish_doctor)
-        self.model_download_updated.connect(self._finish_model_download_update)
         self.model_switch_finished.connect(self._finish_model_switch)
         self.recovery_finished.connect(self._finish_recovery)
 
@@ -418,38 +413,13 @@ class _SettingsWindow(QMainWindow):
         layout.addLayout(
             self._section_header(
                 "听写",
-                "为当前语言和电脑选择可靠的离线识别方式。",
+                "设置语言、麦克风和启动方式。所有识别均在本机完成。",
             )
         )
-
-        model_panel = QWidget()
-        model_panel.setObjectName("modelPanel")
-        model_layout = QVBoxLayout(model_panel)
-        model_layout.setContentsMargins(16, 14, 16, 14)
-        model_layout.setSpacing(4)
-        self.model_profile_title = QLabel("日常听写")
-        self.model_profile_title.setObjectName("modelProfileTitle")
-        self.model_profile_description = QLabel(
-            "自动判断中文、英文和中英混说，低配置也能快速完成。"
-        )
-        self.model_profile_description.setObjectName("modelProfileDescription")
-        self.model_profile_description.setWordWrap(True)
-        self.model_profile_meta = QLabel("SenseVoice Small · CPU · 约 240 MB")
-        self.model_profile_meta.setObjectName("modelProfileMeta")
-        self.model_profile_evidence = QLabel("")
-        self.model_profile_evidence.setObjectName("modelProfileEvidence")
-        self.model_profile_evidence.setWordWrap(True)
-        model_layout.addWidget(self.model_profile_title)
-        model_layout.addWidget(self.model_profile_description)
-        model_layout.addWidget(self.model_profile_meta)
-        model_layout.addWidget(self.model_profile_evidence)
-        layout.addWidget(model_panel)
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(12)
-        self.model_combo = QComboBox()
-        self.model_combo.setAccessibleName("识别模型")
         self.language_combo = QComboBox()
         self.language_combo.setAccessibleName("识别语言")
         self.microphone_combo = QComboBox()
@@ -461,7 +431,6 @@ class _SettingsWindow(QMainWindow):
         self.mode_status = QLabel("离线 · 录音不会离开这台电脑")
         self.performance_status = QLabel("平衡 · 6 个识别线程")
         rows = (
-            ("模型", self.model_combo),
             ("语言", self.language_combo),
             ("麦克风", self.microphone_combo),
             ("性能", self.performance_status),
@@ -500,28 +469,9 @@ class _SettingsWindow(QMainWindow):
         self.save_settings_button.setObjectName("primaryButton")
         self.save_settings_button.setAccessibleName("保存听写设置")
         self.save_settings_button.clicked.connect(self._save_settings)
-        self.model_download_button = QPushButton("检查模型")
-        self.model_download_button.clicked.connect(self._open_model_setup)
-        self.model_cancel_button = QPushButton("取消下载")
-        self.model_cancel_button.clicked.connect(self._cancel_model_download)
-        self.model_cancel_button.hide()
         actions.addWidget(self.save_settings_button)
-        actions.addWidget(self.model_download_button)
-        actions.addWidget(self.model_cancel_button)
         actions.addStretch(1)
         layout.addLayout(actions)
-        self.model_progress = QProgressBar()
-        self.model_progress.setObjectName("modelProgress")
-        self.model_progress.setRange(0, 100)
-        self.model_progress.setValue(0)
-        self.model_progress.setTextVisible(True)
-        self.model_progress.hide()
-        self.model_progress_detail = QLabel("")
-        self.model_progress_detail.setObjectName("sectionSubtitle")
-        self.model_progress_detail.hide()
-        layout.addWidget(self.model_progress)
-        layout.addWidget(self.model_progress_detail)
-        self.model_combo.currentIndexChanged.connect(self._render_model_profile)
         layout.addStretch(1)
         return page
 
@@ -828,19 +778,6 @@ class _SettingsWindow(QMainWindow):
     def _refresh_settings_controls(self, config):
         engine = config.get("engine", {})
         active = engine.get("active", "sensevoice")
-        self.model_combo.blockSignals(True)
-        self.model_combo.clear()
-        for profile in user_model_profiles():
-            state = self.model_manager.status(profile.engine, config).state
-            suffix = "" if state is ModelState.READY else " · 未安装"
-            self.model_combo.addItem(
-                f"{profile.title} · {profile.badge}{suffix}",
-                profile.engine,
-            )
-        index = self.model_combo.findData(active)
-        self.model_combo.setCurrentIndex(max(0, index))
-        self.model_combo.blockSignals(False)
-        self._render_model_profile()
         threads = final_thread_count(
             (engine.get(active) or {}).get("num_threads", "auto")
         )
@@ -865,22 +802,21 @@ class _SettingsWindow(QMainWindow):
         self.autostart_check.setChecked(is_autostart_enabled(self.paths))
 
     def _save_settings(self):
-        engine = self.model_combo.currentData()
         config = self._load_config()
+        engine = config.get("engine", {}).get("active", "sensevoice")
         if self._switch_in_progress:
             return
         if self.model_manager.status(engine, config).state is not ModelState.READY:
-            self._set_status_badge("请先安装所选模型")
+            self._set_status_badge("本机识别能力不可用，请重新安装 VoiceFlow")
             return
         self._switch_in_progress = True
         self.save_settings_button.setEnabled(False)
-        self._set_status_badge("正在验证模型完整性")
+        self._set_status_badge("正在保存设置")
         payload = {
             "engine": engine,
             "language": self.language_combo.currentData(),
             "device_index": self.microphone_combo.currentData(),
             "autostart": self.autostart_check.isChecked(),
-            "previous_engine": config.get("engine", {}).get("active", "sensevoice"),
         }
 
         def run():
@@ -888,22 +824,12 @@ class _SettingsWindow(QMainWindow):
                 status = self.model_manager.status(engine, config, verify=True)
                 if status.state is not ModelState.READY:
                     raise RuntimeError("模型 SHA-256 完整性校验未通过")
-                switch = ModelSwitchCoordinator(
-                    self.paths.model_switch_dir,
-                    self.paths.config_file,
-                )
-                apply = lambda: update_runtime_settings(
+                update_runtime_settings(
                     self.paths.config_file,
                     engine=engine,
                     language=payload["language"],
                     device_index=payload["device_index"],
                 )
-                if engine != payload["previous_engine"]:
-                    switch.stage(engine=engine, apply=apply)
-                    payload["staged"] = True
-                else:
-                    apply()
-                    payload["staged"] = False
                 payload["ok"] = True
             except Exception as error:
                 payload["ok"] = False
@@ -917,18 +843,14 @@ class _SettingsWindow(QMainWindow):
         self._switch_in_progress = False
         self.save_settings_button.setEnabled(True)
         if not payload.get("ok"):
-            self._set_status_badge(f"切换失败：{payload.get('error', '未知错误')}")
+            self._set_status_badge(f"设置保存失败：{payload.get('error', '未知错误')}")
             return
         try:
             set_autostart(self.paths, bool(payload.get("autostart")))
         except Exception as error:
-            self._set_status_badge(f"模型已保存；自动启动设置失败：{error}")
+            self._set_status_badge(f"听写设置已保存；自动启动设置失败：{error}")
             return
-        self._set_status_badge(
-            "已安全切换，重启时验证；失败会自动回滚"
-            if payload.get("staged")
-            else "设置已保存，重启后生效"
-        )
+        self._set_status_badge("设置已保存，重启后生效")
 
     def _current_language_label(self):
         try:
@@ -939,7 +861,7 @@ class _SettingsWindow(QMainWindow):
             active = engine.get("active", "sensevoice")
             language = (engine.get(active) or {}).get("language", "auto")
             labels = {"zh": "中文优先", "en": "English 优先", "auto": "自动中英"}
-            return f"{labels.get(language, language)} ({active})"
+            return labels.get(language, language)
         except Exception:
             return "配置读取失败"
 
@@ -1196,69 +1118,6 @@ class _SettingsWindow(QMainWindow):
         pyperclip.copy("\n\n".join(texts))
         self._set_status_badge("已复制")
 
-    def _open_model_setup(self):
-        config = self._load_config()
-        engine = self.model_combo.currentData() or config.get("engine", {}).get(
-            "active",
-            "sensevoice",
-        )
-        if self._download_task is not None:
-            return
-        status = self.model_manager.status(engine, config, verify=True)
-        if status.state is ModelState.READY:
-            self._set_status_badge("模型 SHA-256 完整性校验通过")
-            return
-        self.model_progress.setValue(0)
-        self.model_progress.show()
-        self.model_progress_detail.setText("正在准备固定版本下载…")
-        self.model_progress_detail.show()
-        self.model_download_button.setEnabled(False)
-        self.model_cancel_button.show()
-        self._download_task = self.model_manager.start_download(
-            engine,
-            self.model_download_updated.emit,
-        )
-
-    def _cancel_model_download(self):
-        if self._download_task is not None:
-            self._download_task.cancel()
-
-    @Slot(object)
-    def _finish_model_download_update(self, update):
-        state = update.get("state")
-        self.model_progress.setValue(int(update.get("progress", 0)))
-        self.model_progress_detail.setText(str(update.get("detail", "")))
-        self._set_status_badge(str(update.get("detail", "")))
-        if state not in {"ready", "failed", "cancelled"}:
-            return
-        self._download_task = None
-        self.model_download_button.setEnabled(True)
-        self.model_cancel_button.hide()
-        if state == "ready":
-            self.model_progress.setValue(100)
-            self.refresh()
-
-    def _render_model_profile(self, *_args):
-        engine = self.model_combo.currentData()
-        if not engine:
-            return
-        profile = profile_for_engine(engine)
-        config = self._load_config()
-        self._populate_language_options(engine, config)
-        state = self.model_manager.status(engine, config).state
-        self.model_profile_title.setText(f"{profile.title} · {profile.badge}")
-        self.model_profile_description.setText(profile.summary)
-        self.model_profile_meta.setText(
-            f"{profile.languages}　·　{profile.hardware}　·　下载 {profile.download_size_label}"
-        )
-        self.model_profile_evidence.setText(profile.evidence_note)
-        if state is ModelState.READY:
-            self.model_download_button.setText("验证完整性")
-        elif state is ModelState.CORRUPT:
-            self.model_download_button.setText("修复模型")
-        else:
-            self.model_download_button.setText(f"下载 {profile.download_size_label}")
-
     def _populate_language_options(self, engine, config):
         configured = (
             config.get("engine", {}).get(engine, {}).get("language")
@@ -1509,46 +1368,16 @@ class _SettingsWindow(QMainWindow):
             border: 1px solid #ececf0;
             border-radius: 12px;
         }
-        QWidget#modelPanel, QWidget#hotkeyPanel, QWidget#recoveryPanel,
+        QWidget#hotkeyPanel, QWidget#recoveryPanel,
         QWidget#aboutHero, QWidget#privacyPanel {
             background: #ffffff;
             border: 1px solid #ececf0;
             border-radius: 13px;
         }
-        QLabel#modelProfileTitle {
-            color: #1d1d1f;
-            font-size: 16px;
-            font-weight: 650;
-        }
-        QLabel#modelProfileDescription {
-            color: #515154;
-            font-size: 14px;
-        }
-        QLabel#modelProfileMeta {
-            color: #86868b;
-            font-size: 12px;
-        }
-        QLabel#modelProfileEvidence {
-            color: #5f5f64;
-            font-size: 12px;
-            padding-top: 5px;
-        }
         QLabel#recoveryTitle {
             color: #8a5600;
             font-size: 14px;
             font-weight: 650;
-        }
-        QProgressBar#modelProgress {
-            min-height: 8px;
-            max-height: 8px;
-            border: none;
-            border-radius: 4px;
-            background: #e8e8ed;
-            color: transparent;
-        }
-        QProgressBar#modelProgress::chunk {
-            border-radius: 4px;
-            background: #007aff;
         }
         QLabel#readinessName {
             color: #6e6e73;
@@ -2128,6 +1957,20 @@ class OverlayWindow:
             f"appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})"
         )
 
+    def update_transcript_state(self, state):
+        self._js(
+            "updateTranscriptState("
+            f"{json.dumps(state.authoritative_prefix, ensure_ascii=False)}, "
+            f"{json.dumps(state.draft_tail, ensure_ascii=False)}, "
+            f"{int(state.session_id)})"
+        )
+
+    def show_authoritative_final(self, text, session_id):
+        self._js(
+            "showAuthoritativeFinal("
+            f"{json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
+        )
+
     def update_audio_level(self, levels, session_id):
         if self._bridge:
             safe_levels = [max(0.0, min(float(level), 1.0)) for level in levels[:3]]
@@ -2139,25 +1982,21 @@ class OverlayWindow:
         self._tray_state(TRAY_ICON_PROCESSING)
         self._js("showProcessing()")
 
-    def show_finalizing(self, session_id):
+    def show_settling(self, session_id):
         self._tray_state(TRAY_ICON_PROCESSING)
-        self._js(f"showFinalizing({int(session_id)})")
+        self._js(f"showSettling({int(session_id)})")
 
 
     def show_done(self):
         self._tray_state(TRAY_ICON_IDLE)
         self._js("showDone()")
 
-    def show_final_summary(self, character_count, session_id):
-        self._tray_state(TRAY_ICON_IDLE)
-        self._js(f"showFinalSummary({int(character_count)}, {int(session_id)})")
-
-    def show_delivery_summary(self, status, character_count, session_id):
+    def show_delivery_state(self, status, session_id):
         self._tray_state(TRAY_ICON_IDLE)
         self._js(
-            "showDeliverySummary("
+            "showDeliveryState("
             f"{json.dumps(str(status))}, "
-            f"{int(character_count)}, {int(session_id)})"
+            f"{int(session_id)})"
         )
 
 

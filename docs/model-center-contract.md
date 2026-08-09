@@ -1,6 +1,10 @@
 # Model Center Contract
 
-Status: local candidate only. No model or installer has been published by this change.
+Status: superseded by
+[`ADR-002`](decisions/ADR-002-single-visual-state-and-fixed-model.md). The
+ordinary product no longer exposes model selection, download, repair, or
+switching. The remaining sections are retained as historical engineering
+context only.
 
 ## Ordinary user choices
 

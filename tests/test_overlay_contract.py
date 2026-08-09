@@ -31,14 +31,16 @@ def test_streaming_queue_is_bounded_and_catches_up_without_unbounded_transcript_
     assert "displayedStreamingText = [];" not in html
 
 
-def test_final_summary_uses_truthful_delivery_copy():
+def test_delivery_state_uses_minimal_truthful_copy():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert "function showDeliverySummary(" in html
-    assert "已复制到剪贴板" in html
-    assert "已复制并发送粘贴" in html
-    assert "def show_delivery_summary(" in overlay
+    assert "function showDeliveryState(" in html
+    assert "clipboard_verified_only: '已复制'" in html
+    assert "clipboard_verified_paste_dispatched: '已完成'" in html
+    assert "已复制并发送粘贴" not in html
+    assert "check_only" not in html
+    assert "def show_delivery_state(" in overlay
 
 
 def test_streaming_renders_only_confirmed_append_only_text():
@@ -49,18 +51,24 @@ def test_streaming_renders_only_confirmed_append_only_text():
     assert "function updateStreaming(" not in html
     assert "streamingTargetProvisional" not in html
     assert "commonGraphemePrefix" not in html
-    assert "txt.textContent = tail.join('');" in html
+    assert "renderStreamingTail();" in html
+    assert "draftText.textContent =" in html
     assert "innerHTML" not in html
     assert "def append_streaming(self, delta, session_id):" in overlay
     assert "self.overlay.append_streaming(delta, generation)" in main
     assert "self.overlay.update_streaming(" not in main
 
 
-def test_streaming_text_uses_one_color_without_a_color_transition():
+def test_recording_text_uses_one_color_and_authoritative_updates_keep_the_red_meter():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    state_start = html.index("function updateTranscriptState(")
+    state_block = html[state_start:html.index("function showAuthoritativeFinal(", state_start)]
 
     assert "transition: color" not in html
-    assert "rgba(245, 245, 247, 0.48)" not in html
+    assert ".ticker-draft" in html
+    assert ".ticker-draft {\n    color: var(--text);\n}" in html
+    assert "pill.className = 'pill streaming';" in state_block
+    assert "'pill authoritative'" not in state_block
     assert ".ticker-provisional {" not in html
 
 
@@ -97,20 +105,20 @@ def test_streaming_tail_is_cropped_without_horizontal_translation():
     assert "horizontalOffset: 0" in html
 
 
-def test_processing_and_final_summary_cancel_pending_characters():
+def test_processing_and_authoritative_final_cancel_pending_characters():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     processing = html[
         html.index("function showProcessing()"):
-        html.index("function showFinalizing(")
+        html.index("function showSettling(")
     ]
     final = html[
-        html.index("function showFinalSummary("):
-        html.index("function showResult(")
+        html.index("function showAuthoritativeFinal("):
+        html.index("function showSettling(")
     ]
 
     assert "cancelStreamingQueue();" in processing
-    assert "resetTextMotion();" in final
-    assert "`已复制 · ${count}字`" in final
+    assert "cancelStreamingQueue();" in final
+    assert "setTranscriptBuffers(text || '', '');" in final
 
 
 def test_reduced_motion_appends_the_confirmed_delta_immediately():
@@ -176,23 +184,23 @@ def test_online_preview_uses_one_monotonic_append_path():
     assert "self.overlay.append_streaming(delta, generation)" in main
 
 
-def test_finalizing_and_final_summary_are_session_guarded():
+def test_settling_authoritative_final_and_delivery_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert "function showFinalizing(sessionId)" in html
-    assert "activeSession = sessionId;" in html[html.index("function showFinalizing(sessionId)"):html.index("function showDone()")]
-    assert "pill.className = 'pill finalizing';" in html
-    assert "function showFinalSummary(characterCount, sessionId)" in html
-    final_block = html[html.index("function showFinalSummary(characterCount, sessionId)"):html.index("function showResult(msg)")]
+    assert "function showSettling(sessionId)" in html
+    settling_block = html[html.index("function showSettling(sessionId)"):html.index("function showDeliveryState(")]
+    assert "if (sessionId < activeSession) return;" in settling_block
+    assert "pill.className = 'pill settling';" in settling_block
+    assert "function showAuthoritativeFinal(text, sessionId)" in html
+    final_block = html[html.index("function showAuthoritativeFinal(text, sessionId)"):html.index("function showSettling(sessionId)")]
     assert "if (sessionId < activeSession) return;" in final_block
-    assert "pill.className = 'pill final_ready success';" in final_block
-    assert "resetTextMotion();" in final_block
-    assert "已复制 · ${count}字" in final_block
-    assert "def show_finalizing(self, session_id):" in overlay
-    assert "showFinalizing({int(session_id)})" in overlay
-    assert "def show_final_summary(self, character_count, session_id):" in overlay
-    assert "showFinalSummary({int(character_count)}, {int(session_id)})" in overlay
+    assert "pill.className = 'pill final_text';" in final_block
+    assert "cancelStreamingQueue();" in final_block
+    assert "def show_settling(self, session_id):" in overlay
+    assert "showSettling({int(session_id)})" in overlay
+    assert "def show_authoritative_final(self, text, session_id):" in overlay
+    assert "showAuthoritativeFinal(" in overlay
 
 
 def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
@@ -210,11 +218,24 @@ def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     assert 'for label in ("状态", "听写", "词典", "历史")' in overlay
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
-    assert 'self.model_combo.setAccessibleName("识别模型")' in overlay
     assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
     assert 'self.microphone_combo.setAccessibleName("麦克风")' in overlay
     assert 'self.doctor_list.setAccessibleName("诊断结果")' in overlay
     assert 'self.practice_box.setAccessibleName("VoiceFlow 试说输入框")' in overlay
+
+
+def test_settings_do_not_expose_model_choice_or_download_controls():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    status_start = overlay.index("def _status_page(self):")
+    status_block = overlay[status_start:overlay.index("def _dictionary_page(self):", status_start)]
+
+    assert "model_combo" not in status_block
+    assert "model_download_button" not in status_block
+    assert "model_cancel_button" not in status_block
+    assert "model_progress" not in status_block
+    assert '("模型",' not in status_block
+    assert "下载" not in status_block
 
 
 def test_history_does_not_expose_internal_output_status_codes():
@@ -374,7 +395,7 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "QLabel#sectionTitle" in settings_block
 
 
-def test_settings_status_page_exposes_language_and_model_setup_action():
+def test_settings_status_page_exposes_language_without_model_setup_actions():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
@@ -382,16 +403,14 @@ def test_settings_status_page_exposes_language_and_model_setup_action():
 
     assert "self.language_combo = QComboBox()" in settings_block
     assert '("语言", self.language_combo)' in settings_block
-    assert "self.model_combo = QComboBox()" in settings_block
+    assert "self.model_combo = QComboBox()" not in settings_block
     assert "def _save_settings(self):" in settings_block
-    assert '"验证完整性"' in settings_block
-    assert '"实验室"' in (ROOT / "src" / "model_catalog.py").read_text(encoding="utf-8")
-    assert "for profile in user_model_profiles()" in settings_block
-    assert "self.model_download_button.clicked.connect(self._open_model_setup)" in settings_block
-    assert "self.model_cancel_button.clicked.connect(self._cancel_model_download)" in settings_block
-    assert "self.model_progress = QProgressBar()" in settings_block
-    assert "def _open_model_setup(self):" in settings_block
-    assert "self.model_manager.start_download" in settings_block
+    assert "for profile in user_model_profiles()" not in settings_block
+    assert "model_download_button" not in settings_block
+    assert "model_cancel_button" not in settings_block
+    assert "self.model_progress = QProgressBar()" not in settings_block
+    assert "def _open_model_setup(self):" not in settings_block
+    assert "self.model_manager.start_download" not in settings_block
 
 
 def test_sensevoice_language_copy_recommends_automatic_bilingual_detection():
@@ -551,34 +570,36 @@ def test_streaming_updates_are_session_guarded():
     assert "appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})" in overlay
 
 
-def test_stop_flow_outputs_before_final_summary_feedback():
+def test_stop_flow_replaces_final_text_before_minimal_delivery_feedback():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     stop_idx = main.index("def _on_record_stop")
     stream_idx = main.index("def _start_streaming", stop_idx)
     stop_block = main[stop_idx:stream_idx]
 
     assert "final_generation = self._stop_streaming()" in stop_block
-    assert "self.overlay.show_finalizing(final_generation)" in stop_block
+    assert "self.overlay.show_settling(final_generation)" in stop_block
+    assert "self.overlay.show_authoritative_final(text, final_generation)" in stop_block
     assert "delivery = self.output_handler.deliver(" in stop_block
-    assert "self.overlay.show_delivery_summary(" in stop_block
-    assert stop_block.index("delivery = self.output_handler.deliver(") < stop_block.index("self.overlay.show_delivery_summary(")
+    assert "self.overlay.show_delivery_state(" in stop_block
+    assert stop_block.index("self.overlay.show_authoritative_final(") < stop_block.index("delivery = self.output_handler.deliver(")
+    assert stop_block.index("delivery = self.output_handler.deliver(") < stop_block.index("self.overlay.show_delivery_state(")
     assert "self.overlay.show_done()" not in stop_block
     assert "self.overlay.show_result(text)" not in stop_block
 
 
-def test_overlay_has_processing_finalizing_spinner_and_final_checkmark():
+def test_overlay_has_processing_settling_spinner_and_final_checkmark():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     processing_idx = html.index("function showProcessing()")
-    done_idx = html.index("function showFinalizing(sessionId)", processing_idx)
+    done_idx = html.index("function showSettling(sessionId)", processing_idx)
     processing_block = html[processing_idx:done_idx]
     processing_ticker_block = html[html.index(".processing .ticker"):html.index(".error .ticker")]
 
     assert ".pill.done" in html
-    assert ".pill.finalizing" in html
-    assert ".pill.final_ready" in html
+    assert ".pill.settling" in html
+    assert ".final_text .mark span" in html
     assert ".processing .mark::before" in html
-    assert ".finalizing .mark::before" in html
+    assert ".settling .mark::before" in html
     assert ".done .mark::before" in html
     assert ".final_ready .mark::before" in html
     assert "@keyframes spin" in html
@@ -604,7 +625,7 @@ def test_overlay_processing_only_changes_mark_state():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
     processing_css = html[html.index(".pill.processing"):html.index(".pill.done")]
     processing_idx = html.index("function showProcessing()")
-    processing_block = html[processing_idx:html.index("function showFinalizing(sessionId)", processing_idx)]
+    processing_block = html[processing_idx:html.index("function showSettling(sessionId)", processing_idx)]
 
     assert "--target-width" not in processing_css
     assert "pill.className = 'pill processing';" in processing_block
@@ -634,11 +655,11 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     assert 'id="wave"' in svg
     assert 'id="check"' in svg
     assert 'id="liveText"' in svg
-    assert 'id="finalText"' in svg
+    assert 'id="finalText"' not in svg
     assert "@keyframes waveState" in svg
     assert "@keyframes checkState" in svg
     assert "@keyframes liveTextState" in svg
-    assert "@keyframes finalTextState" in svg
+    assert "@keyframes finalTextState" not in svg
     assert 'id="demo-spinner"' not in svg
     assert "@keyframes spinnerState" not in svg
 
@@ -652,7 +673,7 @@ def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
     assert "prefers-reduced-motion: reduce" in svg
     assert "明早十点，把方案同步给团队。" in svg
     assert "按一下开始，再按一下完成" in svg
-    assert "已复制 · 14字" in svg
+    assert "已复制 · 14字" not in svg
     assert 'id="softPanel"' not in svg
 
 
@@ -684,3 +705,96 @@ def test_tray_menu_can_toggle_dictation_without_a_global_hotkey():
     assert 'QAction("开始 / 停止听写"' in overlay
     assert "dictate_act.triggered.connect(self._on_record_toggle)" in overlay
     assert "on_record_toggle=self._on_record_toggle" in main
+
+
+def test_flagship_capsule_uses_draft_and_authoritative_text_layers():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    assert 'id="authoritativeText"' in html
+    assert 'id="draftText"' in html
+    assert ".ticker-draft" in html
+    assert "color: var(--muted);" in html
+    assert "function updateTranscriptState(" in html
+    assert "function showAuthoritativeFinal(" in html
+    assert "def update_transcript_state(" in overlay
+    assert "def show_authoritative_final(" in overlay
+    assert "innerHTML" not in html
+
+
+def test_stop_wait_keeps_text_and_uses_an_unlabelled_spinner_after_350ms():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+    settling_start = html.index("function showSettling(sessionId)")
+    settling_end = html.index("function showDeliveryState(", settling_start)
+    settling = html[settling_start:settling_end]
+
+    assert "FINALIZING_DELAY_SECONDS = 0.35" in main
+    assert "pill.className = 'pill settling';" in settling
+    assert "cancelStreamingQueue();" in settling
+    assert "txt.textContent" not in settling
+    assert "setWidthForLabel" not in settling
+    assert "整理中" not in settling
+    assert "pill.classList.contains('final_text')" in settling
+    assert "pill.classList.contains('final_ready')" in settling
+    assert ".settling .mark::before" in html
+    assert ".settling .ticker" in html
+
+
+def test_delivery_feedback_is_minimal_truthful_and_has_accessible_detail():
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+
+    delivery_start = html.index("function showDeliveryState(")
+    delivery_end = html.index("function showResult(", delivery_start)
+    delivery = html[delivery_start:delivery_end]
+
+    assert "clipboard_verified_paste_dispatched: '已完成'" in delivery
+    assert "clipboard_verified_only: '已复制'" in delivery
+    assert "recovery_saved_clipboard_unavailable: '已保存'" in delivery
+    assert "clipboard_verified_paste_dispatched: '已复制并发送粘贴'" not in delivery
+    assert "clipboard_verified_only: '已复制到剪贴板'" not in delivery
+    assert "字`" not in delivery
+    assert "pill.setAttribute('aria-label'" in delivery
+    assert "check_only" not in delivery
+    assert ".pill.check_only" not in html
+    assert "def show_delivery_state(" in overlay
+
+
+def test_final_text_replaces_the_draft_before_delivery_feedback():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    stop_start = main.index("def _on_record_stop")
+    stop_end = main.index("def _audio_sample_count", stop_start)
+    stop = main[stop_start:stop_end]
+
+    final_text = stop.index("self.overlay.show_authoritative_final(")
+    delivery = stop.index("delivery = self.output_handler.deliver(")
+    feedback = stop.index("self.overlay.show_delivery_state(")
+
+    assert stop.index("finalizing_done.set()") < final_text
+    assert final_text < delivery < feedback
+    assert "self.overlay.show_delivery_summary(" not in stop
+    assert "self.overlay.show_final_summary(" not in stop
+
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+    final_start = html.index("function showAuthoritativeFinal(")
+    final_end = html.index("function showProcessing()", final_start)
+    final = html[final_start:final_end]
+    assert "pill.classList.contains('final_ready')" in final
+    assert "pill.classList.contains('recovery')" in final
+
+
+def test_delivery_dwell_matches_the_visible_feedback_contract():
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "FINAL_REPLACEMENT_DWELL_MS = 140" in html
+    assert "FINAL_TEXT_HOLD_SHORT_MS = 700" in main
+    assert "CLIPBOARD_ONLY_HOLD_MS = 1040" in main
+    assert "RECOVERY_SAVED_HOLD_MS = 1740" in main
+    hold_start = main.index("def _final_text_hold_ms")
+    hold_end = main.index("def _delivery_hold_ms", hold_start)
+    hold = main[hold_start:hold_end]
+    assert "return self.FINAL_TEXT_HOLD_SHORT_MS" in hold
+    assert "FINAL_TEXT_HOLD_LONG_MS" not in hold

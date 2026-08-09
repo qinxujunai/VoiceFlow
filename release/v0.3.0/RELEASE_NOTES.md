@@ -9,8 +9,9 @@
 - 所有终稿先写入并反读验证剪贴板；只有目标仍是同一个可编辑控件时才发送粘贴。
 - 焦点变化、未知控件或权限不兼容时不冒险粘贴，明确显示“已复制到剪贴板”。
 - 胶囊只显示模型已确认的文字，长英文和中文都按真实像素宽度平滑扩展，不回滚、不重播、不泄漏模型控制符。
-- 设置后台收敛为状态、听写、词典和历史四个任务；提供模型大小、速度、内存和证据说明。
-- 可选 Qwen3-ASR 0.6B 支持应用内固定版本下载、进度、取消、SHA-256 校验和启动失败回滚；当前仍标记为实验模型，不宣称比默认模型更准。
+- 设置后台收敛为状态、听写、词典和历史四个任务；普通用户无需选择、下载或维护模型。
+- 胶囊预览与权威终稿使用统一文字颜色，录音条保持稳定红色；完成后明确显示“已完成”。
+- 自然停顿后的权威文字更快回填，停止后的短任务不再绕行冗长状态。
 - 一小时音频覆盖、剪贴板竞争、焦点安全、状态机故障注入、高 DPI 和真实 WebEngine 进入发布质量门槛。
 
 ## 下载
@@ -19,11 +20,11 @@ Windows 10 / 11 x64 用户下载：
 
 `VoiceFlow-0.3.0-Windows-x64.exe`
 
-安装包包含默认 SenseVoice 终稿模型和双语流式预览模型；其他实验模型按需下载，不扩大默认安装包。
+安装包已经包含 SenseVoice 终稿模型和双语流式预览模型，安装后无需额外下载模型。
 
 ---
 
 VoiceFlow 0.3.0 adds recoverable recording sessions, verified clipboard-first
 delivery, focus-safe paste dispatch, automatic Chinese-English detection, and
-an honest in-app model center. The bundled default remains fully offline and
-optional models are downloaded only after explicit user action.
+a quieter capsule with faster pause correction. The reviewed default models
+are bundled for a fully offline, no-setup experience.

@@ -161,6 +161,15 @@ class OnlinePreviewTranscriber:
             "num_threads": preview_thread_count(requested_threads),
             "sample_rate": int(sample_rate),
             "enable_endpoint_detection": True,
+            "rule1_min_trailing_silence": float(
+                preview.get("rule1_min_trailing_silence", 1.6)
+            ),
+            "rule2_min_trailing_silence": float(
+                preview.get("rule2_min_trailing_silence", 0.55)
+            ),
+            "rule3_min_utterance_length": float(
+                preview.get("rule3_min_utterance_length", 18.0)
+            ),
             "provider": preview.get("provider", "cpu"),
         }
         if runtime_engine == "online-paraformer":

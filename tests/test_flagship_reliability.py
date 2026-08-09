@@ -408,7 +408,8 @@ def test_main_connects_recovery_safe_text_and_truthful_delivery_in_order():
     assert "self._safe_text.sanitize(raw_text)" in source
     assert "self._recording_state.mark_delivering()" in source
     assert "self.output_handler.deliver(" in source
-    assert "self.overlay.show_delivery_summary(" in source
+    assert "self.overlay.show_authoritative_final(" in source
+    assert "self.overlay.show_delivery_state(" in source
     assert source.index("self._safe_text.sanitize(raw_text)") < source.index(
         "self.output_handler.deliver("
     )

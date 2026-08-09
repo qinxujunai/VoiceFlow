@@ -40,6 +40,7 @@ from platform_utils import open_path
 from recovery_session import RecoverySessionStore
 from safe_text import SafeTextBoundary
 from model_switch import ModelSwitchCoordinator
+from transcript_state import FinalizationTimeline, TranscriptViewState
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -81,12 +82,14 @@ class VoiceInputSystem:
     STREAM_PREVIEW_POLL_SECONDS = 0.04
     FINAL_SEGMENT_SECONDS = 18.0
     FINAL_SEGMENT_OVERLAP_SECONDS = 1.0
-    FINAL_SEGMENT_HOLD_SECONDS = 2.0
-    SEGMENTED_FINAL_MIN_SECONDS = 45.0
-    FINALIZING_VISIBLE_AFTER_SECONDS = 20.0
-    FINALIZING_DELAY_SECONDS = 0.18
+    FINAL_SEGMENT_HOLD_SECONDS = 0.25
+    SEGMENTED_FINAL_MIN_SECONDS = 20.0
+    PREVIEW_ENDPOINT_LIMIT = 256
+    FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
+    FINALIZING_DELAY_SECONDS = 0.35
     FINAL_TEXT_HOLD_SHORT_MS = 700
-    FINAL_TEXT_HOLD_LONG_MS = 1400
+    CLIPBOARD_ONLY_HOLD_MS = 1040
+    RECOVERY_SAVED_HOLD_MS = 1740
 
     def __init__(self, config_path=None, *, paths=None):
         self.paths = paths or AppPaths.discover(config_path=config_path)
@@ -122,6 +125,11 @@ class VoiceInputSystem:
         self._final_segments = []
         self._finalized_audio_len = 0
         self._final_cache_lock = threading.Lock()
+        self._final_cache_state_lock = threading.Lock()
+        self._final_cache_idle = threading.Event()
+        self._final_cache_idle.set()
+        self._preview_endpoint_lock = threading.Lock()
+        self._preview_endpoint_samples = []
         self._transcribe_lock = threading.Lock()
         recovery_config = self.config.get("recovery", {})
         self._recovery_enabled = bool(recovery_config.get("enabled", True))
@@ -339,12 +347,29 @@ class VoiceInputSystem:
 
         try:
             freeze_started = time.perf_counter()
+            self.session.freeze()
+            audio_frozen_ms = (time.perf_counter() - freeze_started) * 1000
+            stream_handoff_started = time.perf_counter()
+            final_generation = self._stop_streaming()
+            stream_handoff_ms = (
+                time.perf_counter() - stream_handoff_started
+            ) * 1000
+            finalizing_timer = threading.Timer(
+                self.FINALIZING_DELAY_SECONDS,
+                lambda: (
+                    self.overlay.show_settling(final_generation)
+                    if not finalizing_done.is_set()
+                    else None
+                ),
+            )
+            finalizing_timer.daemon = True
+            finalizing_timer.start()
+            teardown_started = time.perf_counter()
             try:
                 result = self.session.stop()
             finally:
                 self.audio.set_recovery_sink(None)
-                audio_frozen_ms = (time.perf_counter() - freeze_started) * 1000
-                final_generation = self._stop_streaming()
+                audio_teardown_ms = (time.perf_counter() - teardown_started) * 1000
             data = result.audio_data
             if len(data) == 0:
                 if self._recovery_journal is not None:
@@ -354,18 +379,14 @@ class VoiceInputSystem:
                 self.overlay.hide_after(2000)
                 return
 
+            cache_handoff_started = time.perf_counter()
+            self._await_final_cache_handoff()
+            stream_handoff_ms += (
+                time.perf_counter() - cache_handoff_started
+            ) * 1000
+
             total_samples = result.total_samples or len(data)
             duration = result.duration or (total_samples / self.audio.sample_rate)
-            finalizing_timer = threading.Timer(
-                self.FINALIZING_DELAY_SECONDS,
-                lambda: (
-                    self.overlay.show_finalizing(final_generation)
-                    if not finalizing_done.is_set()
-                    else None
-                ),
-            )
-            finalizing_timer.daemon = True
-            finalizing_timer.start()
             if self._recovery_journal is not None:
                 self._recovery_journal.mark_state(
                     "finalizing",
@@ -378,13 +399,15 @@ class VoiceInputSystem:
                 buffer_start_sample=result.start_sample,
                 total_samples=total_samples,
             )
+            transcription_ms = (time.perf_counter() - transcription_started) * 1000
             raw_text = final_result.text
+            safe_text_started = time.perf_counter()
             safe_result = self._safe_text.sanitize(raw_text)
             text = self.cleaner.clean(safe_result.text) if safe_result.text else ""
             text = self.punctuation.restore(text)
             if text and not has_lexical_content(text):
                 text = ""
-            transcription_ms = (time.perf_counter() - transcription_started) * 1000
+            safe_text_ms = (time.perf_counter() - safe_text_started) * 1000
 
             # Safety: if final transcription empty but streaming had text, use streaming text
             if not text and self._latest_text:
@@ -402,13 +425,25 @@ class VoiceInputSystem:
                     )
 
             if text:
+                finalizing_done.set()
                 print(f"[转写] {text} ({duration:.1f}s)", flush=True)
+                self.overlay.show_authoritative_final(text, final_generation)
                 self._recording_state.mark_delivering()
+                delivery_started = time.perf_counter()
                 delivery = self.output_handler.deliver(
                     text,
                     start_target=self._target_snapshot,
                     session_id=self._active_session_id or uuid.uuid4().hex,
                     allow_paste=final_result.coverage_ok,
+                )
+                delivery_ms = (time.perf_counter() - delivery_started) * 1000
+                timeline = FinalizationTimeline(
+                    audio_frozen_ms=audio_frozen_ms,
+                    audio_teardown_ms=audio_teardown_ms,
+                    stream_handoff_ms=stream_handoff_ms,
+                    transcription_ms=transcription_ms,
+                    safe_text_ms=safe_text_ms,
+                    delivery_ms=delivery_ms,
                 )
                 output_status = delivery.output_status
                 stop_to_paste_ms = (time.perf_counter() - stop_started) * 1000
@@ -428,8 +463,12 @@ class VoiceInputSystem:
                     final_source=final_result.final_source,
                     trigger_to_feedback_ms=self._last_trigger_to_feedback_ms,
                     stop_to_paste_ms=stop_to_paste_ms,
-                    audio_frozen_ms=audio_frozen_ms,
-                    transcription_ms=transcription_ms,
+                    audio_frozen_ms=timeline.audio_frozen_ms,
+                    audio_teardown_ms=timeline.audio_teardown_ms,
+                    stream_handoff_ms=timeline.stream_handoff_ms,
+                    transcription_ms=timeline.transcription_ms,
+                    safe_text_ms=timeline.safe_text_ms,
+                    delivery_ms=timeline.delivery_ms,
                     preview_first_text_ms=self._preview_first_text_ms,
                     preview_speech_onset_sample=self._speech_onset_sample,
                     preview_first_model_delta_ms=self._preview_first_model_delta_ms,
@@ -458,18 +497,10 @@ class VoiceInputSystem:
                 elif self._recovery_journal is not None:
                     self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
-                if delivery.clipboard_verified:
-                    finalizing_done.set()
-                    self.overlay.show_delivery_summary(
-                        output_status,
-                        len(text),
-                        final_generation,
-                    )
-                    self.overlay.hide_after(self._final_text_hold_ms(duration))
-                else:
-                    finalizing_done.set()
-                    self.overlay.show_error("文字已安全保存，剪贴板暂不可用")
-                    self.overlay.hide_after(2400)
+                self.overlay.show_delivery_state(output_status, final_generation)
+                self.overlay.hide_after(
+                    self._delivery_hold_ms(output_status, duration)
+                )
                 if delivered_completely:
                     self._recording_state.mark_complete()
                 else:
@@ -592,6 +623,8 @@ class VoiceInputSystem:
         next_sample += len(new_audio)
         if update.text:
             self._latest_text = preview_session.committed_text
+        if update.endpoint_final:
+            self._note_preview_endpoint(update.audio_end_sample)
         if update.hypothesis_diverged:
             self._preview_divergence_count += 1
         if generation == self._stream_generation and update.delta:
@@ -602,6 +635,22 @@ class VoiceInputSystem:
         with self._final_cache_lock:
             self._final_segments = []
             self._finalized_audio_len = 0
+        endpoint_lock = getattr(self, "_preview_endpoint_lock", None)
+        if endpoint_lock is not None:
+            with endpoint_lock:
+                self._preview_endpoint_samples = []
+        idle = getattr(self, "_final_cache_idle", None)
+        if idle is not None:
+            idle.set()
+
+    def _await_final_cache_handoff(self):
+        idle = getattr(self, "_final_cache_idle", None)
+        if idle is None:
+            return True
+        completed = idle.wait(self.FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS)
+        if not completed:
+            logger.warning("progressive final cache handoff timed out")
+        return completed
 
     def _next_final_segment(self, chunk, finalized_audio_len):
         segment_range = self._next_final_segment_range(len(chunk), finalized_audio_len)
@@ -615,11 +664,55 @@ class VoiceInputSystem:
         overlap_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
         hold_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_HOLD_SECONDS)
         stable_len = max(0, total_samples - hold_samples)
+        endpoint = self._next_stable_endpoint(finalized_audio_len, stable_len)
+        if endpoint is not None:
+            start = max(0, finalized_audio_len - overlap_samples)
+            return start, endpoint
         if segment_samples <= 0 or stable_len - finalized_audio_len < segment_samples:
             return None
         start = max(0, finalized_audio_len - overlap_samples)
         end = finalized_audio_len + segment_samples
         return start, end
+
+    def _note_preview_endpoint(self, sample_index):
+        sample_index = max(0, int(sample_index))
+        lock = getattr(self, "_preview_endpoint_lock", None)
+        if lock is None:
+            return
+        with lock:
+            if not self._preview_endpoint_samples or sample_index > self._preview_endpoint_samples[-1]:
+                self._preview_endpoint_samples.append(sample_index)
+                if len(self._preview_endpoint_samples) > self.PREVIEW_ENDPOINT_LIMIT:
+                    del self._preview_endpoint_samples[:-self.PREVIEW_ENDPOINT_LIMIT]
+
+    def _consume_preview_endpoint(self, sample_index):
+        lock = getattr(self, "_preview_endpoint_lock", None)
+        if lock is None:
+            return False
+        sample_index = int(sample_index)
+        with lock:
+            natural_endpoint = sample_index in self._preview_endpoint_samples
+            self._preview_endpoint_samples = [
+                value for value in self._preview_endpoint_samples
+                if value > sample_index
+            ]
+        return natural_endpoint
+
+    def _next_stable_endpoint(self, finalized_audio_len, stable_len):
+        lock = getattr(self, "_preview_endpoint_lock", None)
+        if lock is None:
+            return None
+        minimum = finalized_audio_len + int(self.audio.sample_rate * 2.0)
+        maximum = min(
+            stable_len,
+            finalized_audio_len + int(self.audio.sample_rate * self.FINAL_SEGMENT_SECONDS),
+        )
+        with lock:
+            candidates = [
+                value for value in self._preview_endpoint_samples
+                if minimum <= value <= maximum
+            ]
+        return candidates[-1] if candidates else None
 
     @staticmethod
     def _segment_text(segment):
@@ -706,7 +799,7 @@ class VoiceInputSystem:
         total_samples = len(data) if total_samples is None else total_samples
         duration = total_samples / self.audio.sample_rate
         return (
-            duration > self.SEGMENTED_FINAL_MIN_SECONDS
+            duration >= self.SEGMENTED_FINAL_MIN_SECONDS
             and bool(segments)
             and buffer_start_sample <= finalized_audio_len <= total_samples
         )
@@ -861,13 +954,15 @@ class VoiceInputSystem:
         finally:
             lock.release()
 
-    def _should_show_finalizing(self, duration):
-        return duration >= self.FINALIZING_VISIBLE_AFTER_SECONDS
-
-    def _final_text_hold_ms(self, duration):
-        if duration >= self.FINALIZING_VISIBLE_AFTER_SECONDS:
-            return self.FINAL_TEXT_HOLD_LONG_MS
+    def _final_text_hold_ms(self, _duration):
         return self.FINAL_TEXT_HOLD_SHORT_MS
+
+    def _delivery_hold_ms(self, output_status, duration):
+        if output_status == "clipboard_verified_only":
+            return self.CLIPBOARD_ONLY_HOLD_MS
+        if output_status == "recovery_saved_clipboard_unavailable":
+            return self.RECOVERY_SAVED_HOLD_MS
+        return self._final_text_hold_ms(duration)
 
     def _active_engine_name(self):
         return self.config.get("engine", {}).get("active", "sensevoice")
@@ -907,24 +1002,53 @@ class VoiceInputSystem:
                         finalized_len,
                     )
                     if segment_range is not None:
-                        segment_start, segment_end = segment_range
-                        segment = self._audio_snapshot(segment_start, segment_end)
-                        has_speech = self._contains_speech(segment)
-                        segment_text = (
-                            self._transcribe_audio(
-                                segment,
-                                blocking=False,
-                                activity_checked=True,
+                        with self._final_cache_state_lock:
+                            if stop_event.is_set():
+                                break
+                            self._final_cache_idle.clear()
+                        try:
+                            segment_start, segment_end = segment_range
+                            segment = self._audio_snapshot(segment_start, segment_end)
+                            has_speech = self._contains_speech(segment)
+                            segment_text = (
+                                self._transcribe_audio(
+                                    segment,
+                                    blocking=False,
+                                    activity_checked=True,
+                                )
+                                if has_speech else ""
                             )
-                            if has_speech else ""
-                        )
-                        if segment_text is not None and (not has_speech or segment_text):
-                            self._commit_final_segment(
-                                segment_text,
-                                segment_start,
-                                segment_end,
-                                has_speech,
-                            )
+                            if segment_text is not None and (
+                                not has_speech or segment_text
+                            ):
+                                natural_endpoint = self._consume_preview_endpoint(
+                                    segment_end
+                                )
+                                self._commit_final_segment(
+                                    segment_text,
+                                    segment_start,
+                                    segment_end,
+                                    has_speech,
+                                )
+                                segments, covered_to = self._snapshot_final_cache()
+                                authoritative = self._join_transcript_parts(
+                                    [self._segment_text(item) for item in segments]
+                                )
+                                if (
+                                    natural_endpoint
+                                    and authoritative
+                                    and generation == self._stream_generation
+                                ):
+                                    self.overlay.update_transcript_state(
+                                        TranscriptViewState(
+                                            session_id=generation,
+                                            authoritative_prefix=authoritative,
+                                            covered_start_sample=0,
+                                            covered_end_sample=covered_to,
+                                        )
+                                    )
+                        finally:
+                            self._final_cache_idle.set()
                 except Exception:
                     logger.exception("progressive final cache failed")
                 stop_event.wait(0.08)
@@ -938,21 +1062,12 @@ class VoiceInputSystem:
         self._streaming = False
         stop_event = getattr(self, "_stream_stop_event", None)
         if stop_event is not None:
-            stop_event.set()
+            with self._final_cache_state_lock:
+                stop_event.set()
         self._stream_generation += 1
         final_generation = self._stream_generation
-        stream_thread = getattr(self, "_stream_thread", None)
-        if stream_thread:
-            if stream_thread is not threading.current_thread():
-                stream_thread.join(timeout=0.15)
-            if getattr(self, "_stream_thread", None) is stream_thread:
-                self._stream_thread = None
-        final_cache_thread = getattr(self, "_final_cache_thread", None)
-        if final_cache_thread:
-            if final_cache_thread is not threading.current_thread():
-                final_cache_thread.join(timeout=0.05)
-            if getattr(self, "_final_cache_thread", None) is final_cache_thread:
-                self._final_cache_thread = None
+        self._stream_thread = None
+        self._final_cache_thread = None
         if getattr(self, "_stream_stop_event", None) is stop_event:
             self._stream_stop_event = None
         return final_generation
