@@ -39,6 +39,7 @@ class HistoryStore:
         preview_first_model_delta_ms=None,
         preview_first_paint_ms=None,
         preview_update_gap_ms=None,
+        preview_active_speech_update_gap_ms=None,
         preview_queue_delay_ms=None,
         preview_divergence_count=None,
         preview_update_count=None,
@@ -48,6 +49,8 @@ class HistoryStore:
         paste_dispatched=None,
         recovery_saved=None,
         safe_text_reasons=None,
+        delivery_reason="",
+        target_evidence="",
     ):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         entry = {
@@ -106,6 +109,11 @@ class HistoryStore:
             )
         if preview_update_gap_ms is not None:
             entry["preview_update_gap_ms"] = round(float(preview_update_gap_ms), 3)
+        if preview_active_speech_update_gap_ms is not None:
+            entry["preview_active_speech_update_gap_ms"] = round(
+                float(preview_active_speech_update_gap_ms),
+                3,
+            )
         if preview_queue_delay_ms is not None:
             entry["preview_queue_delay_ms"] = round(
                 float(preview_queue_delay_ms),
@@ -127,6 +135,10 @@ class HistoryStore:
             entry["recovery_saved"] = bool(recovery_saved)
         if safe_text_reasons is not None:
             entry["safe_text_reasons"] = list(safe_text_reasons)
+        if delivery_reason:
+            entry["delivery_reason"] = str(delivery_reason)
+        if target_evidence:
+            entry["target_evidence"] = str(target_evidence)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry

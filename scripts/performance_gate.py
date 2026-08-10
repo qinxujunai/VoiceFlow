@@ -66,6 +66,11 @@ def analyze_history(
         for row in rows
         if "preview_update_gap_ms" in row
     ]
+    preview_active_gap = [
+        float(row["preview_active_speech_update_gap_ms"])
+        for row in rows
+        if "preview_active_speech_update_gap_ms" in row
+    ]
     preview_queue = [
         float(row["preview_queue_delay_ms"])
         for row in rows
@@ -84,6 +89,10 @@ def analyze_history(
         "preview_first_model_delta_p95_ms": _p95(preview_model),
         "preview_first_paint_p95_ms": _p95(preview_paint),
         "preview_update_gap_p95_ms": _p95(preview_gap),
+        "preview_active_speech_update_gap_p95_ms": _p95(preview_active_gap),
+        "preview_gap_gate_source": (
+            "active_speech" if preview_active_gap else "wall_clock_legacy"
+        ),
         "preview_queue_delay_p95_ms": _p95(preview_queue),
         "preview_chunk_chars_p95": _p95(preview_chunks),
         "feedback_samples": len(feedback),
@@ -114,8 +123,14 @@ def analyze_history(
         failures.append("preview first model delta P95 exceeds 900 ms")
     if metrics["preview_first_paint_p95_ms"] is not None and metrics["preview_first_paint_p95_ms"] > 900:
         failures.append("preview first paint P95 exceeds 900 ms")
-    if metrics["preview_update_gap_p95_ms"] is not None and metrics["preview_update_gap_p95_ms"] > 450:
-        failures.append("preview update gap P95 exceeds 450 ms")
+    gated_preview_gap = (
+        metrics["preview_active_speech_update_gap_p95_ms"]
+        if preview_active_gap
+        else metrics["preview_update_gap_p95_ms"]
+    )
+    if gated_preview_gap is not None and gated_preview_gap > 450:
+        label = "preview active-speech update gap" if preview_active_gap else "preview update gap"
+        failures.append(f"{label} P95 exceeds 450 ms")
     if metrics["preview_queue_delay_p95_ms"] is not None and metrics["preview_queue_delay_p95_ms"] > 250:
         failures.append("preview queue delay P95 exceeds 250 ms")
     if metrics["preview_chunk_chars_p95"] is not None and metrics["preview_chunk_chars_p95"] > 2:

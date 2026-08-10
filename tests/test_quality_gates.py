@@ -34,6 +34,7 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
             "preview_first_model_delta_ms": 700,
             "preview_first_paint_ms": 780,
             "preview_update_gap_ms": 420,
+            "preview_active_speech_update_gap_ms": 390,
             "preview_queue_delay_ms": 80,
             "preview_max_chunk_chars": 2,
         })
@@ -55,6 +56,8 @@ def test_performance_gate_enforces_p95_and_sample_coverage(tmp_path):
 
     assert result["passed"] is True
     assert result["metrics"]["trigger_to_feedback_p95_ms"] == 45
+    assert result["metrics"]["preview_active_speech_update_gap_p95_ms"] == 390
+    assert result["metrics"]["preview_gap_gate_source"] == "active_speech"
 
 
 def test_performance_gate_rejects_missing_release_evidence(tmp_path):
@@ -94,6 +97,7 @@ def test_performance_gate_prefers_explicit_reproducible_evidence(tmp_path):
                     "preview_first_model_delta_ms": 700,
                     "preview_first_paint_ms": 780,
                     "preview_update_gap_ms": 420,
+                    "preview_active_speech_update_gap_ms": 390,
                     "preview_queue_delay_ms": 80,
                     "preview_max_chunk_chars": 2,
                 },
@@ -134,6 +138,7 @@ def test_performance_gate_rejects_slow_or_chunky_preview(tmp_path):
                 "preview_first_model_delta_ms": 950,
                 "preview_first_paint_ms": 1050,
                 "preview_update_gap_ms": 600,
+                "preview_active_speech_update_gap_ms": 600,
                 "preview_queue_delay_ms": 300,
                 "preview_max_chunk_chars": 5,
             }
@@ -149,7 +154,7 @@ def test_performance_gate_rejects_slow_or_chunky_preview(tmp_path):
 
     assert result["passed"] is False
     assert any("preview first paint" in item for item in result["failures"])
-    assert any("preview update gap" in item for item in result["failures"])
+    assert any("preview active-speech update gap" in item for item in result["failures"])
     assert any("preview chunk" in item for item in result["failures"])
 
 

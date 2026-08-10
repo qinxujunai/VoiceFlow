@@ -36,6 +36,7 @@ from settings_store import (
     update_runtime_settings,
 )
 from runtime_paths import AppPaths, RuntimeMode
+from version import display_version
 from runtime_services import (
     ModelManager,
     ModelState,
@@ -193,7 +194,7 @@ class _SettingsWindow(QMainWindow):
         self.help_button.setMenu(help_menu)
         self.help_button.setAccessibleName("帮助、诊断与关于")
         sidebar_layout.addWidget(self.help_button)
-        build_label = QLabel(f"0.3.0 · {platform_label()}")
+        build_label = QLabel(f"{display_version()} · {platform_label()}")
         build_label.setObjectName("sidebarVersion")
         sidebar_layout.addWidget(build_label)
         sidebar_panel.setFixedWidth(184)
@@ -610,7 +611,7 @@ class _SettingsWindow(QMainWindow):
         about_copy.setSpacing(2)
         about_title = QLabel("VoiceFlow")
         about_title.setObjectName("aboutTitle")
-        version = QLabel(f"版本 0.3.0 · {platform_label()}")
+        version = QLabel(f"版本 {display_version()} · {platform_label()}")
         version.setObjectName("aboutVersion")
         about_copy.addWidget(about_title)
         about_copy.addWidget(version)

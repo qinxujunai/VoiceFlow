@@ -2,15 +2,15 @@
   "$schema": "https://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:9158a187-2ec7-5dee-889a-d825d804ecec",
+  "serialNumber": "urn:uuid:eef4a7a1-6547-5abd-8881-d8e16cc538d4",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-08-10T15:47:18.796807Z",
+    "timestamp": "2026-08-10T17:06:40.586203Z",
     "component": {
       "type": "application",
       "name": "VoiceFlow",
-      "version": "0.3.0",
-      "purl": "pkg:github/qinxujunai/VoiceFlow@v0.3.0"
+      "version": "0.3.1",
+      "purl": "pkg:github/qinxujunai/VoiceFlow@v0.3.1"
     }
   },
   "components": [
