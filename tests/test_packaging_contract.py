@@ -24,6 +24,20 @@ def test_windows_ci_forces_utf8_for_chinese_diagnostics():
     assert workflow.count("persist-credentials: false") == 3
 
 
+def test_installer_smoke_derives_the_artifact_from_the_source_version():
+    script = (ROOT / "scripts" / "smoke_installer.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '[string]$InstallerPath = ""' in script
+    assert 'src\\version.py' in script
+    assert "APP_VERSION\\s*=\\s*" in script
+    assert "([^''\"]+)" in script
+    assert '"VoiceFlow-$version-Windows-x64.exe"' in script
+    assert 'VoiceFlow-0.3.0-Windows-x64.exe' not in script
+    assert 'Could not read APP_VERSION' in script
+
+
 def test_quick_verify_rejects_pathological_model_output():
     verify = (ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
 
