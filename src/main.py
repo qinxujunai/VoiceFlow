@@ -244,6 +244,7 @@ class VoiceInputSystem:
             on_record_toggle=self._on_record_toggle,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
+            on_copy_text=self._copy_text,
             on_output_text=self._output_text,
             on_open_dictionary=self._open_dictionary,
             on_quit=self.shutdown,
@@ -379,8 +380,8 @@ class VoiceInputSystem:
                 if self._recovery_journal is not None:
                     self._recovery_journal.close_without_recovery()
                     self._recovery_journal = None
-                self.overlay.show_error("无音频")
-                self.overlay.hide_after(2000)
+                self.overlay.show_canceled()
+                self.overlay.hide_after(650)
                 return
 
             cache_handoff_started = time.perf_counter()
@@ -1124,9 +1125,9 @@ class VoiceInputSystem:
         last = self.history.last()
         text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
         if text:
-            import pyperclip
-            pyperclip.copy(text)
-            self.overlay.show_result("已复制上一次结果")
+            status = self._copy_text(text)
+            message = "已复制" if status == "clipboard_verified_only" else "复制失败"
+            self.overlay.show_result(message)
             self.overlay.hide_after(1200)
 
     def _repaste_last_text(self):
@@ -1136,7 +1137,13 @@ class VoiceInputSystem:
 
     def _output_text(self, text):
         if text and hasattr(self, "output_handler"):
-            self.output_handler.output(text)
+            return self.output_handler.output(text)
+        return "empty"
+
+    def _copy_text(self, text):
+        if text and hasattr(self, "output_handler"):
+            return self.output_handler.copy_only(text)
+        return "empty"
 
     def _recover_session(self, session_id):
         if self._recording_state.current is not RecordingState.IDLE:
