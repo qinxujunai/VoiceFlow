@@ -24,13 +24,27 @@ def test_windows_ci_forces_utf8_for_chinese_diagnostics():
     assert workflow.count("persist-credentials: false") == 3
 
 
+def test_installer_smoke_derives_the_artifact_from_the_source_version():
+    script = (ROOT / "scripts" / "smoke_installer.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '[string]$InstallerPath = ""' in script
+    assert 'src\\version.py' in script
+    assert "APP_VERSION\\s*=\\s*" in script
+    assert "([^''\"]+)" in script
+    assert '"VoiceFlow-$version-Windows-x64.exe"' in script
+    assert 'VoiceFlow-0.3.0-Windows-x64.exe' not in script
+    assert 'Could not read APP_VERSION' in script
+
+
 def test_quick_verify_rejects_pathological_model_output():
     verify = (ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
 
     assert '"--strict-output"' in verify
 
 
-def test_public_release_bundles_reviewed_preview_and_requires_signing():
+def test_public_release_bundles_reviewed_preview_and_supports_truthful_signing():
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
@@ -45,6 +59,7 @@ def test_public_release_bundles_reviewed_preview_and_requires_signing():
     assert "WINDOWS_CERTIFICATE_BASE64" in release
     assert "signtool" in release.lower()
     assert "Get-AuthenticodeSignature" in release
+    assert "Unsigned build: release notes must disclose this state" in release
     assert 'release\\$env:GITHUB_REF_NAME\\SHA256SUMS.txt' in release
     assert 'release\\$env:GITHUB_REF_NAME\\SBOM.cdx.json' in release
     assert 'release\\$env:GITHUB_REF_NAME\\THIRD_PARTY_NOTICES.md' in release
@@ -76,7 +91,7 @@ def test_product_site_deploy_is_pinned_and_uses_only_site_assets():
         encoding="utf-8"
     )
 
-    assert "path: site" in workflow
+    assert "path: ${{ runner.temp }}/voiceflow-site" in workflow
     assert "permissions:" in workflow
     assert "pages: write" in workflow
     assert "id-token: write" in workflow
@@ -104,14 +119,14 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert '<html lang="zh-CN">' in index
     assert 'data-language="zh"' in index
     assert 'data-language="en"' in index
-    assert "VoiceFlow-0.2.2-Windows-x64.exe" in index
-    assert "releases/latest/download" not in index
-    assert "releases/download/v0.2.2/" in index
+    assert "__VOICEFLOW_INSTALLER_URL__" in index
+    assert "__VOICEFLOW_VERSION__" in index
+    assert "v0.2.2" not in index + copy
     assert "macOS" not in index
     assert "Not available yet" not in copy
     assert index.count("data-download") == 1
-    assert "尚未代码签名" not in index
-    assert "not code-signed yet" not in copy
+    assert "未代码签名" in index
+    assert "not code-signed" in copy
     assert "Beta" not in index
     assert "Beta" not in copy
 
@@ -237,10 +252,45 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 0, 0)" in version
-    assert "StringStruct('FileVersion', '0.3.0')" in version
-    assert "StringStruct('ProductVersion', '0.3.0')" in version
+    assert "filevers=(0, 3, 1, 2)" in version
+    assert "prodvers=(0, 3, 1, 2)" in version
+    assert "StringStruct('FileVersion', '0.3.1.2')" in version
+    assert "StringStruct('ProductVersion', '0.3.1+260811.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
+
+
+def test_release_candidate_has_a_traceable_build_id_everywhere():
+    application = (ROOT / "src" / "version.py").read_text(encoding="utf-8")
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
+    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'APP_VERSION = "0.3.1"' in application
+    assert 'BUILD_ID = "260811.2"' in application
+    assert "display_version()" in overlay
+    assert '#define MyAppBuildId "260811.2"' in installer
+    assert "VersionInfoVersion=0.3.1.2" in installer
+    assert "build 260811.2" in notes
+
+
+def test_release_notes_installer_and_checksum_are_consistent():
+    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
+    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
+        encoding="utf-8"
+    )
+    checksums = (ROOT / "release" / "v0.3.1" / "SHA256SUMS.txt").read_text(
+        encoding="utf-8"
+    )
+
+    version = re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1)
+    installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
+    assert f"# VoiceFlow {version}" in notes
+    assert installer_name in notes
+    assert "SHA256SUMS.txt" in notes
+    assert not re.search(r"SHA-256：`[A-F0-9]{64}`", notes)
+    assert any(line.endswith(installer_name) for line in checksums.splitlines())
 
 
 def test_development_audio_samples_are_explicitly_excluded_from_the_installer():

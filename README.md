@@ -7,7 +7,7 @@
 > 开口，文字就位。
 
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
-[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe)
+[![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 
 ![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
 
@@ -23,7 +23,7 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 
 ## 下载
 
-下载 [VoiceFlow-0.2.2-Windows-x64.exe](https://github.com/qinxujunai/VoiceFlow/releases/download/v0.2.2/VoiceFlow-0.2.2-Windows-x64.exe)。
+从 [GitHub Latest Release](https://github.com/qinxujunai/VoiceFlow/releases/latest) 下载最新的 Windows 安装包。
 安装包已经包含默认离线模型，不需要 Python，安装完成即可使用。
 
 系统要求：Windows 10 / 11 x64、可用麦克风。

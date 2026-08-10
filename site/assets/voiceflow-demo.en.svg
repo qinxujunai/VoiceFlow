@@ -73,7 +73,7 @@
       <path d="M1.5 10 L6.5 15 L16.5 4.5" fill="none" stroke="#30d158" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
     <text id="liveText" class="ui" x="66" y="33" font-size="18" font-weight="500" fill="#f5f5f7" opacity="0">Send the plan by ten.</text>
-    <text id="finalText" class="ui" x="58" y="33" font-size="16" font-weight="520" fill="#f5f5f7" opacity="0">Copied · 21</text>
+    <text id="finalText" class="ui" x="62" y="33" font-size="17" font-weight="520" fill="#f5f5f7" opacity="0">Done</text>
   </g>
 
   <g class="ui" fill="#1d1d1f">

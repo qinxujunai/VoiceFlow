@@ -191,7 +191,7 @@ def test_delivery_only_dispatches_paste_to_same_confirmed_editable_target(tmp_pa
     assert not (tmp_path / "delivery" / "s1.json").exists()
 
 
-def test_delivery_uses_clipboard_only_when_focus_changed(tmp_path):
+def test_delivery_dispatches_to_the_current_foreground_when_window_changed(tmp_path):
     from delivery import DeliveryCoordinator, TargetSnapshot, VerifiedClipboard
 
     start = TargetSnapshot(101, 202, "editor-1", True, True, True)
@@ -213,9 +213,129 @@ def test_delivery_uses_clipboard_only_when_focus_changed(tmp_path):
     result = coordinator.deliver("保底文字", start_target=start, session_id="s2")
 
     assert result.clipboard_verified is True
+    assert result.paste_dispatched is True
+    assert result.clipboard_only is False
+    assert result.reason == "paste_dispatched"
+    assert pasted == [True]
+
+
+def test_delivery_dispatches_when_stop_target_is_a_transient_group(tmp_path):
+    from delivery import DeliveryCoordinator, TargetSnapshot, VerifiedClipboard
+
+    start = TargetSnapshot(101, 202, "editor-1", True, True, True)
+    transient_group = TargetSnapshot(
+        101,
+        202,
+        "uia:GroupControl:runtime:42.8",
+        False,
+        True,
+        True,
+        control_type="GroupControl",
+        rejection_reason="no_writable_evidence",
+    )
+    clipboard_value = {"value": ""}
+    pasted = []
+    coordinator = DeliveryCoordinator(
+        clipboard=VerifiedClipboard(
+            copy=lambda value: clipboard_value.__setitem__("value", value),
+            paste=lambda: clipboard_value["value"],
+            sleeper=lambda _delay: None,
+            retry_delays=(0.0,),
+        ),
+        inspect_target=lambda: transient_group,
+        dispatch_paste=lambda: pasted.append(True) or True,
+        ledger_dir=tmp_path / "delivery",
+    )
+
+    result = coordinator.deliver("结束时短暂变成分组", start_target=start, session_id="group-stop")
+
+    assert result.paste_dispatched is True
+    assert result.reason == "paste_dispatched"
+    assert pasted == [True]
+
+
+def test_delivery_dispatches_when_start_target_was_a_transient_group(tmp_path):
+    from delivery import DeliveryCoordinator, TargetSnapshot, VerifiedClipboard
+
+    transient_group = TargetSnapshot(
+        101,
+        202,
+        "uia:GroupControl:runtime:42.8",
+        False,
+        True,
+        True,
+        control_type="GroupControl",
+        rejection_reason="no_writable_evidence",
+    )
+    stop = TargetSnapshot(101, 202, "editor-1", True, True, True)
+    clipboard_value = {"value": ""}
+    pasted = []
+    coordinator = DeliveryCoordinator(
+        clipboard=VerifiedClipboard(
+            copy=lambda value: clipboard_value.__setitem__("value", value),
+            paste=lambda: clipboard_value["value"],
+            sleeper=lambda _delay: None,
+            retry_delays=(0.0,),
+        ),
+        inspect_target=lambda: stop,
+        dispatch_paste=lambda: pasted.append(True) or True,
+        ledger_dir=tmp_path / "delivery",
+    )
+
+    result = coordinator.deliver("开始时短暂变成分组", start_target=transient_group, session_id="group-start")
+
+    assert result.paste_dispatched is True
+    assert result.reason == "paste_dispatched"
+    assert pasted == [True]
+
+
+def test_delivery_blocks_when_current_foreground_is_not_integrity_compatible(tmp_path):
+    from delivery import DeliveryCoordinator, TargetSnapshot, VerifiedClipboard
+
+    elevated = TargetSnapshot(303, 404, "editor-2", True, False, True)
+    clipboard_value = {"value": ""}
+    pasted = []
+    coordinator = DeliveryCoordinator(
+        clipboard=VerifiedClipboard(
+            copy=lambda value: clipboard_value.__setitem__("value", value),
+            paste=lambda: clipboard_value["value"],
+            sleeper=lambda _delay: None,
+            retry_delays=(0.0,),
+        ),
+        inspect_target=lambda: elevated,
+        dispatch_paste=lambda: pasted.append(True) or True,
+        ledger_dir=tmp_path / "delivery",
+    )
+
+    result = coordinator.deliver("管理员窗口只保底", start_target=None, session_id="elevated")
+
     assert result.paste_dispatched is False
-    assert result.clipboard_only is True
-    assert result.reason == "target_changed_or_not_editable"
+    assert result.reason == "target_integrity_incompatible"
+    assert pasted == []
+
+
+def test_delivery_blocks_when_there_is_no_current_foreground(tmp_path):
+    from delivery import DeliveryCoordinator, TargetSnapshot, VerifiedClipboard
+
+    missing = TargetSnapshot(None, None, "", False, False, False)
+    clipboard_value = {"value": ""}
+    pasted = []
+    coordinator = DeliveryCoordinator(
+        clipboard=VerifiedClipboard(
+            copy=lambda value: clipboard_value.__setitem__("value", value),
+            paste=lambda: clipboard_value["value"],
+            sleeper=lambda _delay: None,
+            retry_delays=(0.0,),
+        ),
+        inspect_target=lambda: missing,
+        dispatch_paste=lambda: pasted.append(True) or True,
+        ledger_dir=tmp_path / "delivery",
+    )
+
+    result = coordinator.deliver("没有前台窗口", start_target=None, session_id="missing")
+
+    assert result.paste_dispatched is False
+    assert result.reason == "stop_target_unknown"
     assert pasted == []
 
 
@@ -340,7 +460,8 @@ def test_uia_focus_marks_only_writable_value_pattern_as_editable(monkeypatch):
     assert target is not None
     assert target.editable is True
     assert target.known is True
-    assert target.element_id == "uia:EditControl:message-box:42.7.9"
+    assert target.element_id == "uia:EditControl:message-box"
+    assert target.runtime_id == "42.7.9"
 
 
 def test_uia_focus_rejects_read_only_document(monkeypatch):
@@ -372,6 +493,365 @@ def test_uia_focus_rejects_read_only_document(monkeypatch):
 
     assert target is not None
     assert target.editable is False
+
+
+def test_uia_focus_uses_writable_text_selection_on_editable_ancestor(monkeypatch):
+    import delivery
+
+    class TextRange:
+        @staticmethod
+        def GetAttributeValue(_attribute):
+            return False
+
+    class TextPattern:
+        @staticmethod
+        def GetSelection():
+            return [TextRange()]
+
+    class ParentControl:
+        ProcessId = 202
+        ControlTypeName = "DocumentControl"
+        AutomationId = "message-editor"
+        ClassName = "Chrome_RenderWidgetHostHWND"
+        IsEnabled = True
+        IsKeyboardFocusable = True
+        HasKeyboardFocus = True
+        IsPassword = False
+
+        @staticmethod
+        def GetRuntimeId():
+            return (42, 10, 11)
+
+        @staticmethod
+        def GetPattern(pattern):
+            if pattern == 10014:
+                return TextPattern()
+            return None
+
+        @staticmethod
+        def GetParentControl():
+            return None
+
+    parent = ParentControl()
+
+    class FocusedLeaf:
+        ProcessId = 202
+        ControlTypeName = "TextControl"
+        AutomationId = ""
+        ClassName = ""
+        IsEnabled = True
+        IsKeyboardFocusable = False
+        HasKeyboardFocus = True
+        IsPassword = False
+
+        @staticmethod
+        def GetRuntimeId():
+            return (42, 10, 12)
+
+        @staticmethod
+        def GetPattern(_pattern):
+            return None
+
+        @staticmethod
+        def GetParentControl():
+            return parent
+
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: FocusedLeaf(),
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.editable is True
+    assert target.element_id == (
+        "uia:DocumentControl:message-editor:Chrome_RenderWidgetHostHWND"
+    )
+    assert target.editable_evidence == delivery.EditableEvidence.UIA_TEXT_WRITABLE
+    assert target.control_type == "DocumentControl"
+
+
+def test_uia_focus_rejects_read_only_text_selection(monkeypatch):
+    import delivery
+
+    text_range = types.SimpleNamespace(GetAttributeValue=lambda _attribute: True)
+    text_pattern = types.SimpleNamespace(GetSelection=lambda: [text_range])
+    control = types.SimpleNamespace(
+        ProcessId=202,
+        ControlTypeName="DocumentControl",
+        AutomationId="article",
+        ClassName="Chrome_RenderWidgetHostHWND",
+        IsEnabled=True,
+        IsKeyboardFocusable=True,
+        HasKeyboardFocus=True,
+        IsPassword=False,
+        GetRuntimeId=lambda: (42, 12),
+        GetPattern=lambda pattern: text_pattern if pattern == 10014 else None,
+        GetParentControl=lambda: None,
+    )
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: control,
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.editable is False
+    assert target.rejection_reason == "no_writable_evidence"
+
+
+def test_uia_focus_accepts_focused_legacy_text_control(monkeypatch):
+    import delivery
+
+    legacy = types.SimpleNamespace(Role=42, State=0x00100004)
+    control = types.SimpleNamespace(
+        ProcessId=202,
+        ControlTypeName="CustomControl",
+        AutomationId="rich-input",
+        ClassName="TXGuiFoundation",
+        IsEnabled=True,
+        IsKeyboardFocusable=True,
+        HasKeyboardFocus=True,
+        IsPassword=False,
+        GetRuntimeId=lambda: (42, 13),
+        GetPattern=lambda pattern: legacy if pattern == 10018 else None,
+        GetParentControl=lambda: None,
+    )
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: control,
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.editable is True
+    assert target.editable_evidence == delivery.EditableEvidence.LEGACY_TEXT
+
+
+def test_target_decision_prefers_current_foreground_but_keeps_integrity_gate():
+    from delivery import TargetSnapshot
+
+    start = TargetSnapshot(101, 202, "editor-1", True, True, True)
+    changed = TargetSnapshot(101, 202, "editor-2", True, True, True)
+    elevated = TargetSnapshot(101, 202, "editor-1", True, False, True)
+
+    assert changed.paste_decision_from(start).reason == "current_foreground_target"
+    assert changed.paste_decision_from(start).allowed is True
+    assert elevated.paste_decision_from(start).reason == "target_integrity_incompatible"
+
+
+def test_uia_runtime_id_change_keeps_normalized_editor_identity(monkeypatch):
+    import delivery
+
+    text_range = types.SimpleNamespace(GetAttributeValue=lambda _attribute: False)
+    text_pattern = types.SimpleNamespace(GetSelection=lambda: [text_range])
+
+    def control(runtime_id):
+        return types.SimpleNamespace(
+            ProcessId=202,
+            ControlTypeName="DocumentControl",
+            AutomationId="message-editor",
+            ClassName="Chrome_RenderWidgetHostHWND",
+            IsEnabled=True,
+            IsKeyboardFocusable=True,
+            HasKeyboardFocus=True,
+            IsPassword=False,
+            GetRuntimeId=lambda: runtime_id,
+            GetPattern=lambda pattern: text_pattern if pattern == 10014 else None,
+            GetParentControl=lambda: None,
+        )
+
+    fake = types.SimpleNamespace(
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    start = delivery._snapshot_uia_control(
+        fake,
+        control((42, 15, 1)),
+        foreground=101,
+        foreground_process_id=202,
+        contains_focused_descendant=False,
+    )
+    stop = delivery._snapshot_uia_control(
+        fake,
+        control((42, 15, 2)),
+        foreground=101,
+        foreground_process_id=202,
+        contains_focused_descendant=False,
+    )
+
+    assert start is not None and stop is not None
+    assert start.runtime_id != stop.runtime_id
+    assert start.element_id == stop.element_id
+    assert stop.paste_decision_from(start).allowed is True
+
+
+def test_uia_password_control_is_never_editable(monkeypatch):
+    import delivery
+
+    writable = types.SimpleNamespace(IsReadOnly=False)
+    control = types.SimpleNamespace(
+        ProcessId=202,
+        ControlTypeName="EditControl",
+        AutomationId="password",
+        ClassName="Edit",
+        IsEnabled=True,
+        IsKeyboardFocusable=True,
+        HasKeyboardFocus=True,
+        IsPassword=True,
+        GetRuntimeId=lambda: (42, 16),
+        GetPattern=lambda pattern: writable if pattern == 10002 else None,
+        GetParentControl=lambda: None,
+    )
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: control,
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.editable is False
+    assert target.rejection_reason == "password"
+
+
+def test_uia_list_with_inherited_writable_value_pattern_is_not_an_editor(monkeypatch):
+    import delivery
+
+    writable = types.SimpleNamespace(IsReadOnly=False)
+    control = types.SimpleNamespace(
+        ProcessId=202,
+        ControlTypeName="ListControl",
+        AutomationId="chat_message_list",
+        ClassName="RecyclerListView",
+        IsEnabled=True,
+        IsKeyboardFocusable=True,
+        HasKeyboardFocus=True,
+        IsPassword=False,
+        GetRuntimeId=lambda: (42, 17),
+        GetPattern=lambda pattern: writable if pattern == 10002 else None,
+        GetParentControl=lambda: None,
+    )
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: control,
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.control_type == "ListControl"
+    assert target.editable is False
+    assert target.rejection_reason == "no_writable_evidence"
+
+
+def test_uia_native_edit_class_without_verified_writable_handle_is_rejected(
+    monkeypatch,
+):
+    import delivery
+
+    read_only = types.SimpleNamespace(IsReadOnly=True)
+    control = types.SimpleNamespace(
+        ProcessId=202,
+        ControlTypeName="EditControl",
+        AutomationId="read-only-editor",
+        ClassName="Edit",
+        NativeWindowHandle=0,
+        IsEnabled=True,
+        IsKeyboardFocusable=True,
+        HasKeyboardFocus=True,
+        IsPassword=False,
+        GetRuntimeId=lambda: (42, 18),
+        GetPattern=lambda pattern: read_only if pattern == 10002 else None,
+        GetParentControl=lambda: None,
+    )
+    fake = types.SimpleNamespace(
+        GetFocusedControl=lambda: control,
+        PatternId=types.SimpleNamespace(
+            ValuePattern=10002,
+            TextPattern=10014,
+            TextEditPattern=10032,
+            LegacyIAccessiblePattern=10018,
+        ),
+        TextAttributeId=types.SimpleNamespace(IsReadOnlyAttribute=40015),
+    )
+    monkeypatch.setitem(sys.modules, "uiautomation", fake)
+    monkeypatch.setattr(delivery, "_integrity_compatible", lambda _pid: True)
+
+    target = delivery._inspect_uia_target(
+        foreground=101,
+        foreground_process_id=202,
+    )
+
+    assert target is not None
+    assert target.editable is False
+    assert target.rejection_reason == "no_writable_evidence"
 
 
 def test_safe_text_boundary_removes_protocol_tokens_and_controls_without_rewriting_words():
