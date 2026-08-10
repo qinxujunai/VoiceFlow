@@ -54,8 +54,12 @@ src/
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
-- Dispatch paste only when Windows UI Automation confirms the same editable
-  focus element at start and stop and UIPI integrity is compatible.
+- After verified clipboard delivery, dispatch one paste to the ordinary
+  foreground application observed at stop time unless there is positive
+  evidence of a blocked target (desktop, secure desktop, incompatible UIPI,
+  VoiceFlow's own non-input window, or no valid foreground window). The start
+  target is diagnostic context only; transient UIA unknown/group nodes are not
+  a clipboard-only gate.
 - Recovery PCM is temporary local state. Delete it only after verified
   clipboard delivery plus history, or after an explicit user delete action.
 - Final output must cover the complete stopped audio; streaming preview is only preview.

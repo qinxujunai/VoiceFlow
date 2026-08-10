@@ -36,7 +36,7 @@ Use one capsule with three explicit layers of truth:
 
 Delivery feedback is separate from recognition:
 
-- verified clipboard plus paste dispatch: centered green check only;
+- verified clipboard plus paste dispatch: centered green check plus `已完成`;
 - verified clipboard without paste: `已复制`;
 - durable local recovery while clipboard is unavailable: amber `已保存`;
 - errors: short reason with recovery actions elsewhere.

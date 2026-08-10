@@ -82,7 +82,7 @@ class VoiceInputSystem:
     STREAM_PREVIEW_POLL_SECONDS = 0.04
     FINAL_SEGMENT_SECONDS = 18.0
     FINAL_SEGMENT_OVERLAP_SECONDS = 1.0
-    FINAL_SEGMENT_HOLD_SECONDS = 0.25
+    FINAL_SEGMENT_HOLD_SECONDS = 0.32
     SEGMENTED_FINAL_MIN_SECONDS = 20.0
     PREVIEW_ENDPOINT_LIMIT = 256
     FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
@@ -118,6 +118,8 @@ class VoiceInputSystem:
         self._preview_queue_delay_ms = None
         self._preview_last_delta_at = None
         self._preview_update_gap_ms = None
+        self._preview_active_speech_since_delta_ms = 0.0
+        self._preview_active_speech_update_gap_ms = None
         self._preview_divergence_count = 0
         self._preview_update_count = 0
         self._preview_max_chunk_chars = 0
@@ -242,6 +244,7 @@ class VoiceInputSystem:
             on_record_toggle=self._on_record_toggle,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
+            on_copy_text=self._copy_text,
             on_output_text=self._output_text,
             on_open_dictionary=self._open_dictionary,
             on_quit=self.shutdown,
@@ -322,6 +325,8 @@ class VoiceInputSystem:
             self._preview_queue_delay_ms = None
             self._preview_last_delta_at = None
             self._preview_update_gap_ms = None
+            self._preview_active_speech_since_delta_ms = 0.0
+            self._preview_active_speech_update_gap_ms = None
             self._preview_divergence_count = 0
             self._preview_update_count = 0
             self._preview_max_chunk_chars = 0
@@ -375,8 +380,8 @@ class VoiceInputSystem:
                 if self._recovery_journal is not None:
                     self._recovery_journal.close_without_recovery()
                     self._recovery_journal = None
-                self.overlay.show_error("无音频")
-                self.overlay.hide_after(2000)
+                self.overlay.show_canceled()
+                self.overlay.hide_after(650)
                 return
 
             cache_handoff_started = time.perf_counter()
@@ -474,6 +479,9 @@ class VoiceInputSystem:
                     preview_first_model_delta_ms=self._preview_first_model_delta_ms,
                     preview_first_paint_ms=self._preview_first_paint_ms,
                     preview_update_gap_ms=self._preview_update_gap_ms,
+                    preview_active_speech_update_gap_ms=(
+                        self._preview_active_speech_update_gap_ms
+                    ),
                     preview_queue_delay_ms=self._preview_queue_delay_ms,
                     preview_divergence_count=self._preview_divergence_count,
                     preview_update_count=self._preview_update_count,
@@ -483,6 +491,8 @@ class VoiceInputSystem:
                     paste_dispatched=delivery.paste_dispatched,
                     recovery_saved=delivery.recovery_saved,
                     safe_text_reasons=safe_result.reasons,
+                    delivery_reason=delivery.reason,
+                    target_evidence=delivery.target_evidence,
                 )
                 self.output_handler.acknowledge_delivery(self._active_session_id)
                 self.overlay.complete_onboarding()
@@ -533,6 +543,8 @@ class VoiceInputSystem:
             finalizing_done.set()
             if finalizing_timer is not None:
                 finalizing_timer.cancel()
+            if hasattr(self, "output_handler"):
+                self.output_handler.cancel_target_tracking()
             self._recording_state.complete_processing()
             self._active_session_id = None
             self._target_snapshot = None
@@ -580,6 +592,14 @@ class VoiceInputSystem:
                 gap_ms,
                 self._preview_update_gap_ms or 0.0,
             )
+            active_gap_ms = float(
+                getattr(self, "_preview_active_speech_since_delta_ms", 0.0)
+            )
+            self._preview_active_speech_update_gap_ms = max(
+                active_gap_ms,
+                self._preview_active_speech_update_gap_ms or 0.0,
+            )
+        self._preview_active_speech_since_delta_ms = 0.0
         self._preview_last_delta_at = now
         self._preview_update_count += 1
         self._preview_max_chunk_chars = max(
@@ -601,6 +621,12 @@ class VoiceInputSystem:
         new_audio = self._audio_snapshot(next_sample, total_samples)
         if not len(new_audio):
             return next_sample
+        normalized = np.asarray(new_audio, dtype=np.float32) / 32768.0
+        rms = float(np.sqrt(np.mean(np.square(normalized)))) if len(normalized) else 0.0
+        if rms >= getattr(self, "_speech_rms_threshold", 0.002):
+            self._preview_active_speech_since_delta_ms = float(
+                getattr(self, "_preview_active_speech_since_delta_ms", 0.0)
+            ) + len(new_audio) / self.audio.sample_rate * 1000.0
         if getattr(self, "_speech_onset_sample", None) is None:
             onset = find_speech_onset(
                 new_audio,
@@ -1089,6 +1115,8 @@ class VoiceInputSystem:
                 self._recovery_journal = None
             self._active_session_id = None
             self._target_snapshot = None
+            if hasattr(self, "output_handler"):
+                self.output_handler.cancel_target_tracking()
             self.overlay.show_canceled()
             self.overlay.hide_after(800)
         print("[录音] 已取消", flush=True)
@@ -1097,9 +1125,9 @@ class VoiceInputSystem:
         last = self.history.last()
         text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
         if text:
-            import pyperclip
-            pyperclip.copy(text)
-            self.overlay.show_result("已复制上一次结果")
+            status = self._copy_text(text)
+            message = "已复制" if status == "clipboard_verified_only" else "复制失败"
+            self.overlay.show_result(message)
             self.overlay.hide_after(1200)
 
     def _repaste_last_text(self):
@@ -1109,7 +1137,13 @@ class VoiceInputSystem:
 
     def _output_text(self, text):
         if text and hasattr(self, "output_handler"):
-            self.output_handler.output(text)
+            return self.output_handler.output(text)
+        return "empty"
+
+    def _copy_text(self, text):
+        if text and hasattr(self, "output_handler"):
+            return self.output_handler.copy_only(text)
+        return "empty"
 
     def _recover_session(self, session_id):
         if self._recording_state.current is not RecordingState.IDLE:
@@ -1234,6 +1268,8 @@ class VoiceInputSystem:
 
         if hasattr(self, "hotkey_mgr"):
             self.hotkey_mgr.stop()
+        if hasattr(self, "output_handler"):
+            self.output_handler.shutdown()
         print("\n[系统] 已退出", flush=True)
 
 

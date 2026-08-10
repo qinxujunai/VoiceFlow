@@ -51,6 +51,8 @@ class HistoryStoreTests(unittest.TestCase):
                 preview_first_text_ms=520.0,
                 preview_update_count=18,
                 preview_max_chunk_chars=4,
+                delivery_reason="same_editable_target",
+                target_evidence="uia_text_writable",
             )
 
             last = store.last()
@@ -74,6 +76,8 @@ class HistoryStoreTests(unittest.TestCase):
             self.assertEqual(last["preview_first_text_ms"], 520.0)
             self.assertEqual(last["preview_update_count"], 18)
             self.assertEqual(last["preview_max_chunk_chars"], 4)
+            self.assertEqual(last["delivery_reason"], "same_editable_target")
+            self.assertEqual(last["target_evidence"], "uia_text_writable")
 
             rows = (Path(tmp) / "history.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(rows), 1)

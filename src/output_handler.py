@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -13,6 +14,7 @@ import yaml
 from delivery import (
     DeliveryCoordinator,
     DeliveryResult,
+    FocusMonitor,
     TargetSnapshot,
     VerifiedClipboard,
     inspect_current_target,
@@ -20,10 +22,19 @@ from delivery import (
 from platform_utils import paste_modifier
 
 
+logger = logging.getLogger("voiceflow.delivery")
+
+
 class OutputHandler:
     """Store text first, verify it, then dispatch paste only to a stable target."""
 
-    def __init__(self, config_path=None, base_dir=None, overlay=None):
+    def __init__(
+        self,
+        config_path=None,
+        base_dir=None,
+        overlay=None,
+        focus_monitor=None,
+    ):
         if config_path is None:
             config_path = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)),
@@ -42,21 +53,21 @@ class OutputHandler:
         self.history_file = str(self.base_dir / "logs" / "history.txt")
         self.overlay = overlay
         self.last_text = ""
+        self._focus_monitor = focus_monitor or FocusMonitor(
+            inspector=inspect_current_target,
+        )
+        warmup = getattr(self._focus_monitor, "warmup", None)
+        if warmup is not None:
+            warmup()
         self._coordinator = DeliveryCoordinator(
             clipboard=VerifiedClipboard(copy=pyperclip.copy, paste=pyperclip.paste),
-            inspect_target=inspect_current_target,
+            inspect_target=lambda: self._focus_monitor.observe().snapshot,
             dispatch_paste=self._dispatch_paste,
             ledger_dir=self.base_dir / "delivery-pending",
         )
-        # Import COM/UIA and build its first focus object during startup, not on
-        # the user's first recording trigger where it would delay feedback.
-        try:
-            inspect_current_target()
-        except Exception:
-            pass
 
     def capture_target(self) -> TargetSnapshot:
-        return inspect_current_target()
+        return self._focus_monitor.start_tracking().snapshot
 
     def deliver(
         self,
@@ -68,11 +79,47 @@ class OutputHandler:
     ) -> DeliveryResult:
         prepared = self._prepare_text(text)
         self.last_text = prepared
-        return self._coordinator.deliver(
-            prepared,
-            start_target=start_target,
-            session_id=session_id,
-            allow_paste=allow_paste,
+        try:
+            result = self._coordinator.deliver(
+                prepared,
+                start_target=start_target,
+                session_id=session_id,
+                allow_paste=allow_paste,
+            )
+            self._log_focus_trace(session_id)
+            return result
+        finally:
+            self._focus_monitor.stop_tracking()
+
+    def cancel_target_tracking(self):
+        self._focus_monitor.stop_tracking()
+
+    def shutdown(self):
+        self._focus_monitor.shutdown()
+
+    def _log_focus_trace(self, session_id):
+        trace_reader = getattr(self._focus_monitor, "trace", None)
+        if trace_reader is None:
+            return
+        trace = trace_reader()
+        if not trace:
+            return
+        classifications = ",".join(
+            observation.classification.value for observation in trace[-16:]
+        )
+        controls = ",".join(
+            observation.control_type or "unknown" for observation in trace[-16:]
+        )
+        last = trace[-1]
+        logger.info(
+            "delivery focus trace session=%s samples=%s classes=%s controls=%s "
+            "stop_pid=%s stop_window=%s",
+            session_id,
+            len(trace),
+            classifications,
+            controls,
+            last.process_id,
+            last.window_handle,
         )
 
     def output(self, text, *, start_target=None, session_id=None):

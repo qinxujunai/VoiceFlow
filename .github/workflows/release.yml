@@ -15,8 +15,13 @@ permissions:
 
 jobs:
   windows-release:
+    if: github.event.created == true
     runs-on: windows-latest
     timeout-minutes: 50
+    env:
+      SIGNING_AVAILABLE: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' && secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -40,17 +45,9 @@ jobs:
       - name: Install pinned dependencies
         run: python -m pip install -r requirements.lock
       - name: Import required signing certificate
+        if: env.SIGNING_AVAILABLE == 'true'
         shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64)) {
-            throw "WINDOWS_CERTIFICATE_BASE64 is required for a public release"
-          }
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            throw "WINDOWS_CERTIFICATE_PASSWORD is required for a public release"
-          }
           $certificatePath = Join-Path $env:RUNNER_TEMP "voiceflow-signing.pfx"
           [IO.File]::WriteAllBytes(
             $certificatePath,
@@ -102,6 +99,7 @@ jobs:
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
       - name: Sign application
+        if: env.SIGNING_AVAILABLE == 'true'
         shell: pwsh
         run: |
           & $env:SIGNTOOL_PATH sign `
@@ -120,17 +118,21 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          $signCommand = (
-            "`"$env:SIGNTOOL_PATH`" sign " +
-            "/sha1 $env:VOICEFLOW_CERT_THUMBPRINT " +
-            "/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `$f"
+          $arguments = @(
+            "/DINCLUDE_SENSEVOICE=1",
+            "/DINCLUDE_STREAMING_PREVIEW=1"
           )
+          if ($env:SIGNING_AVAILABLE -eq "true") {
+            $signCommand = (
+              "`"$env:SIGNTOOL_PATH`" sign " +
+              "/sha1 $env:VOICEFLOW_CERT_THUMBPRINT " +
+              "/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `$f"
+            )
+            $arguments += "/Svoiceflowsign=$signCommand"
+            $arguments += "/DSIGNTOOL=voiceflowsign"
+          }
           & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
-            "/Svoiceflowsign=$signCommand" `
-            /DSIGNTOOL=voiceflowsign `
-            /DINCLUDE_SENSEVOICE=1 `
-            /DINCLUDE_STREAMING_PREVIEW=1 `
-            installer\VoiceFlow.iss
+            @arguments installer\VoiceFlow.iss
           if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
           }
@@ -144,12 +146,20 @@ jobs:
           )
           foreach ($file in $files) {
             $signature = Get-AuthenticodeSignature -LiteralPath $file
-            if ($signature.Status -ne "Valid") {
-              throw "Invalid Authenticode signature for $file`: $($signature.Status)"
+            if ($env:SIGNING_AVAILABLE -eq "true") {
+              if ($signature.Status -ne "Valid") {
+                throw "Invalid Authenticode signature for $file`: $($signature.Status)"
+              }
+            }
+            elseif ($signature.Status -ne "NotSigned") {
+              throw "Unexpected signature state for unsigned $file`: $($signature.Status)"
             }
           }
+          if ($env:SIGNING_AVAILABLE -ne "true") {
+            Write-Warning "Unsigned build: release notes must disclose this state"
+          }
       - name: Remove imported signing certificate
-        if: always()
+        if: always() && env.SIGNING_AVAILABLE == 'true'
         shell: pwsh
         run: |
           if (-not [string]::IsNullOrWhiteSpace($env:VOICEFLOW_CERT_THUMBPRINT)) {
