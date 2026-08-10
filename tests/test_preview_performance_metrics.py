@@ -78,6 +78,7 @@ def test_history_records_preview_pipeline_stages(tmp_path):
         preview_first_model_delta_ms=320.5,
         preview_first_paint_ms=401.2,
         preview_update_gap_ms=410.0,
+        preview_active_speech_update_gap_ms=390.0,
         preview_queue_delay_ms=80.7,
         preview_divergence_count=2,
     )
@@ -85,5 +86,31 @@ def test_history_records_preview_pipeline_stages(tmp_path):
     assert entry["preview_speech_onset_sample"] == 1600
     assert entry["preview_first_model_delta_ms"] == 320.5
     assert entry["preview_first_paint_ms"] == 401.2
+    assert entry["preview_active_speech_update_gap_ms"] == 390.0
     assert entry["preview_queue_delay_ms"] == 80.7
     assert entry["preview_divergence_count"] == 2
+
+
+def test_preview_active_speech_gap_excludes_wall_clock_silence(monkeypatch):
+    import main
+    from main import VoiceInputSystem
+
+    system = object.__new__(VoiceInputSystem)
+    system._stream_generation = 3
+    system._speech_onset_at = 100.0
+    system._preview_first_model_delta_ms = 100.0
+    system._preview_first_model_delta_at = 100.1
+    system._preview_last_delta_at = 100.1
+    system._preview_update_gap_ms = None
+    system._preview_active_speech_since_delta_ms = 380.0
+    system._preview_active_speech_update_gap_ms = None
+    system._preview_update_count = 1
+    system._preview_max_chunk_chars = 1
+    system.overlay = SimpleNamespace(append_streaming=lambda *_args: None)
+    monkeypatch.setattr(main.time, "perf_counter", lambda: 103.1)
+
+    VoiceInputSystem._append_preview_delta(system, "字", 3)
+
+    assert system._preview_update_gap_ms == 3000.0
+    assert system._preview_active_speech_update_gap_ms == 380.0
+    assert system._preview_active_speech_since_delta_ms == 0.0

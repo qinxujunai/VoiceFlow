@@ -302,11 +302,11 @@ def test_progressive_cache_can_confirm_a_pause_without_a_multi_second_hold():
 
     segment_range = VoiceInputSystem._next_final_segment_range(
         system,
-        int(10.75 * rate),
+        int(10.82 * rate),
         0,
     )
 
-    assert VoiceInputSystem.FINAL_SEGMENT_HOLD_SECONDS == 0.25
+    assert VoiceInputSystem.FINAL_SEGMENT_HOLD_SECONDS == 0.32
     assert segment_range == (0, int(10.5 * rate))
 
 

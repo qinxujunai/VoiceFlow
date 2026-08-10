@@ -1,11 +1,8 @@
 name: Deploy product site
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "site/**"
-      - ".github/workflows/pages.yml"
+  release:
+    types: [published, edited]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +16,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'release' || (!github.event.release.draft && !github.event.release.prerelease)
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,10 +26,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          ref: master
+      - name: Render verified release download
+        env:
+          VOICEFLOW_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/prepare_public_site.py \
+            --output-dir "${{ runner.temp }}/voiceflow-site"
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
-          path: site
+          path: ${{ runner.temp }}/voiceflow-site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
