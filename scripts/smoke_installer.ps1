@@ -1,10 +1,24 @@
 param(
-    [string]$InstallerPath = "dist\installer\VoiceFlow-0.3.0-Windows-x64.exe",
+    [string]$InstallerPath = "",
     [int]$StartupSeconds = 8,
     [switch]$RequireStreamingPreview
 )
 
 $ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
+    $versionSource = Get-Content -LiteralPath "src\version.py" -Raw
+    $versionMatch = [regex]::Match(
+        $versionSource,
+        'APP_VERSION\s*=\s*[''"]([^''"]+)[''"]'
+    )
+    if (-not $versionMatch.Success) {
+        throw "Could not read APP_VERSION from src\version.py"
+    }
+    $version = $versionMatch.Groups[1].Value
+    $InstallerPath = Join-Path `
+        "dist\installer" `
+        "VoiceFlow-$version-Windows-x64.exe"
+}
 $resolvedInstaller = (Resolve-Path -LiteralPath $InstallerPath).Path
 $temporaryRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
 $smokeRoot = Join-Path $temporaryRoot (
