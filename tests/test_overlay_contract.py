@@ -241,8 +241,8 @@ def test_settings_do_not_expose_model_choice_or_download_controls():
 def test_history_does_not_expose_internal_output_status_codes():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert '"clipboard_verified_paste_dispatched": "已复制并发送粘贴"' in overlay
-    assert '"clipboard_verified_only": "已复制到剪贴板"' in overlay
+    assert '"clipboard_verified_paste_dispatched": "已完成"' in overlay
+    assert '"clipboard_verified_only": "已复制"' in overlay
     assert 'status = self._output_status_label' in overlay
 
 
@@ -374,7 +374,9 @@ def test_settings_window_has_recent_history_copy_controls():
     assert "QPushButton(\"复制全部\")" in settings_block
     assert "copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))" in settings_block
     assert "meta_parts.append(f\"尾部 {tail}\")" in settings_block
-    assert "pyperclip.copy(text)" in settings_block
+    assert "status = self._on_copy_text(text)" in settings_block
+    assert "label = self._output_status_label(status)" in settings_block
+    assert "pyperclip.copy(text)" not in settings_block
     assert "pyperclip.copy(\"\\n\\n\".join(texts))" in settings_block
     assert "self._on_repaste_text(text)" in settings_block
     assert "self._set_status_badge(\"无可复制\")" in settings_block
@@ -655,11 +657,13 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     assert 'id="wave"' in svg
     assert 'id="check"' in svg
     assert 'id="liveText"' in svg
-    assert 'id="finalText"' not in svg
+    assert 'id="finalText"' in svg
+    assert ">已完成</text>" in svg
+    assert "· 21" not in svg
     assert "@keyframes waveState" in svg
     assert "@keyframes checkState" in svg
     assert "@keyframes liveTextState" in svg
-    assert "@keyframes finalTextState" not in svg
+    assert "@keyframes finalTextState" in svg
     assert 'id="demo-spinner"' not in svg
     assert "@keyframes spinnerState" not in svg
 
@@ -798,3 +802,14 @@ def test_delivery_dwell_matches_the_visible_feedback_contract():
     hold = main[hold_start:hold_end]
     assert "return self.FINAL_TEXT_HOLD_SHORT_MS" in hold
     assert "FINAL_TEXT_HOLD_LONG_MS" not in hold
+
+
+def test_empty_capture_is_a_neutral_cancel_not_a_red_audio_error():
+    source = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    empty_capture = source.split("if len(data) == 0:", 1)[1].split(
+        "cache_handoff_started", 1
+    )[0]
+
+    assert "self.overlay.show_canceled()" in empty_capture
+    assert 'self.overlay.show_error("无音频")' not in empty_capture
+    assert "self.overlay.hide_after(650)" in empty_capture

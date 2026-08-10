@@ -1,6 +1,6 @@
 # Flagship Reliability Architecture
 
-Status: implemented in the local source candidate; installer and public release remain blocked.
+Status: implemented in the local source candidate; public release remains subject to the release checklist.
 
 ## Product contract
 
@@ -26,15 +26,19 @@ IDLE -> ARMING -> RECORDING -> FINALIZING -> DELIVERING
    control material but may not rewrite semantics.
 5. Write an atomic pending-delivery record.
 6. Write and exactly read back Unicode clipboard text with bounded retries.
-7. Re-read the focused UI Automation element. Dispatch paste only when start
-   and stop identify the same editable element and UIPI integrity is compatible.
+7. Observe the stop-time foreground target through UI Automation and
+   `GetGUIThreadInfo`. Dispatch one paste to an ordinary foreground application
+   unless the desktop, secure desktop, UIPI, VoiceFlow itself, or the absence
+   of a foreground window provides positive evidence to block it. The start
+   target is diagnostic context only.
 8. Append history, clear the delivery record, and delete recovery PCM only
    after successful durable delivery.
 
-Unknown controls, unavailable UI Automation providers, higher-integrity targets,
-changed focus, clipboard contention, and model failures are normal product
-states. They fall back to clipboard-only or recoverable-local delivery without
-blind paste retries.
+Unknown or transient UI Automation nodes are normal inside rich-text chat
+editors and do not by themselves block a stop-time paste. Higher-integrity
+targets, the desktop, clipboard contention, and model failures remain normal
+product states with clipboard-only or recoverable-local delivery and no blind
+paste retries.
 
 ## Bounded long-session resources
 

@@ -30,7 +30,7 @@ def test_quick_verify_rejects_pathological_model_output():
     assert '"--strict-output"' in verify
 
 
-def test_public_release_bundles_reviewed_preview_and_requires_signing():
+def test_public_release_bundles_reviewed_preview_and_supports_truthful_signing():
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
@@ -45,6 +45,7 @@ def test_public_release_bundles_reviewed_preview_and_requires_signing():
     assert "WINDOWS_CERTIFICATE_BASE64" in release
     assert "signtool" in release.lower()
     assert "Get-AuthenticodeSignature" in release
+    assert "Unsigned build: release notes must disclose this state" in release
     assert 'release\\$env:GITHUB_REF_NAME\\SHA256SUMS.txt' in release
     assert 'release\\$env:GITHUB_REF_NAME\\SBOM.cdx.json' in release
     assert 'release\\$env:GITHUB_REF_NAME\\THIRD_PARTY_NOTICES.md' in release
@@ -237,9 +238,10 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 1, 1)" in version
-    assert "StringStruct('FileVersion', '0.3.1.1')" in version
-    assert "StringStruct('ProductVersion', '0.3.1+260811.1')" in version
+    assert "filevers=(0, 3, 1, 2)" in version
+    assert "prodvers=(0, 3, 1, 2)" in version
+    assert "StringStruct('FileVersion', '0.3.1.2')" in version
+    assert "StringStruct('ProductVersion', '0.3.1+260811.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -252,11 +254,11 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     )
 
     assert 'APP_VERSION = "0.3.1"' in application
-    assert 'BUILD_ID = "260811.1"' in application
+    assert 'BUILD_ID = "260811.2"' in application
     assert "display_version()" in overlay
-    assert '#define MyAppBuildId "260811.1"' in installer
-    assert "VersionInfoVersion=0.3.1.1" in installer
-    assert "build 260811.1" in notes
+    assert '#define MyAppBuildId "260811.2"' in installer
+    assert "VersionInfoVersion=0.3.1.2" in installer
+    assert "build 260811.2" in notes
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
@@ -270,14 +272,11 @@ def test_release_notes_installer_and_checksum_are_consistent():
 
     version = re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1)
     installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
-    digest = next(
-        line.split()[0]
-        for line in checksums.splitlines()
-        if line.endswith(installer_name)
-    )
     assert f"# VoiceFlow {version}" in notes
     assert installer_name in notes
-    assert digest.upper() in notes
+    assert "SHA256SUMS.txt" in notes
+    assert not re.search(r"SHA-256：`[A-F0-9]{64}`", notes)
+    assert any(line.endswith(installer_name) for line in checksums.splitlines())
 
 
 def test_development_audio_samples_are_explicitly_excluded_from_the_installer():

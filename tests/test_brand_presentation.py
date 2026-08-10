@@ -42,7 +42,7 @@ def test_product_site_uses_only_the_real_demo():
         assert phrase not in page
 
     assert page.count("data-download") == 1
-    assert "SenseVoice" in page
+    assert "SenseVoice" not in page
     assert "Qwen3" not in page
     assert "无需下载或切换模型" in page
     assert "本版本" in page
@@ -60,6 +60,29 @@ def test_product_site_demo_matches_readme_demo():
     assert "prefers-reduced-motion: reduce" in site_demo
     assert 'rx="48" fill="#f5f5f7"' in site_demo
     assert 'id="softPanel"' not in site_demo
+    assert 'id="finalText"' in site_demo
+    assert ">已完成</text>" in site_demo
+
+
+def test_bilingual_demo_uses_the_real_short_completion_state():
+    chinese_demo = _read("site/assets/voiceflow-demo.svg")
+    english_demo = _read("site/assets/voiceflow-demo.en.svg")
+
+    assert ">已完成</text>" in chinese_demo
+    assert ">Done</text>" in english_demo
+    assert "Copied" not in english_demo
+    assert "· 21" not in english_demo
+
+
+def test_public_copy_matches_stop_time_foreground_delivery_policy():
+    page = _read("site/index.html")
+    copy = _read("site/app.js")
+
+    assert "停止时仍在普通应用，就发送一次粘贴" in page
+    assert "停止时仍在普通应用，就发送一次粘贴" in copy
+    assert "At stop time, VoiceFlow sends one paste" in copy
+    assert "未知输入框只复制" not in page + copy
+    assert "focus remains in a verified editor" not in copy
 
 
 def test_removed_composite_assets_stay_removed():
@@ -315,3 +338,12 @@ def test_public_site_renderer_rejects_a_non_uploaded_compliance_asset(tmp_path):
 
     assert result.returncode != 0
     assert "not uploaded" in result.stderr.casefold()
+
+
+def test_visual_capture_fixtures_use_natural_speech_not_engineering_copy():
+    capture = (PROJECT_ROOT / "scripts" / "capture_ui_states.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "正在稳定追加完整转写" not in capture
+    assert "明早十点，把方案同步给团队。" in capture

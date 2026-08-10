@@ -43,7 +43,6 @@ from runtime_services import (
     format_diagnostics,
     run_runtime_diagnostics,
 )
-from performance_profile import final_thread_count
 from platform_utils import (
     data_location_label,
     icon_asset_name,
@@ -110,6 +109,7 @@ class _SettingsWindow(QMainWindow):
 
     def __init__(
         self,
+        on_copy_text=None,
         on_repaste_text=None,
         on_recover_session=None,
         on_delete_recovery=None,
@@ -124,16 +124,19 @@ class _SettingsWindow(QMainWindow):
         self.paths = paths
         self.root = str(self.paths.data_dir)
         self.model_manager = ModelManager(self.paths)
+        self._on_copy_text = on_copy_text
         self._on_repaste_text = on_repaste_text
         self._on_recover_session = on_recover_session
         self._on_delete_recovery = on_delete_recovery
         self.recovery_store = RecoverySessionStore(self.paths.recovery_dir)
         self._history_rows = []
+        self._dictionary_entries = {}
+        self._active_dictionary_filename = None
         self._last_diagnostics = None
         self._microphone_detected = False
         self._switch_in_progress = False
         self.setWindowTitle("VoiceFlow")
-        self.setMinimumSize(1000, 680)
+        self.setMinimumSize(940, 640)
 
         shell = QWidget()
         shell.setObjectName("appShell")
@@ -194,10 +197,11 @@ class _SettingsWindow(QMainWindow):
         self.help_button.setMenu(help_menu)
         self.help_button.setAccessibleName("帮助、诊断与关于")
         sidebar_layout.addWidget(self.help_button)
-        build_label = QLabel(f"{display_version()} · {platform_label()}")
+        build_label = QLabel(f"{display_version()}\n{platform_label()}")
         build_label.setObjectName("sidebarVersion")
+        build_label.setToolTip(f"{display_version()} · {platform_label()}")
         sidebar_layout.addWidget(build_label)
-        sidebar_panel.setFixedWidth(184)
+        sidebar_panel.setFixedWidth(196)
 
         self.stack = QStackedWidget()
         self.stack.setObjectName("contentStack")
@@ -268,10 +272,7 @@ class _SettingsWindow(QMainWindow):
         self.trial_button.setObjectName("primaryButton")
         self.trial_button.setAccessibleName("开始一次试说")
         self.trial_button.clicked.connect(self._start_trial)
-        history = QPushButton("查看历史")
-        history.clicked.connect(lambda: self.sidebar.setCurrentRow(3))
         hero_actions.addWidget(self.trial_button)
-        hero_actions.addWidget(history)
         hero_actions.addStretch(1)
         hero_layout.addLayout(hero_actions)
         layout.addWidget(hero)
@@ -285,7 +286,7 @@ class _SettingsWindow(QMainWindow):
         readiness_layout.setContentsMargins(12, 12, 12, 12)
         readiness_layout.setSpacing(10)
         values = []
-        for title in ("麦克风", "离线模型", "快捷键"):
+        for title in ("麦克风", "本地处理", "快捷键"):
             item = QWidget()
             item.setObjectName("readinessItem")
             item_layout = QVBoxLayout(item)
@@ -304,7 +305,7 @@ class _SettingsWindow(QMainWindow):
         readiness.setFixedHeight(86)
         layout.addWidget(readiness)
 
-        practice_label = QLabel("先试一次")
+        practice_label = QLabel("试说")
         practice_label.setObjectName("subsectionTitle")
         practice_note = QLabel(f"把光标放在下方。{trigger_instruction()}")
         practice_note.setObjectName("sectionSubtitle")
@@ -341,7 +342,7 @@ class _SettingsWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
-        layout.addLayout(self._section_header("最近转录", "查看、复制或重新送达最近结果"))
+        layout.addLayout(self._section_header("历史", "查看、复制或再次粘贴最近结果"))
 
         self.recovery_panel = QWidget()
         self.recovery_panel.setObjectName("recoveryPanel")
@@ -382,6 +383,9 @@ class _SettingsWindow(QMainWindow):
         refresh = QPushButton("刷新")
         refresh.clicked.connect(self._refresh_history)
         toolbar.addWidget(refresh)
+        copy_all = QPushButton("复制全部")
+        copy_all.clicked.connect(self._copy_all_visible)
+        toolbar.addWidget(copy_all)
         layout.addLayout(toolbar)
 
         self.history_list = QListWidget()
@@ -390,19 +394,6 @@ class _SettingsWindow(QMainWindow):
         self.history_list.itemDoubleClicked.connect(lambda item: self._copy_text(item.data(Qt.ItemDataRole.UserRole)))
         layout.addWidget(self.history_list, 1)
 
-        actions = QHBoxLayout()
-        self.copy_button = QPushButton("复制")
-        self.copy_button.setObjectName("primaryButton")
-        self.copy_button.clicked.connect(self._copy_selected)
-        self.repaste_button = QPushButton("再次粘贴")
-        self.repaste_button.clicked.connect(self._repaste_selected)
-        copy_all = QPushButton("复制全部")
-        copy_all.clicked.connect(self._copy_all_visible)
-        actions.addWidget(self.copy_button)
-        actions.addWidget(self.repaste_button)
-        actions.addWidget(copy_all)
-        actions.addStretch(1)
-        layout.addLayout(actions)
         return page
 
     def _status_page(self):
@@ -429,13 +420,9 @@ class _SettingsWindow(QMainWindow):
             "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
         )
         self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
-        self.mode_status = QLabel("离线 · 录音不会离开这台电脑")
-        self.performance_status = QLabel("平衡 · 6 个识别线程")
         rows = (
             ("语言", self.language_combo),
             ("麦克风", self.microphone_combo),
-            ("性能", self.performance_status),
-            ("隐私", self.mode_status),
         )
         for row, (name, value) in enumerate(rows):
             name_label = QLabel(name)
@@ -445,6 +432,19 @@ class _SettingsWindow(QMainWindow):
             grid.addWidget(value, row, 1)
         layout.addLayout(grid)
         layout.addWidget(self.autostart_check)
+
+        privacy_panel = QWidget()
+        privacy_panel.setObjectName("privacyPanel")
+        privacy_layout = QVBoxLayout(privacy_panel)
+        privacy_layout.setContentsMargins(14, 11, 14, 11)
+        privacy_layout.setSpacing(3)
+        privacy_title = QLabel("本地处理")
+        privacy_title.setObjectName("readinessName")
+        privacy_copy = QLabel("录音和文字不会上传")
+        privacy_copy.setObjectName("hotkeyValue")
+        privacy_layout.addWidget(privacy_title)
+        privacy_layout.addWidget(privacy_copy)
+        layout.addWidget(privacy_panel)
 
         hotkey_panel = QWidget()
         hotkey_panel.setObjectName("hotkeyPanel")
@@ -471,6 +471,9 @@ class _SettingsWindow(QMainWindow):
         self.save_settings_button.setAccessibleName("保存听写设置")
         self.save_settings_button.clicked.connect(self._save_settings)
         actions.addWidget(self.save_settings_button)
+        save_note = QLabel("保存后重新启动 VoiceFlow 生效")
+        save_note.setObjectName("sectionSubtitle")
+        actions.addWidget(save_note)
         actions.addStretch(1)
         layout.addLayout(actions)
         layout.addStretch(1)
@@ -496,46 +499,47 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_section.addItem("确定性纠错", "corrections.txt")
         layout.addWidget(self.dictionary_section)
 
-        self.dictionary_stack = QStackedWidget()
-        self.dictionary_stack.setObjectName("dictionaryStack")
-        dictionary_specs = (
-            (
-                "user-dictionary.txt",
-                "用户词典",
-                "每行一个专有词，例如：\nVoiceFlow\n产品发布会\n项目代号",
-            ),
-            (
-                "phrases.txt",
-                "常用短语",
-                "每行一个常用短语，例如：\n离线语音输入\n发布质量门",
-            ),
-            (
-                "corrections.txt",
-                "确定性纠错",
-                "每行使用 错误=正确，例如：\nvoice flow=VoiceFlow",
-            ),
-        )
-        self.dictionary_editors = {}
-        for filename, accessible_name, placeholder in dictionary_specs:
-            editor = QPlainTextEdit()
-            editor.setObjectName("dictionaryEditor")
-            editor.setAccessibleName(accessible_name)
-            editor.setPlaceholderText(placeholder)
-            self.dictionary_editors[filename] = editor
-            self.dictionary_stack.addWidget(editor)
+        add_row = QHBoxLayout()
+        self.dictionary_input = QLineEdit()
+        self.dictionary_input.setAccessibleName("新增词典条目")
+        self.dictionary_input.setPlaceholderText("添加专有词")
+        self.dictionary_input.returnPressed.connect(self._add_dictionary_entry)
+        add = QPushButton("添加")
+        add.setObjectName("primaryButton")
+        add.clicked.connect(self._add_dictionary_entry)
+        add_row.addWidget(self.dictionary_input, 1)
+        add_row.addWidget(add)
+        layout.addLayout(add_row)
+
+        self.dictionary_hint = QLabel("每项单独一行，双击可以修改。")
+        self.dictionary_hint.setObjectName("sectionSubtitle")
+        layout.addWidget(self.dictionary_hint)
+
+        self.dictionary_list = QListWidget()
+        self.dictionary_list.setObjectName("dictionaryList")
+        self.dictionary_list.setAccessibleName("词典条目")
+        self.dictionary_list.itemChanged.connect(self._dictionary_item_changed)
+        layout.addWidget(self.dictionary_list, 1)
+
+        self.dictionary_count = QLabel("0 项")
+        self.dictionary_count.setObjectName("historyMeta")
+        layout.addWidget(self.dictionary_count)
+
         self.dictionary_section.currentIndexChanged.connect(
-            self.dictionary_stack.setCurrentIndex
+            self._change_dictionary_section
         )
-        layout.addWidget(self.dictionary_stack, 1)
+        self._active_dictionary_filename = self.dictionary_section.currentData()
 
         note = QLabel(
-            "全部内容只保存在这台电脑。纠错只执行明确的“错误=正确”替换，"
+            "全部内容只保存在这台电脑。纠错只执行明确的“错误词=正确词”替换，"
             "不会调用生成模型改写意思。"
         )
         note.setObjectName("privacyNote")
         note.setWordWrap(True)
         layout.addWidget(note)
         actions = QHBoxLayout()
+        remove = QPushButton("删除所选")
+        remove.clicked.connect(self._remove_dictionary_entries)
         save = QPushButton("保存词典")
         save.setObjectName("primaryButton")
         save.clicked.connect(self._save_dictionary)
@@ -543,6 +547,7 @@ class _SettingsWindow(QMainWindow):
         open_folder.clicked.connect(
             lambda: open_path(self.paths.knowledge_dir)
         )
+        actions.addWidget(remove)
         actions.addWidget(save)
         actions.addWidget(open_folder)
         actions.addStretch(1)
@@ -712,16 +717,8 @@ class _SettingsWindow(QMainWindow):
         self.home_microphone.setText(
             f"已检测 · {microphone_name}" if microphone_ready else "需要选择"
         )
-        model_labels = {
-            "sensevoice": "SenseVoice",
-            "qwen3-asr": "Qwen3-ASR",
-            "fun-asr-nano": "Fun-ASR Nano",
-            "whisper-turbo": "Whisper Turbo",
-        }
         self.home_model.setText(
-            f"已验证 · {model_labels.get(active, active)}"
-            if model_ready
-            else "需要修复"
+            "可用 · 录音和文字不会上传" if model_ready else "需要修复"
         )
         self.home_hotkeys.setText(trigger_summary())
         self.trial_button.setEnabled(all_ready)
@@ -735,26 +732,135 @@ class _SettingsWindow(QMainWindow):
         return self.paths.knowledge_dir / filename
 
     def _load_dictionary(self):
-        for filename, editor in self.dictionary_editors.items():
+        for filename in (
+            "user-dictionary.txt",
+            "phrases.txt",
+            "corrections.txt",
+        ):
             try:
                 raw = self._dictionary_path(filename).read_text(encoding="utf-8")
-                entries = [
+                self._dictionary_entries[filename] = [
                     line
                     for line in raw.splitlines()
                     if line.strip() and not line.lstrip().startswith("#")
                 ]
-                editor.setPlainText("\n".join(entries))
             except FileNotFoundError:
-                editor.clear()
+                self._dictionary_entries[filename] = []
             except Exception as error:
+                self._dictionary_entries[filename] = []
                 self._set_status_badge(f"词典读取失败: {error}")
+        self._active_dictionary_filename = self.dictionary_section.currentData()
+        self._render_dictionary_section()
+
+    def _store_dictionary_section(self):
+        filename = self._active_dictionary_filename
+        if not filename or not hasattr(self, "dictionary_list"):
+            return
+        entries = []
+        for index in range(self.dictionary_list.count()):
+            value = self.dictionary_list.item(index).text().strip()
+            if value and value not in entries:
+                entries.append(value)
+        self._dictionary_entries[filename] = entries
+
+    def _render_dictionary_section(self):
+        filename = self._active_dictionary_filename
+        if not filename or not hasattr(self, "dictionary_list"):
+            return
+        self.dictionary_list.blockSignals(True)
+        self.dictionary_list.clear()
+        for value in self._dictionary_entries.get(filename, []):
+            item = QListWidgetItem(value)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            self.dictionary_list.addItem(item)
+        self.dictionary_list.blockSignals(False)
+        corrections = filename == "corrections.txt"
+        if corrections:
+            self.dictionary_input.setPlaceholderText("错误词=正确词")
+            self.dictionary_hint.setText("写成“错误词=正确词”，双击可以修改。")
+        elif filename == "phrases.txt":
+            self.dictionary_input.setPlaceholderText("添加常用短语")
+            self.dictionary_hint.setText("添加经常完整说出的短语，双击可以修改。")
+        else:
+            self.dictionary_input.setPlaceholderText("添加专有词")
+            self.dictionary_hint.setText("添加人名、品牌或项目名，双击可以修改。")
+        self._update_dictionary_count()
+
+    def _change_dictionary_section(self, _index):
+        self._store_dictionary_section()
+        self._active_dictionary_filename = self.dictionary_section.currentData()
+        self._render_dictionary_section()
+
+    def _valid_dictionary_entry(self, value):
+        if self._active_dictionary_filename != "corrections.txt":
+            return bool(value)
+        if value.count("=") != 1:
+            return False
+        wrong, correct = (part.strip() for part in value.split("=", 1))
+        return bool(wrong and correct)
+
+    def _add_dictionary_entry(self):
+        value = self.dictionary_input.text().strip()
+        if not self._valid_dictionary_entry(value):
+            message = (
+                "请使用“错误词=正确词”"
+                if self._active_dictionary_filename == "corrections.txt"
+                else "请输入内容"
+            )
+            self._set_status_badge(message, attention=True)
+            return
+        existing = {
+            self.dictionary_list.item(index).text().strip()
+            for index in range(self.dictionary_list.count())
+        }
+        if value in existing:
+            self._set_status_badge("词典中已有这一项")
+            return
+        item = QListWidgetItem(value)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.dictionary_list.addItem(item)
+        self.dictionary_input.clear()
+        self._store_dictionary_section()
+        self._update_dictionary_count()
+        self._set_status_badge("已添加，保存后生效")
+
+    def _remove_dictionary_entries(self):
+        selected = self.dictionary_list.selectedItems()
+        if not selected:
+            self._set_status_badge("请选择要删除的内容")
+            return
+        for item in selected:
+            self.dictionary_list.takeItem(self.dictionary_list.row(item))
+        self._store_dictionary_section()
+        self._update_dictionary_count()
+        self._set_status_badge("已移除，保存后生效")
+
+    def _dictionary_item_changed(self, item):
+        value = item.text().strip()
+        if not self._valid_dictionary_entry(value):
+            self._set_status_badge("这一项格式不正确", attention=True)
+            return
+        self.dictionary_list.blockSignals(True)
+        item.setText(value)
+        self.dictionary_list.blockSignals(False)
+        self._store_dictionary_section()
+        self._update_dictionary_count()
+
+    def _update_dictionary_count(self):
+        if hasattr(self, "dictionary_count"):
+            self.dictionary_count.setText(f"{self.dictionary_list.count()} 项")
 
     def _save_dictionary(self):
         try:
-            for filename, editor in self.dictionary_editors.items():
+            self._store_dictionary_section()
+            for filename, entries in self._dictionary_entries.items():
+                if filename == "corrections.txt" and any(
+                    not self._valid_correction(value) for value in entries
+                ):
+                    raise ValueError("纠错内容需要使用“错误词=正确词”")
                 path = self._dictionary_path(filename)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                text = editor.toPlainText().strip()
+                text = "\n".join(entries).strip()
                 temporary = path.with_suffix(path.suffix + ".tmp")
                 temporary.write_text(
                     f"{text}\n" if text else "",
@@ -764,6 +870,13 @@ class _SettingsWindow(QMainWindow):
             self._set_status_badge("词典已保存，重启后生效")
         except Exception as error:
             self._set_status_badge(f"词典保存失败: {error}")
+
+    @staticmethod
+    def _valid_correction(value):
+        if value.count("=") != 1:
+            return False
+        wrong, correct = (part.strip() for part in value.split("=", 1))
+        return bool(wrong and correct)
 
     def _load_config(self):
         try:
@@ -779,11 +892,6 @@ class _SettingsWindow(QMainWindow):
     def _refresh_settings_controls(self, config):
         engine = config.get("engine", {})
         active = engine.get("active", "sensevoice")
-        threads = final_thread_count(
-            (engine.get(active) or {}).get("num_threads", "auto")
-        )
-        self.performance_status.setText(f"自动平衡 · {threads} 个最终识别线程")
-
         self._populate_language_options(active, config)
 
         self.microphone_combo.clear()
@@ -868,16 +976,16 @@ class _SettingsWindow(QMainWindow):
 
     def _output_status_label(self, status):
         return {
-            "clipboard_verified_paste_dispatched": "已复制并发送粘贴",
-            "clipboard_verified_only": "已复制到剪贴板",
-            "recovery_saved_clipboard_unavailable": "文字已安全保存，等待复制",
-            "clipboard_copied_paste_sent": "已复制并发送粘贴",
-            "clipboard_copied_integrity_warning": "完整性未确认，仅保留到剪贴板",
-            "fallback": "已保留在剪贴板",
+            "clipboard_verified_paste_dispatched": "已完成",
+            "clipboard_verified_only": "已复制",
+            "recovery_saved_clipboard_unavailable": "已保存",
+            "clipboard_copied_paste_sent": "已完成",
+            "clipboard_copied_integrity_warning": "已复制",
+            "fallback": "已复制",
             "typed": "已输入",
-            "error": "处理失败",
-            "unknown": "状态未知",
-        }.get(status, "已处理")
+            "error": "失败",
+            "unknown": "未知",
+        }.get(status, "未知")
 
     def _format_timestamp(self, value):
         try:
@@ -989,6 +1097,12 @@ class _SettingsWindow(QMainWindow):
         copy.setObjectName("inlineCopyButton")
         copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))
         row.addWidget(copy)
+        repaste = QPushButton("再次粘贴")
+        repaste.setObjectName("inlineRepasteButton")
+        repaste.clicked.connect(
+            lambda _=False, value=text: self._repaste_text(value)
+        )
+        row.addWidget(repaste)
         return card
 
     def _empty_card(self):
@@ -1019,18 +1133,27 @@ class _SettingsWindow(QMainWindow):
         if not text:
             self._set_status_badge("无可复制")
             return
-        import pyperclip
-        pyperclip.copy(text)
-        self._set_status_badge("已复制")
+        if not self._on_copy_text:
+            self._set_status_badge("复制失败", attention=True)
+            return
+        status = self._on_copy_text(text)
+        label = self._output_status_label(status)
+        self._set_status_badge(label, attention=label in {"失败", "未知"})
 
     def _repaste_selected(self):
         text = self._selected_text()
+        self._repaste_text(text)
+
+    def _repaste_text(self, text):
         if not text:
             self._set_status_badge("无可粘贴")
             return
-        if self._on_repaste_text:
-            self._on_repaste_text(text)
-            self._set_status_badge("已粘贴")
+        if not self._on_repaste_text:
+            self._set_status_badge("粘贴失败", attention=True)
+            return
+        status = self._on_repaste_text(text)
+        label = self._output_status_label(status)
+        self._set_status_badge(label, attention=label in {"失败", "未知"})
 
     def _refresh_recovery(self):
         sessions = self.recovery_store.list_recoverable()
@@ -1331,10 +1454,14 @@ class _SettingsWindow(QMainWindow):
             border: none;
             font-weight: 600;
         }
-        QStackedWidget#contentStack, QWidget#contentPage {
+        QStackedWidget#contentStack {
             background: #fbfbfc;
             border: 1px solid #dedee3;
             border-radius: 16px;
+        }
+        QWidget#contentPage {
+            background: transparent;
+            border: none;
         }
         QLabel#sectionTitle {
             font-size: 22px;
@@ -1356,8 +1483,8 @@ class _SettingsWindow(QMainWindow):
             font-weight: 600;
         }
         QWidget#heroPanel {
-            background: #f0f6ff;
-            border: 1px solid #dce9fb;
+            background: #ffffff;
+            border: 1px solid #ececf0;
             border-radius: 16px;
         }
         QWidget#readinessPanel {
@@ -1446,7 +1573,8 @@ class _SettingsWindow(QMainWindow):
             font-weight: 500;
         }
         QLineEdit, QPlainTextEdit, QComboBox,
-        QListWidget#historyList, QListWidget#diagnosticList {
+        QListWidget#historyList, QListWidget#diagnosticList,
+        QListWidget#dictionaryList {
             border: 1px solid #d5d5da;
             border-radius: 9px;
             background: #ffffff;
@@ -1461,11 +1589,13 @@ class _SettingsWindow(QMainWindow):
             width: 32px;
             border: none;
         }
-        QListWidget#historyList, QListWidget#diagnosticList {
+        QListWidget#historyList, QListWidget#diagnosticList,
+        QListWidget#dictionaryList {
             outline: none;
             background: #f4f4f6;
         }
-        QListWidget#historyList::item, QListWidget#diagnosticList::item {
+        QListWidget#historyList::item, QListWidget#diagnosticList::item,
+        QListWidget#dictionaryList::item {
             padding: 0px;
             margin: 5px;
             border-radius: 10px;
@@ -1473,7 +1603,8 @@ class _SettingsWindow(QMainWindow):
             background: #ffffff;
         }
         QListWidget#historyList::item:selected,
-        QListWidget#diagnosticList::item:selected {
+        QListWidget#diagnosticList::item:selected,
+        QListWidget#dictionaryList::item:selected {
             color: #1d1d1f;
             background: #eef5ff;
             border: 1px solid #c8dfff;
@@ -1528,7 +1659,7 @@ class _SettingsWindow(QMainWindow):
             padding-left: 8px;
             padding-right: 8px;
         }
-        QPushButton#inlineCopyButton {
+        QPushButton#inlineCopyButton, QPushButton#inlineRepasteButton {
             min-width: 58px;
             min-height: 28px;
             padding: 3px 10px;
@@ -1553,6 +1684,7 @@ class OverlayWindow:
         self._on_record_toggle = None
         self._on_copy_last = None
         self._on_repaste_last = None
+        self._on_copy_text = None
         self._on_output_text = None
         self._on_open_dictionary = None
         self._on_quit = None
@@ -1581,6 +1713,7 @@ class OverlayWindow:
         on_record_toggle=None,
         on_copy_last=None,
         on_repaste_last=None,
+        on_copy_text=None,
         on_output_text=None,
         on_open_dictionary=None,
         on_quit=None,
@@ -1592,6 +1725,7 @@ class OverlayWindow:
         self._on_record_toggle = on_record_toggle
         self._on_copy_last = on_copy_last
         self._on_repaste_last = on_repaste_last
+        self._on_copy_text = on_copy_text
         self._on_output_text = on_output_text
         self._on_open_dictionary = on_open_dictionary
         self._on_quit = on_quit
@@ -1844,6 +1978,7 @@ class OverlayWindow:
     def _ensure_settings_window(self):
         if self._settings_window is None:
             self._settings_window = _SettingsWindow(
+                on_copy_text=self._on_copy_text,
                 on_repaste_text=self._on_output_text,
                 on_recover_session=self._on_recover_session,
                 on_delete_recovery=self._on_delete_recovery,

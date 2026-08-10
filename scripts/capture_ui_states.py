@@ -33,9 +33,9 @@ from qt_compat import (  # noqa: E402
 
 OVERLAY_STATES = {
     "recording": "prepareRecording(1); updateAudioLevel([0.018, 0.092, 0.044], 1)",
-    "streaming": "prepareRecording(2); appendStreaming('正在稳定追加完整转写', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
+    "streaming": "prepareRecording(2); appendStreaming('明早十点，把方案同步给团队。', 2); updateAudioLevel([0.032, 0.118, 0.061], 2)",
     "mixed": "prepareRecording(3); updateTranscriptState('明早十点，', '把方案同步给团队。', 3)",
-    "settling": "prepareRecording(4); updateTranscriptState('', '正在稳定追加完整转写', 4); showSettling(4)",
+    "settling": "prepareRecording(4); updateTranscriptState('', '明早十点，把方案同步给团队。', 4); showSettling(4)",
     "final_text": "prepareRecording(5); updateTranscriptState('', '明早十点，把方案同步给团队。', 5); showAuthoritativeFinal('明早十点，把方案同步给团队。', 5)",
     "completed": "prepareRecording(6); showAuthoritativeFinal('明早十点，把方案同步给团队。', 6); showDeliveryState('clipboard_verified_paste_dispatched', 6)",
     "clipboard": "prepareRecording(7); showDeliveryState('clipboard_verified_only', 7)",
