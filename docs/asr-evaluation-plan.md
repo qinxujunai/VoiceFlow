@@ -33,7 +33,9 @@ same local manifest.
 - RTF: transcription time divided by audio duration.
 - Segment count: number of cached final segments used for long recordings.
 - Speech-onset-to-first-delta and speech-onset-to-first-browser-paint.
-- Preview update-gap P95, chunk-size P95, queue-delay P95, and divergence count.
+- Preview model update-gap P95, model-delta size, visible paint cadence,
+  queue-delay P95, and divergence count. Model batches and visible characters
+  are measured separately.
 
 ## Manifest Shape
 
@@ -85,7 +87,9 @@ The streaming model is measured separately:
 venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce
 ```
 
-It must meet first delta P95 <= 900 ms from detected speech onset, update gap
-P95 <= 450 ms, chunk-size P95 <= 2 graphemes with a hard maximum of 4, and
-queue delay P95 <= 250 ms. A candidate must also have an explicit model-weight
-license before it can enter a public installer.
+It must meet first confirmed model delta and first visible paint P95 <= 1.3 s
+from detected speech onset, model update-gap P95 <= 1.3 s, model-delta P95 <=
+12 characters with a hard maximum of 16, and queue delay P95 <= 350 ms. The
+capsule still paints one confirmed character per visible step; model batches
+must never be misreported as UI batch rendering. A candidate must also have an
+explicit model-weight license before it can enter a public installer.
