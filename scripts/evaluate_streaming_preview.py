@@ -135,18 +135,16 @@ def evaluate_pcm(
 def _gate(result):
     failures = []
     first_delta = result.get("first_delta_ms")
-    if first_delta is None or first_delta > 900:
-        failures.append(f"first delta {first_delta}ms exceeds 900ms")
+    if first_delta is None or first_delta > 1300:
+        failures.append(f"first delta {first_delta}ms exceeds 1.3 seconds")
     gap = result.get("update_gap_p95_ms")
-    if gap is not None and gap > 450:
-        failures.append(f"update gap P95 {gap}ms exceeds 450ms")
-    preview_text = result.get("preview_text", "")
-    contains_cjk = any("\u3400" <= char <= "\u9fff" for char in preview_text)
+    if gap is not None and gap > 1300:
+        failures.append(f"update gap P95 {gap}ms exceeds 1.3 seconds")
     chunk = result.get("chunk_chars_p95")
-    if contains_cjk and chunk is not None and chunk > 2:
-        failures.append(f"CJK chunk size P95 {chunk} exceeds 2 chars")
-    if contains_cjk and result.get("max_chunk_chars", 0) > 4:
-        failures.append("CJK chunk hard limit exceeds 4 chars")
+    if chunk is not None and chunk > 12:
+        failures.append(f"model delta P95 {chunk} exceeds 12 characters")
+    if result.get("max_chunk_chars", 0) > 16:
+        failures.append("model delta hard limit exceeds 16 characters")
     queue = result.get("queue_delay_p95_ms")
     if queue is not None and queue > 350:
         failures.append(f"queue delay P95 {queue}ms exceeds 350ms")

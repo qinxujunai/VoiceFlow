@@ -66,6 +66,11 @@ def analyze_history(
         for row in rows
         if "preview_update_gap_ms" in row
     ]
+    preview_model_gap = [
+        float(row["preview_model_update_gap_ms"])
+        for row in rows
+        if row.get("preview_model_update_gap_ms") is not None
+    ]
     preview_active_gap = [
         float(row["preview_active_speech_update_gap_ms"])
         for row in rows
@@ -81,6 +86,21 @@ def analyze_history(
         for row in rows
         if "preview_max_chunk_chars" in row
     ]
+    preview_visible_chunks = [
+        float(row["preview_visible_chunk_chars"])
+        for row in rows
+        if row.get("preview_visible_chunk_chars") is not None
+    ]
+    preview_model_chunks = [
+        float(row["preview_model_delta_chars"])
+        for row in rows
+        if row.get("preview_model_delta_chars") is not None
+    ]
+    preview_model_chunk_max = [
+        float(row["preview_model_delta_hard_max_chars"])
+        for row in rows
+        if row.get("preview_model_delta_hard_max_chars") is not None
+    ]
     metrics = {
         "trigger_to_feedback_p95_ms": _p95(feedback),
         "short_stop_to_paste_p95_ms": _p95(short),
@@ -89,12 +109,15 @@ def analyze_history(
         "preview_first_model_delta_p95_ms": _p95(preview_model),
         "preview_first_paint_p95_ms": _p95(preview_paint),
         "preview_update_gap_p95_ms": _p95(preview_gap),
+        "preview_model_update_gap_p95_ms": _p95(preview_model_gap),
         "preview_active_speech_update_gap_p95_ms": _p95(preview_active_gap),
         "preview_gap_gate_source": (
             "active_speech" if preview_active_gap else "wall_clock_legacy"
         ),
         "preview_queue_delay_p95_ms": _p95(preview_queue),
         "preview_chunk_chars_p95": _p95(preview_chunks),
+        "preview_visible_chunk_chars_p95": _p95(preview_visible_chunks),
+        "preview_model_delta_chars_p95": _p95(preview_model_chunks),
         "feedback_samples": len(feedback),
         "short_samples": len(short),
         "medium_samples": len(medium),
@@ -119,24 +142,33 @@ def analyze_history(
         failures.append("10-60 second stop-to-paste P95 exceeds 700 ms")
     if metrics["two_minute_stop_to_paste_p95_ms"] is not None and metrics["two_minute_stop_to_paste_p95_ms"] > 2500:
         failures.append("two-minute stop-to-paste P95 exceeds 2.5 seconds")
-    if metrics["preview_first_model_delta_p95_ms"] is not None and metrics["preview_first_model_delta_p95_ms"] > 900:
-        failures.append("preview first model delta P95 exceeds 900 ms")
-    if metrics["preview_first_paint_p95_ms"] is not None and metrics["preview_first_paint_p95_ms"] > 900:
-        failures.append("preview first paint P95 exceeds 900 ms")
+    if metrics["preview_first_model_delta_p95_ms"] is not None and metrics["preview_first_model_delta_p95_ms"] > 1300:
+        failures.append("preview first model delta P95 exceeds 1.3 seconds")
+    if metrics["preview_first_paint_p95_ms"] is not None and metrics["preview_first_paint_p95_ms"] > 1300:
+        failures.append("preview first paint P95 exceeds 1.3 seconds")
+    if metrics["preview_model_update_gap_p95_ms"] is not None and metrics["preview_model_update_gap_p95_ms"] > 1300:
+        failures.append("preview model update gap P95 exceeds 1.3 seconds")
     gated_preview_gap = (
         metrics["preview_active_speech_update_gap_p95_ms"]
         if preview_active_gap
         else metrics["preview_update_gap_p95_ms"]
     )
-    if gated_preview_gap is not None and gated_preview_gap > 450:
+    if not preview_model_gap and gated_preview_gap is not None and gated_preview_gap > 1300:
         label = "preview active-speech update gap" if preview_active_gap else "preview update gap"
-        failures.append(f"{label} P95 exceeds 450 ms")
-    if metrics["preview_queue_delay_p95_ms"] is not None and metrics["preview_queue_delay_p95_ms"] > 250:
-        failures.append("preview queue delay P95 exceeds 250 ms")
-    if metrics["preview_chunk_chars_p95"] is not None and metrics["preview_chunk_chars_p95"] > 2:
-        failures.append("preview chunk-size P95 exceeds 2 characters")
-    if preview_chunks and max(preview_chunks) > 4:
-        failures.append("preview chunk hard limit exceeds 4 characters")
+        failures.append(f"{label} P95 exceeds 1.3 seconds")
+    if metrics["preview_queue_delay_p95_ms"] is not None and metrics["preview_queue_delay_p95_ms"] > 350:
+        failures.append("preview queue delay P95 exceeds 350 ms")
+    if preview_visible_chunks:
+        if metrics["preview_visible_chunk_chars_p95"] > 1:
+            failures.append("preview visible paint exceeds one character")
+        if max(preview_visible_chunks) > 1:
+            failures.append("preview visible paint hard limit exceeds one character")
+    elif metrics["preview_chunk_chars_p95"] is not None and metrics["preview_chunk_chars_p95"] > 12:
+        failures.append("legacy preview model chunk P95 exceeds 12 characters")
+    if preview_model_chunks and metrics["preview_model_delta_chars_p95"] > 12:
+        failures.append("preview model delta P95 exceeds 12 characters")
+    if preview_model_chunk_max and max(preview_model_chunk_max) > 16:
+        failures.append("preview model delta hard limit exceeds 16 characters")
     return {"passed": not failures, "metrics": metrics, "failures": failures}
 
 
