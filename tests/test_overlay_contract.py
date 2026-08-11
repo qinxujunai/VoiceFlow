@@ -544,6 +544,27 @@ def test_existing_instance_file_fallback_opens_settings_once(tmp_path):
     assert not overlay._instance_request_path.exists()
 
 
+def test_existing_instance_file_fallback_tolerates_small_clock_rollback(
+    tmp_path,
+    monkeypatch,
+):
+    import overlay_webview
+    from overlay_webview import OverlayWindow
+
+    clock = iter((100.0, 99.9))
+    monkeypatch.setattr(overlay_webview.time, "time", lambda: next(clock))
+    overlay = object.__new__(OverlayWindow)
+    overlay._instance_request_path = tmp_path / "show-settings.request"
+    shown = []
+    overlay._show_settings = lambda: shown.append(True)
+
+    overlay._write_instance_request()
+    overlay._consume_instance_request()
+
+    assert shown == [True]
+    assert not overlay._instance_request_path.exists()
+
+
 def test_hide_path_hides_window_before_resetting_dom():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     hide_idx = overlay.index("def _hide_and_idle")
