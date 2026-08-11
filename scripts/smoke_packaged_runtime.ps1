@@ -1,6 +1,6 @@
 param(
     [string]$AppDir = "dist\VoiceFlow",
-    [int]$StartupSeconds = 8
+    [int]$StartupTimeoutSeconds = 45
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,12 +25,24 @@ try {
         -WorkingDirectory $resolvedAppDir `
         -PassThru `
         -WindowStyle Hidden
-    Start-Sleep -Seconds $StartupSeconds
-    if ($process.HasExited) {
-        throw "Packaged VoiceFlow exited early with code $($process.ExitCode)"
-    }
 
     $runtimeRoot = Join-Path $smokeRoot "VoiceFlow"
+    $runtimeState = Join-Path $runtimeRoot "runtime-state.json"
+    $startupDeadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
+    while (-not (Test-Path -LiteralPath $runtimeState)) {
+        $process.Refresh()
+        if ($process.HasExited) {
+            throw "Packaged VoiceFlow exited before readiness with code $($process.ExitCode)"
+        }
+        if ([DateTime]::UtcNow -ge $startupDeadline) {
+            throw (
+                "Packaged VoiceFlow readiness timed out after " +
+                "$StartupTimeoutSeconds seconds: $runtimeState"
+            )
+        }
+        Start-Sleep -Milliseconds 250
+    }
+
     $required = @(
         "config.yaml",
         "runtime-state.json",
