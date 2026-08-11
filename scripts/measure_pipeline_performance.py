@@ -7,6 +7,7 @@ import json
 import math
 import sys
 import time
+import uuid
 import wave
 from pathlib import Path
 
@@ -22,8 +23,11 @@ sys.path.insert(0, str(SRC))
 
 from output_handler import OutputHandler  # noqa: E402
 from main import VoiceInputSystem  # noqa: E402
+from runtime_paths import AppPaths  # noqa: E402
+from streaming_transcriber import OnlinePreviewTranscriber  # noqa: E402
 from text_cleaner import TextCleaner  # noqa: E402
 from transcriber import Transcriber  # noqa: E402
+from evaluate_streaming_preview import evaluate_pcm  # noqa: E402
 
 
 def _load_pcm(path: Path) -> tuple[np.ndarray, int]:
@@ -51,7 +55,10 @@ def _replace_pipeline_rows(path: Path, rows: list[dict]) -> None:
         ]
     existing = [
         row for row in existing
-        if row.get("source") != "deterministic_full_pipeline"
+        if row.get("source") not in {
+            "deterministic_full_pipeline",
+            "deterministic_streaming_preview",
+        }
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -63,6 +70,63 @@ def _replace_pipeline_rows(path: Path, rows: list[dict]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _preview_evidence_row(result, *, case, measured_at):
+    """Keep performance evidence while excluding recognized user text."""
+    first_delta_ms = result.get("first_delta_ms")
+    return {
+        "source": "deterministic_streaming_preview",
+        "measured_at": measured_at,
+        "preview_case": str(case),
+        "preview_first_model_delta_ms": first_delta_ms,
+        "preview_first_paint_ms": (
+            None
+            if first_delta_ms is None
+            else round(float(first_delta_ms) + 48.0, 3)
+        ),
+        "preview_model_update_gap_ms": result.get("update_gap_p95_ms"),
+        "preview_queue_delay_ms": result.get("queue_delay_p95_ms"),
+        "preview_visible_chunk_chars": 1,
+        "preview_model_delta_chars": result.get("chunk_chars_p95"),
+        "preview_model_delta_hard_max_chars": result.get("max_chunk_chars"),
+        "preview_divergence_count": int(result.get("divergence_count", 0)),
+    }
+
+
+def _measure_preview_rows(config, paths, samples, measured_at):
+    preview = OnlinePreviewTranscriber.from_config(
+        config,
+        resolve_asset=paths.resolve_asset,
+        sample_rate=16000,
+    )
+    sample_paths = (
+        ("zh", ROOT / "models" / "sensevoice" / "test_wavs" / "zh.wav"),
+        ("en", ROOT / "models" / "sensevoice" / "test_wavs" / "en.wav"),
+    )
+    loaded = {
+        case: _load_pcm(path)
+        for case, path in sample_paths
+    }
+    rows = []
+    for index in range(samples):
+        case, _path = sample_paths[index % len(sample_paths)]
+        pcm, sample_rate = loaded[case]
+        result = evaluate_pcm(
+            preview,
+            pcm,
+            sample_rate,
+            chunk_ms=40,
+            append_interval_ms=48,
+        )
+        rows.append(
+            _preview_evidence_row(
+                result,
+                case=case,
+                measured_at=measured_at,
+            )
+        )
+    return rows
 
 
 def _prepare_progressive_cache(
@@ -98,6 +162,7 @@ def main() -> int:
     parser.add_argument("--short-seconds", type=int, default=10)
     parser.add_argument("--medium-seconds", type=int, default=45)
     parser.add_argument("--long-seconds", type=int, default=120)
+    parser.add_argument("--preview-samples", type=int, default=20)
     parser.add_argument(
         "--sample",
         default=str(ROOT / "models" / "sensevoice" / "test_wavs" / "zh.wav"),
@@ -112,6 +177,7 @@ def main() -> int:
 
     config_path = ROOT / "config.yaml"
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    paths = AppPaths.discover(config_path=config_path)
     engine_name = config.get("engine", {}).get("active", "sensevoice")
     if engine_name != "sensevoice":
         raise RuntimeError("release performance evidence must use SenseVoice")
@@ -156,10 +222,18 @@ def main() -> int:
     try:
         for duration, pcm in ((args.short_seconds, short_audio),):
             for _ in range(args.samples):
+                start_target = output.capture_target()
+                session_id = f"benchmark-{uuid.uuid4().hex}"
                 started = time.perf_counter()
                 raw_text = transcriber.transcribe(pcm, sample_rate)
                 text = cleaner.clean(raw_text) if raw_text else ""
-                output.output(text or raw_text or "VoiceFlow")
+                delivery = output.deliver(
+                    text or raw_text or "VoiceFlow",
+                    start_target=start_target,
+                    session_id=session_id,
+                )
+                if delivery.clipboard_verified:
+                    output.acknowledge_delivery(session_id)
                 elapsed_ms = (time.perf_counter() - started) * 1000
                 rows.append(
                     {
@@ -170,15 +244,31 @@ def main() -> int:
                         "stop_to_paste_ms": round(elapsed_ms, 3),
                     }
                 )
+        rows.extend(
+            _measure_preview_rows(
+                config,
+                paths,
+                args.preview_samples,
+                measured_at,
+            )
+        )
         for duration, progressive_parts, tail in progressive_runs:
             for _ in range(args.samples):
+                start_target = output.capture_target()
+                session_id = f"benchmark-{uuid.uuid4().hex}"
                 started = time.perf_counter()
                 tail_text = transcriber.transcribe(tail, sample_rate)
                 raw_text = transcript_merger._join_transcript_parts(
                     [*progressive_parts, tail_text]
                 )
                 text = cleaner.clean(raw_text) if raw_text else ""
-                output.output(text or raw_text or "VoiceFlow")
+                delivery = output.deliver(
+                    text or raw_text or "VoiceFlow",
+                    start_target=start_target,
+                    session_id=session_id,
+                )
+                if delivery.clipboard_verified:
+                    output.acknowledge_delivery(session_id)
                 elapsed_ms = (time.perf_counter() - started) * 1000
                 rows.append(
                     {
@@ -195,12 +285,14 @@ def main() -> int:
         pyperclip.copy = original_copy
         pyautogui.hotkey = original_hotkey
         pyautogui.press = original_press
+        output.shutdown()
 
     _replace_pipeline_rows(Path(args.output), rows)
     print(
         json.dumps(
             {
                 "samples_per_duration": args.samples,
+                "preview_samples": args.preview_samples,
                 "durations_seconds": [
                     args.short_seconds,
                     args.medium_seconds,

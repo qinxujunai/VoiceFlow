@@ -42,6 +42,11 @@ a reason. The current closure matrix is
 - 10-60 second stop-to-clipboard: P95 at most 700 ms;
 - two-minute stop-to-clipboard: P95 at most 2.5 s;
 - at least 20 samples per published bucket;
+- preview first confirmed model delta and first visible paint: P95 at most
+  1.3 s on the bilingual release samples;
+- preview model update-gap: P95 at most 1.3 s; model batches may contain at
+  most 16 characters, while the capsule visibly paints one confirmed
+  character per step with queue delay P95 at most 350 ms;
 - no audio callback underrun in the release matrix;
 - no Qt main-thread task longer than 50 ms during recording;
 - bounded preview memory and work during long dictation.
