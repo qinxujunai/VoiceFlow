@@ -38,6 +38,18 @@ def test_installer_smoke_derives_the_artifact_from_the_source_version():
     assert 'Could not read APP_VERSION' in script
 
 
+def test_packaged_runtime_smoke_waits_for_an_explicit_ready_signal():
+    script = (ROOT / "scripts" / "smoke_packaged_runtime.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert '[int]$StartupTimeoutSeconds = 45' in script
+    assert 'while (-not (Test-Path -LiteralPath $runtimeState))' in script
+    assert '$process.Refresh()' in script
+    assert 'Packaged VoiceFlow readiness timed out' in script
+    assert 'Start-Sleep -Seconds $StartupSeconds' not in script
+
+
 def test_quick_verify_rejects_pathological_model_output():
     verify = (ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
 

@@ -121,3 +121,29 @@ def test_streaming_metrics_ignore_replaceable_provisional_hypotheses():
     assert result["first_delta_ms"] == 50.0
     assert result["max_chunk_chars"] == 1
     assert result["preview_text"] == "你好"
+
+
+def test_candidate_gate_uses_model_emission_budget_not_visible_character_budget():
+    from evaluate_streaming_preview import _gate
+
+    passing = {
+        "first_delta_ms": 1200,
+        "update_gap_p95_ms": 1280,
+        "chunk_chars_p95": 12,
+        "max_chunk_chars": 16,
+        "queue_delay_p95_ms": 300,
+        "preview_text": "中 English",
+    }
+    failing = {
+        **passing,
+        "first_delta_ms": 1400,
+        "update_gap_p95_ms": 1400,
+        "max_chunk_chars": 17,
+        "queue_delay_p95_ms": 400,
+    }
+
+    assert _gate(passing) == []
+    failures = _gate(failing)
+    assert any("1.3 seconds" in failure for failure in failures)
+    assert any("16 characters" in failure for failure in failures)
+    assert any("350ms" in failure for failure in failures)

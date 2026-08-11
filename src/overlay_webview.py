@@ -1864,7 +1864,10 @@ class OverlayWindow:
             request_path.unlink(missing_ok=True)
         except OSError:
             return
-        if 0 <= time.time() - requested_at <= 10:
+        # Hosted Windows machines and user PCs can move wall time slightly
+        # backwards while synchronizing.  A fresh atomic request remains valid
+        # across that small correction, while genuinely stale files stay ignored.
+        if -2 <= time.time() - requested_at <= 10:
             self._show_settings()
 
     def _on_instance_message(self):

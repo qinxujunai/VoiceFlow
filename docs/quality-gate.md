@@ -35,14 +35,18 @@ evidence on the release machine first:
 
 ```bat
 venv\Scripts\python.exe scripts\measure_overlay_feedback.py --samples 20
-venv\Scripts\python.exe scripts\measure_pipeline_performance.py --samples 20
+venv\Scripts\python.exe scripts\measure_pipeline_performance.py --samples 20 --preview-samples 20
 ```
 
 The first command measures the real Qt paint completion. The second runs the
-default ASR, text cleaner, progressive long-dictation tail, and output timing
-path with deterministic audio and suppressed keyboard side effects. Stable
-release approval still requires the separate real-device Windows matrix. UI
-capture covers 100%, 125%, 150%, and 200% scale.
+default ASR, text cleaner, progressive long-dictation tail, output timing, and
+the pinned bilingual preview model with deterministic audio and suppressed
+keyboard side effects. Preview evidence separates model batches from the
+capsule's one-character visible paint cadence and contains no recognized text.
+The current release-machine evidence is recorded in
+[`release-performance-evidence-2026-08-11.md`](release-performance-evidence-2026-08-11.md).
+Stable release approval still requires the separate real-device Windows
+matrix. UI capture covers 100%, 125%, 150%, and 200% scale.
 
 ## Product Invariants
 
