@@ -65,17 +65,19 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
 - The tag-driven Release workflow publishes the installer, checksums, SBOM,
   notices, and GitHub build-provenance attestation from the same commit.
 
-## Current 0.3.1 blockers
+## Current 0.3.1 limitations
 
-Do not create a public tag while any item remains open:
+These are disclosed limitations, not unearned product claims:
 
-- 160-sample authorized release corpus and untouched holdout are incomplete.
+- The authorized natural-speech accuracy corpus and untouched holdout are not
+  complete. Therefore 0.3.1 makes no comparative accuracy claim.
 - The bilingual preview has an Apache-2.0 weight license and passes control-token
-  safety; the authorized real-speech accuracy holdout remains incomplete.
-- Clean Win10/11 offline install, upgrade, rollback, and uninstall evidence is
-  incomplete.
-- The executable and installer are not Authenticode signed and timestamped.
-- Real 2/5/10-minute microphone coverage and resource-budget evidence are
-  incomplete.
-- The measured installed process tree is approximately 1.32 GB Private Bytes;
-  see `docs/resource-profile-2026-07-28.md`.
+  safety; it is described as preview, never as authoritative final text.
+- The tag workflow repeats install, launch, model-integrity, upgrade, uninstall,
+  and private-data tests on a clean Windows runner before it can publish.
+- The executable and installer are not Authenticode signed. README, website,
+  and Release notes disclose the Windows warning and publish exact SHA-256.
+- Synthetic one-hour coverage and two-hour stress are automated; release users
+  are not promised a measured physical-microphone accuracy rate for that duration.
+- The final installed process tree measured 1,024 MB Private Bytes and 683.7 MB
+  Working Set after both recognizers loaded; see the release performance evidence.

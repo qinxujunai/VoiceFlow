@@ -218,7 +218,7 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert 'for label in ("状态", "听写", "词典", "历史")' in overlay
+    assert 'for label in ("状态", "词典", "历史", "设置")' in overlay
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
     assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
@@ -395,7 +395,7 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "self.sidebar = QListWidget()" in settings_block
     assert "self.stack = QStackedWidget()" in settings_block
     assert "self.sidebar.currentRowChanged.connect(self._show_primary_page)" in settings_block
-    assert "page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}" in settings_block
+    assert "page_by_row = {0: 0, 1: 3, 2: 1, 3: 2}" in settings_block
     assert "QTabWidget" not in overlay
     assert "QLabel#sectionTitle" in settings_block
 
@@ -442,6 +442,7 @@ def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
 
+    assert 'self.dictionary_section.addItem("内置 AI 术语", "builtin-ai.txt")' in settings_block
     assert 'self.dictionary_section.addItem("专有词", "user-dictionary.txt")' in settings_block
     assert 'self.dictionary_section.addItem("常用短语", "phrases.txt")' in settings_block
     assert 'self.dictionary_section.addItem("确定性纠错", "corrections.txt")' in settings_block
@@ -679,13 +680,14 @@ def test_readme_demo_uses_single_product_pill_state_machine():
     assert svg.count('id="demo-pill"') == 1
     assert svg.count('id="capsule"') == 1
     assert 'id="wave"' in svg
-    assert 'id="check"' in svg
+    assert 'id="check"' not in svg
     assert 'id="liveText"' in svg
     assert 'id="finalText"' in svg
-    assert ">已完成</text>" in svg
+    assert ">已完成</text>" not in svg
+    assert "deliveryDismissState" in svg
     assert "· 21" not in svg
     assert "@keyframes waveState" in svg
-    assert "@keyframes checkState" in svg
+    assert "@keyframes checkState" not in svg
     assert "@keyframes liveTextState" in svg
     assert "@keyframes finalTextState" in svg
     assert 'id="demo-spinner"' not in svg

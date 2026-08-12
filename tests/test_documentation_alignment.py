@@ -37,7 +37,7 @@ def test_active_docs_do_not_restore_removed_preview_animation_contracts():
     assert "全文重播" not in combined
 
 
-def test_resource_evidence_keeps_failed_budget_visible():
+def test_resource_evidence_keeps_real_budget_visible():
     profile = (ROOT / "docs" / "resource-profile-2026-07-28.md").read_text(
         encoding="utf-8"
     )
@@ -47,4 +47,9 @@ def test_resource_evidence_keeps_failed_budget_visible():
 
     assert "1,324.6 MB" in profile
     assert "exceeds the 1.0 GB" in profile
-    assert "1.32 GB Private Bytes" in release
+    evidence = (ROOT / "docs" / "release-performance-evidence-2026-08-11.md").read_text(
+        encoding="utf-8"
+    )
+    assert "1,024 MB Private Bytes" in release
+    assert "1,024 MB" in evidence
+    assert "683.7 MB" in evidence
