@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
   <title id="title">VoiceFlow product demo</title>
-  <desc id="desc">A single VoiceFlow capsule expands with live text, completes with a green check, and returns the final sentence to the cursor.</desc>
+  <desc id="desc">A single VoiceFlow capsule expands with live text, confirms the final sentence in place, returns it to the cursor, and quietly disappears.</desc>
   <defs>
     <filter id="pillShadow" x="-30%" y="-140%" width="160%" height="380%">
       <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#000000" flood-opacity="0.22"/>
@@ -11,7 +11,6 @@
       #capsule { animation: capsuleState 6.8s ease-in-out infinite; }
       #demo-pill { animation: pillState 6.8s ease-in-out infinite; }
       #wave { animation: waveState 6.8s ease-in-out infinite; }
-      #check { animation: checkState 6.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       #liveText { animation: liveTextState 6.8s ease-in-out infinite; }
       #finalText { animation: finalTextState 6.8s ease-in-out infinite; }
       #outputText, #outputCaret { animation: outputState 6.8s ease-in-out infinite; }
@@ -22,29 +21,31 @@
       @keyframes capsuleState {
         0%, 12%, 96%, 100% { transform: translate(552px, 168px); opacity: 1; }
         22%, 64% { transform: translate(410px, 168px); opacity: 1; }
-        72%, 88% { transform: translate(515px, 168px); opacity: 1; }
+        72%, 76% { transform: translate(410px, 168px); opacity: 1; }
+        82%, 88% { transform: translate(552px, 168px); opacity: 0; }
         92% { transform: translate(552px, 168px); opacity: 0; }
       }
       @keyframes pillState {
         0%, 12%, 96%, 100% { width: 96px; }
         22%, 64% { width: 380px; }
-        72%, 88% { width: 170px; }
+        72%, 76% { width: 380px; }
+        82%, 100% { width: 96px; }
       }
       @keyframes waveState {
         0%, 64% { opacity: 1; }
         70%, 100% { opacity: 0; }
-      }
-      @keyframes checkState {
-        0%, 66%, 100% { opacity: 0; }
-        72%, 88% { opacity: 1; }
       }
       @keyframes liveTextState {
         0%, 18%, 68%, 100% { opacity: 0; }
         25%, 64% { opacity: 1; }
       }
       @keyframes finalTextState {
-        0%, 67%, 100% { opacity: 0; }
-        73%, 88% { opacity: 1; }
+        0%, 67%, 82%, 100% { opacity: 0; }
+        72%, 76% { opacity: 1; }
+      }
+      @keyframes deliveryDismissState {
+        0%, 76% { opacity: 1; }
+        82%, 100% { opacity: 0; }
       }
       @keyframes outputState {
         0%, 68%, 100% { opacity: 0; transform: translateY(5px); }
@@ -67,11 +68,11 @@
         45% { transform: scaleY(1.28); opacity: 1; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #capsule { animation: none; transform: translate(515px, 168px); }
-        #demo-pill { animation: none; width: 170px; }
-        #wave, #liveText { opacity: 0; }
-        #check, #finalText, #outputText, #outputCaret { opacity: 1; }
-        #wave, #check, #liveText, #finalText, #outputText, #outputCaret,
+        #capsule { animation: none; transform: translate(552px, 168px); opacity: 0; }
+        #demo-pill { animation: none; width: 96px; }
+        #wave, #liveText, #finalText { opacity: 0; }
+        #outputText, #outputCaret { opacity: 1; }
+        #wave, #liveText, #finalText, #outputText, #outputCaret,
         .bar-a, .bar-b, .bar-c { animation: none; }
       }
     </style>
@@ -95,12 +96,8 @@
       <rect class="bar-c" x="14" y="5" width="2.4" height="10" rx="1.2" fill="#ff453a"/>
     </g>
 
-    <g id="check" transform="translate(22 16)" opacity="0">
-      <path d="M1.5 10 L6.5 15 L16.5 4.5" fill="none" stroke="#30d158" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </g>
-
     <text id="liveText" class="ui" x="66" y="33" font-size="18" font-weight="500" fill="#f5f5f7" opacity="0">明早十点，把方案同步给团队。</text>
-    <text id="finalText" class="ui" x="58" y="33" font-size="17" font-weight="520" fill="#f5f5f7" opacity="0">已完成</text>
+    <text id="finalText" class="ui" x="66" y="33" font-size="18" font-weight="500" fill="#f5f5f7" opacity="0">明早十点，把方案同步给团队。</text>
   </g>
 
   <g class="ui" fill="#1d1d1f">

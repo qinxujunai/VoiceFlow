@@ -291,6 +291,12 @@ class VoiceInputSystem:
         elif state is RecordingState.IDLE:
             self._on_record_start(triggered_at)
 
+    def _can_record_toggle(self):
+        return self._recording_state.current in {
+            RecordingState.IDLE,
+            RecordingState.RECORDING,
+        }
+
     def _on_record_start(self, triggered_at=None):
         if not self._recording_state.claim_start():
             return
@@ -1247,6 +1253,7 @@ class VoiceInputSystem:
             config_path=self.config_path,
             callbacks={
                 "on_record_toggle": self._on_record_toggle,
+                "can_record_toggle": self._can_record_toggle,
                 "on_record_cancel": self._on_record_cancel,
             },
         )

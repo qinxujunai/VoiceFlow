@@ -79,9 +79,9 @@ def _capture_settings(
     captures = []
     primary_pages = (
         (0, "home"),
-        (1, "dictation"),
-        (2, "dictionary"),
-        (3, "history"),
+        (1, "dictionary"),
+        (2, "history"),
+        (3, "settings"),
     )
     for row, name in primary_pages:
         window.sidebar.setCurrentRow(row)

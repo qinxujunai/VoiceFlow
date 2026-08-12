@@ -136,22 +136,22 @@ class _SettingsWindow(QMainWindow):
         self._microphone_detected = False
         self._switch_in_progress = False
         self.setWindowTitle("VoiceFlow")
-        self.setMinimumSize(940, 640)
+        self.setMinimumSize(980, 660)
 
         shell = QWidget()
         shell.setObjectName("appShell")
         root = QVBoxLayout(shell)
-        root.setContentsMargins(14, 14, 14, 14)
+        root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
         body = QHBoxLayout()
-        body.setSpacing(14)
+        body.setSpacing(0)
 
         sidebar_panel = QWidget()
         sidebar_panel.setObjectName("sidebarPanel")
         sidebar_layout = QVBoxLayout(sidebar_panel)
-        sidebar_layout.setContentsMargins(14, 16, 14, 14)
-        sidebar_layout.setSpacing(12)
+        sidebar_layout.setContentsMargins(16, 20, 16, 16)
+        sidebar_layout.setSpacing(16)
 
         brand = QHBoxLayout()
         brand.setSpacing(10)
@@ -178,7 +178,7 @@ class _SettingsWindow(QMainWindow):
 
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
-        for label in ("状态", "听写", "词典", "历史"):
+        for label in ("状态", "词典", "历史", "设置"):
             self.sidebar.addItem(QListWidgetItem(label))
         self.sidebar.setCurrentRow(0)
         self.sidebar.setAccessibleName("设置导航")
@@ -189,11 +189,11 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
         help_menu = QMenu(self)
-        diagnostics_action = help_menu.addAction("运行诊断")
+        diagnostics_action = help_menu.addAction("运行检查")
         diagnostics_action.triggered.connect(lambda: self._show_aux_page(4))
-        about_action = help_menu.addAction("帮助与关于")
+        about_action = help_menu.addAction("关于 VoiceFlow")
         about_action.triggered.connect(lambda: self._show_aux_page(5))
-        self.help_button = QPushButton("帮助与关于")
+        self.help_button = QPushButton("帮助")
         self.help_button.setMenu(help_menu)
         self.help_button.setAccessibleName("帮助、诊断与关于")
         sidebar_layout.addWidget(self.help_button)
@@ -201,7 +201,7 @@ class _SettingsWindow(QMainWindow):
         build_label.setObjectName("sidebarVersion")
         build_label.setToolTip(f"{display_version()} · {platform_label()}")
         sidebar_layout.addWidget(build_label)
-        sidebar_panel.setFixedWidth(196)
+        sidebar_panel.setFixedWidth(176)
 
         self.stack = QStackedWidget()
         self.stack.setObjectName("contentStack")
@@ -224,7 +224,7 @@ class _SettingsWindow(QMainWindow):
         self.recovery_finished.connect(self._finish_recovery)
 
     def _show_primary_page(self, row):
-        page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}
+        page_by_row = {0: 0, 1: 3, 2: 1, 3: 2}
         if row in page_by_row:
             self.stack.setCurrentIndex(page_by_row[row])
 
@@ -249,74 +249,83 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(28, 26, 28, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(44, 34, 44, 30)
+        layout.setSpacing(22)
 
-        hero = QWidget()
-        hero.setObjectName("heroPanel")
-        hero_layout = QVBoxLayout(hero)
-        hero_layout.setContentsMargins(22, 20, 22, 20)
-        hero_layout.setSpacing(8)
-        self.home_ready_title = QLabel("按下，说话，文字就位。")
-        self.home_ready_title.setObjectName("heroTitle")
+        system_status = QWidget()
+        system_status.setObjectName("systemStatusPanel")
+        status_layout = QHBoxLayout(system_status)
+        status_layout.setContentsMargins(16, 11, 16, 11)
+        status_layout.setSpacing(14)
+        self.home_microphone = QLabel("麦克风 · 正在检查")
+        self.home_microphone.setObjectName("systemStatusItem")
+        self.home_model = QLabel("本地处理")
+        self.home_model.setObjectName("systemStatusItem")
+        self.home_hotkeys = QLabel(trigger_summary())
+        self.home_hotkeys.setObjectName("systemStatusItem")
+        status_layout.addWidget(self.home_microphone)
+        status_layout.addStretch(1)
+        status_layout.addWidget(self.home_model)
+        status_layout.addStretch(1)
+        status_layout.addWidget(self.home_hotkeys)
+        layout.addWidget(system_status)
+
+        intro = QVBoxLayout()
+        intro.setSpacing(7)
+        self.home_ready_title = QLabel("VoiceFlow 已就绪")
+        self.home_ready_title.setObjectName("commandTitle")
         self.home_ready_subtitle = QLabel(
-            "不切换窗口，不上传录音。识别结果会留在剪贴板和本地历史中。"
+            "完全离线。按快捷键开始说话，再按一次停止。"
         )
-        self.home_ready_subtitle.setObjectName("heroSubtitle")
+        self.home_ready_subtitle.setObjectName("commandSubtitle")
         self.home_ready_subtitle.setWordWrap(True)
-        hero_layout.addWidget(self.home_ready_title)
-        hero_layout.addWidget(self.home_ready_subtitle)
+        intro.addWidget(self.home_ready_title)
+        intro.addWidget(self.home_ready_subtitle)
+        layout.addLayout(intro)
 
-        hero_actions = QHBoxLayout()
-        self.trial_button = QPushButton("试说一次")
+        shortcut_panel = QWidget()
+        shortcut_panel.setObjectName("shortcutPanel")
+        shortcut_layout = QHBoxLayout(shortcut_panel)
+        shortcut_layout.setContentsMargins(18, 13, 18, 13)
+        shortcut_layout.setSpacing(12)
+        shortcut_name = QLabel("默认快捷键")
+        shortcut_name.setObjectName("panelLabel")
+        shortcut_value = QLabel(f"{trigger_summary()}　　Esc 取消")
+        shortcut_value.setObjectName("shortcutValue")
+        shortcut_layout.addWidget(shortcut_name)
+        shortcut_layout.addStretch(1)
+        shortcut_layout.addWidget(shortcut_value)
+        layout.addWidget(shortcut_panel)
+
+        practice_panel = QWidget()
+        practice_panel.setObjectName("practicePanel")
+        practice_layout = QVBoxLayout(practice_panel)
+        practice_layout.setContentsMargins(18, 16, 18, 16)
+        practice_layout.setSpacing(12)
+        practice_header = QHBoxLayout()
+        practice_copy = QVBoxLayout()
+        practice_copy.setSpacing(3)
+        practice_label = QLabel("试说一句")
+        practice_label.setObjectName("subsectionTitle")
+        practice_note = QLabel("把光标放在下方，然后开始听写。")
+        practice_note.setObjectName("sectionSubtitle")
+        practice_copy.addWidget(practice_label)
+        practice_copy.addWidget(practice_note)
+        self.trial_button = QPushButton("试说一句")
         self.trial_button.setObjectName("primaryButton")
         self.trial_button.setAccessibleName("开始一次试说")
         self.trial_button.clicked.connect(self._start_trial)
-        hero_actions.addWidget(self.trial_button)
-        hero_actions.addStretch(1)
-        hero_layout.addLayout(hero_actions)
-        layout.addWidget(hero)
-
-        readiness_title = QLabel("准备状态")
-        readiness_title.setObjectName("subsectionTitle")
-        layout.addWidget(readiness_title)
-        readiness = QWidget()
-        readiness.setObjectName("readinessPanel")
-        readiness_layout = QHBoxLayout(readiness)
-        readiness_layout.setContentsMargins(12, 12, 12, 12)
-        readiness_layout.setSpacing(10)
-        values = []
-        for title in ("麦克风", "本地处理", "快捷键"):
-            item = QWidget()
-            item.setObjectName("readinessItem")
-            item_layout = QVBoxLayout(item)
-            item_layout.setContentsMargins(12, 9, 12, 9)
-            item_layout.setSpacing(3)
-            name = QLabel(title)
-            name.setObjectName("readinessName")
-            value = QLabel("正在检查")
-            value.setObjectName("readinessValue")
-            value.setAccessibleName(f"{title}状态")
-            item_layout.addWidget(name)
-            item_layout.addWidget(value)
-            readiness_layout.addWidget(item, 1)
-            values.append(value)
-        self.home_microphone, self.home_model, self.home_hotkeys = values
-        readiness.setFixedHeight(86)
-        layout.addWidget(readiness)
-
-        practice_label = QLabel("试说")
-        practice_label.setObjectName("subsectionTitle")
-        practice_note = QLabel(f"把光标放在下方。{trigger_instruction()}")
-        practice_note.setObjectName("sectionSubtitle")
+        practice_header.addLayout(practice_copy)
+        practice_header.addStretch(1)
+        practice_header.addWidget(self.trial_button)
         self.practice_box = QPlainTextEdit()
         self.practice_box.setObjectName("practiceBox")
         self.practice_box.setAccessibleName("VoiceFlow 试说输入框")
-        self.practice_box.setPlaceholderText("识别结果会像普通输入一样出现在这里")
-        self.practice_box.setFixedHeight(82)
-        layout.addWidget(practice_label)
-        layout.addWidget(practice_note)
-        layout.addWidget(self.practice_box)
+        self.practice_box.setPlaceholderText("识别结果会出现在这里")
+        self.practice_box.setFixedHeight(92)
+        practice_layout.addLayout(practice_header)
+        practice_layout.addWidget(self.practice_box)
+        layout.addWidget(practice_panel)
 
         recent_header = QHBoxLayout()
         recent_title = QLabel("最近听写")
@@ -334,6 +343,7 @@ class _SettingsWindow(QMainWindow):
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.home_recent_labels.append(label)
         layout.addWidget(label)
+        layout.addStretch(1)
         return page
 
     def _recent_page(self):
@@ -404,8 +414,8 @@ class _SettingsWindow(QMainWindow):
         layout.setSpacing(16)
         layout.addLayout(
             self._section_header(
-                "听写",
-                "设置语言、麦克风和启动方式。所有识别均在本机完成。",
+                "设置",
+                "选择语言、麦克风和启动方式。",
             )
         )
 
@@ -488,12 +498,13 @@ class _SettingsWindow(QMainWindow):
         layout.addLayout(
             self._section_header(
                 "词典",
-                "补充专有词、常用短语和确定性纠错，不改变你的原意。",
+                "英文术语会规范大小写；明确纠错不会改变你的原意。",
             )
         )
 
         self.dictionary_section = QComboBox()
         self.dictionary_section.setAccessibleName("词典分区")
+        self.dictionary_section.addItem("内置 AI 术语", "builtin-ai.txt")
         self.dictionary_section.addItem("专有词", "user-dictionary.txt")
         self.dictionary_section.addItem("常用短语", "phrases.txt")
         self.dictionary_section.addItem("确定性纠错", "corrections.txt")
@@ -707,7 +718,7 @@ class _SettingsWindow(QMainWindow):
         microphone_ready = self._microphone_detected
         all_ready = model_ready and microphone_ready
         self.home_ready_title.setText(
-            "随时可以开始" if all_ready else "还需要完成一项设置"
+            "VoiceFlow 已就绪" if all_ready else "还需要完成一项设置"
         )
         self.home_ready_subtitle.setText(
             "完全离线。按快捷键开始说话，再按一次停止。"
@@ -715,24 +726,25 @@ class _SettingsWindow(QMainWindow):
             else "完成下方检查后，就可以在任意输入框使用语音输入。"
         )
         self.home_microphone.setText(
-            f"已检测 · {microphone_name}" if microphone_ready else "需要选择"
+            f"麦克风 · {microphone_name}" if microphone_ready else "麦克风 · 需要选择"
         )
         self.home_model.setText(
-            "可用 · 录音和文字不会上传" if model_ready else "需要修复"
+            "本地处理 · 可用" if model_ready else "本地处理 · 需要检查"
         )
-        self.home_hotkeys.setText(trigger_summary())
+        self.home_hotkeys.setText(f"快捷键 · {trigger_summary()}")
         self.trial_button.setEnabled(all_ready)
 
     def _start_trial(self):
         self.sidebar.setCurrentRow(0)
         self.practice_box.setFocus()
-        self._set_status_badge(trigger_instruction())
+        self._set_status_badge("可以开始说话")
 
     def _dictionary_path(self, filename):
         return self.paths.knowledge_dir / filename
 
     def _load_dictionary(self):
         for filename in (
+            "builtin-ai.txt",
             "user-dictionary.txt",
             "phrases.txt",
             "corrections.txt",
@@ -756,6 +768,8 @@ class _SettingsWindow(QMainWindow):
         filename = self._active_dictionary_filename
         if not filename or not hasattr(self, "dictionary_list"):
             return
+        if filename == "builtin-ai.txt":
+            return
         entries = []
         for index in range(self.dictionary_list.count()):
             value = self.dictionary_list.item(index).text().strip()
@@ -769,13 +783,21 @@ class _SettingsWindow(QMainWindow):
             return
         self.dictionary_list.blockSignals(True)
         self.dictionary_list.clear()
+        readonly = filename == "builtin-ai.txt"
         for value in self._dictionary_entries.get(filename, []):
             item = QListWidgetItem(value)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            if not readonly:
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.dictionary_list.addItem(item)
         self.dictionary_list.blockSignals(False)
+        self.dictionary_input.setEnabled(not readonly)
         corrections = filename == "corrections.txt"
-        if corrections:
+        if readonly:
+            self.dictionary_input.setPlaceholderText("内置术语不可编辑")
+            self.dictionary_hint.setText(
+                "内置术语随 VoiceFlow 更新；识别到相同英文时会规范大小写。"
+            )
+        elif corrections:
             self.dictionary_input.setPlaceholderText("错误词=正确词")
             self.dictionary_hint.setText("写成“错误词=正确词”，双击可以修改。")
         elif filename == "phrases.txt":
@@ -783,7 +805,9 @@ class _SettingsWindow(QMainWindow):
             self.dictionary_hint.setText("添加经常完整说出的短语，双击可以修改。")
         else:
             self.dictionary_input.setPlaceholderText("添加专有词")
-            self.dictionary_hint.setText("添加人名、品牌或项目名，双击可以修改。")
+            self.dictionary_hint.setText(
+                "添加人名、品牌或项目名；英文会规范大小写，误识别请使用确定性纠错。"
+            )
         self._update_dictionary_count()
 
     def _change_dictionary_section(self, _index):
@@ -792,6 +816,8 @@ class _SettingsWindow(QMainWindow):
         self._render_dictionary_section()
 
     def _valid_dictionary_entry(self, value):
+        if self._active_dictionary_filename == "builtin-ai.txt":
+            return False
         if self._active_dictionary_filename != "corrections.txt":
             return bool(value)
         if value.count("=") != 1:
@@ -825,6 +851,9 @@ class _SettingsWindow(QMainWindow):
         self._set_status_badge("已添加，保存后生效")
 
     def _remove_dictionary_entries(self):
+        if self._active_dictionary_filename == "builtin-ai.txt":
+            self._set_status_badge("内置术语不可删除")
+            return
         selected = self.dictionary_list.selectedItems()
         if not selected:
             self._set_status_badge("请选择要删除的内容")
@@ -854,6 +883,8 @@ class _SettingsWindow(QMainWindow):
         try:
             self._store_dictionary_section()
             for filename, entries in self._dictionary_entries.items():
+                if filename == "builtin-ai.txt":
+                    continue
                 if filename == "corrections.txt" and any(
                     not self._valid_correction(value) for value in entries
                 ):
@@ -867,7 +898,7 @@ class _SettingsWindow(QMainWindow):
                     encoding="utf-8",
                 )
                 os.replace(temporary, path)
-            self._set_status_badge("词典已保存，重启后生效")
+            self._set_status_badge("词典已保存")
         except Exception as error:
             self._set_status_badge(f"词典保存失败: {error}")
 
@@ -1398,15 +1429,16 @@ class _SettingsWindow(QMainWindow):
     def _style(self):
         return """
         QWidget#appShell {
-            background: #ececef;
+            background: #f7f7f8;
             color: #1d1d1f;
             font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei";
             font-size: 14px;
         }
         QWidget#sidebarPanel {
-            background: #f5f5f7;
-            border: 1px solid #dedee3;
-            border-radius: 16px;
+            background: #f0f0f2;
+            border: none;
+            border-right: 1px solid #dedee3;
+            border-radius: 0px;
         }
         QLabel#brandIcon {
             min-width: 32px;
@@ -1425,17 +1457,15 @@ class _SettingsWindow(QMainWindow):
             color: #86868b;
         }
         QLabel#statusBadge {
-            padding: 7px 10px;
-            border-radius: 10px;
-            background: #eaf7ee;
+            padding: 7px 2px;
+            background: transparent;
             color: #24753d;
-            border: 1px solid #d3ead9;
+            border: none;
             font-weight: 600;
         }
         QLabel#statusBadge[attention="true"] {
             color: #9a5b00;
-            background: #fff4df;
-            border-color: #f0dfba;
+            background: transparent;
         }
         QListWidget#sidebar {
             background: transparent;
@@ -1455,9 +1485,9 @@ class _SettingsWindow(QMainWindow):
             font-weight: 600;
         }
         QStackedWidget#contentStack {
-            background: #fbfbfc;
-            border: 1px solid #dedee3;
-            border-radius: 16px;
+            background: #ffffff;
+            border: none;
+            border-radius: 0px;
         }
         QWidget#contentPage {
             background: transparent;
@@ -1468,12 +1498,12 @@ class _SettingsWindow(QMainWindow):
             font-weight: 650;
             color: #1d1d1f;
         }
-        QLabel#heroTitle {
+        QLabel#commandTitle {
             font-size: 27px;
             font-weight: 650;
             color: #1d1d1f;
         }
-        QLabel#heroSubtitle, QLabel#bodyText {
+        QLabel#commandSubtitle, QLabel#bodyText {
             color: #515154;
             font-size: 14px;
         }
@@ -1482,19 +1512,29 @@ class _SettingsWindow(QMainWindow):
             font-size: 14px;
             font-weight: 600;
         }
-        QWidget#heroPanel {
-            background: #ffffff;
-            border: 1px solid #ececf0;
-            border-radius: 16px;
+        QWidget#systemStatusPanel {
+            background: #fafafa;
+            border: 1px solid #e5e5e8;
+            border-radius: 10px;
         }
-        QWidget#readinessPanel {
-            background: transparent;
-            border: none;
+        QLabel#systemStatusItem {
+            color: #4d4d50;
+            font-size: 12px;
+            font-weight: 550;
         }
-        QWidget#readinessItem {
+        QWidget#shortcutPanel, QWidget#practicePanel {
             background: #ffffff;
-            border: 1px solid #ececf0;
+            border: 1px solid #e4e4e7;
             border-radius: 12px;
+        }
+        QLabel#panelLabel {
+            color: #6e6e73;
+            font-size: 13px;
+        }
+        QLabel#shortcutValue {
+            color: #1d1d1f;
+            font-size: 13px;
+            font-weight: 600;
         }
         QWidget#hotkeyPanel, QWidget#recoveryPanel,
         QWidget#aboutHero, QWidget#privacyPanel {
@@ -1522,10 +1562,10 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#recentLine {
             color: #3a3a3c;
-            padding: 11px 13px;
-            background: #ffffff;
-            border: 1px solid #ececf0;
-            border-radius: 11px;
+            padding: 11px 1px;
+            background: transparent;
+            border: none;
+            border-top: 1px solid #ececf0;
         }
         QLabel#diagnosticSummary {
             color: #3a3a3c;
