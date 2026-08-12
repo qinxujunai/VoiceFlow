@@ -87,7 +87,7 @@ class VoiceInputSystem:
     PREVIEW_ENDPOINT_LIMIT = 256
     FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
     FINALIZING_DELAY_SECONDS = 0.35
-    FINAL_TEXT_HOLD_SHORT_MS = 700
+    SUCCESS_DISMISS_MS = 140
     CLIPBOARD_ONLY_HOLD_MS = 1040
     RECOVERY_SAVED_HOLD_MS = 1740
 
@@ -980,15 +980,14 @@ class VoiceInputSystem:
         finally:
             lock.release()
 
-    def _final_text_hold_ms(self, _duration):
-        return self.FINAL_TEXT_HOLD_SHORT_MS
-
-    def _delivery_hold_ms(self, output_status, duration):
+    def _delivery_hold_ms(self, output_status, _duration):
+        if output_status == "clipboard_verified_paste_dispatched":
+            return self.SUCCESS_DISMISS_MS
         if output_status == "clipboard_verified_only":
             return self.CLIPBOARD_ONLY_HOLD_MS
         if output_status == "recovery_saved_clipboard_unavailable":
             return self.RECOVERY_SAVED_HOLD_MS
-        return self._final_text_hold_ms(duration)
+        return self.CLIPBOARD_ONLY_HOLD_MS
 
     def _active_engine_name(self):
         return self.config.get("engine", {}).get("active", "sensevoice")

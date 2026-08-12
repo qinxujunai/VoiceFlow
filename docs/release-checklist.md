@@ -18,7 +18,8 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
   evidence.
 - Launching twice focuses the existing app instead of opening another main
   process.
-- Short dictation stops quickly and shows the final checkmark.
+- Short dictation stops quickly, pastes once, and dismisses the capsule without
+  a redundant success label.
 - Long dictation keeps the overlay responsive and writes final text to clipboard
   and history.
 - `logs\performance-evidence.jsonl` was regenerated on the release machine; it
