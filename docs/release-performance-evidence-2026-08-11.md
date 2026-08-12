@@ -42,3 +42,20 @@ The candidate comparison kept the existing bilingual Zipformer. The local
 Paraformer challenger was larger, slower, and produced worse Chinese and
 English preview text on the same pinned samples. SenseVoice remains the final
 authority in every case.
+
+## Packaged runtime resource check
+
+The final `0.3.1+260812.1` installer was installed over the existing
+`D:\Apps\VoiceFlow` sample. After 20 seconds, with both bundled recognizers
+loaded, the process tree contained VoiceFlow and one Qt WebEngine helper:
+
+| Resource | Measured |
+| --- | ---: |
+| Private Bytes | 1,024 MB |
+| Working Set | 683.7 MB |
+| Processes | 2 |
+
+This is an installed-runtime observation on the release workstation, not a
+minimum-memory claim. It improves on the older 1.32 GB profile but remains a
+material cost of keeping separate low-latency preview and authoritative final
+recognizers resident.

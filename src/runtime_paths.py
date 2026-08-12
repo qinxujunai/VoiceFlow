@@ -232,6 +232,19 @@ def _copy_if_missing(source: Path, destination: Path) -> bool:
     return True
 
 
+def _replace_builtin_resource(source: Path, destination: Path) -> bool:
+    """Refresh a versioned public resource without touching user-owned files."""
+    if not source.is_file() or source.resolve() == destination.resolve():
+        return False
+    if destination.is_file() and source.read_bytes() == destination.read_bytes():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.upgrading")
+    shutil.copy2(source, temporary)
+    os.replace(temporary, destination)
+    return True
+
+
 def _write_json_atomic(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
@@ -423,7 +436,12 @@ def prepare_runtime_layout(
                 continue
             relative = source.relative_to(legacy)
             destination = paths.data_dir / relative
-            if _copy_if_missing(source, destination):
+            copied_resource = (
+                _replace_builtin_resource(source, destination)
+                if relative.as_posix() == "knowledge-base/builtin-ai.txt"
+                else _copy_if_missing(source, destination)
+            )
+            if copied_resource:
                 copied.append(relative.as_posix())
 
     for filename in ("user-dictionary.txt", "phrases.txt", "corrections.txt"):

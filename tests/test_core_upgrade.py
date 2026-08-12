@@ -126,6 +126,87 @@ class VocabularyTests(unittest.TestCase):
             self.assertEqual(vocab.apply_corrections("我用科瑟和扣问"), "我用Cursor和Qwen")
             self.assertEqual(vocab.apply_corrections("cursor 应保持原样"), "cursor 应保持原样")
 
+    def test_bundled_ai_dictionary_covers_current_general_ai_workflows(self):
+        from vocabulary import Vocabulary
+
+        vocabulary = Vocabulary(ROOT)
+        expected = {
+            "ChatGPT",
+            "Claude",
+            "Codex",
+            "Cursor",
+            "DeepSeek",
+            "GitHub",
+            "HuggingFace",
+            "LangGraph",
+            "LlamaIndex",
+            "MCP",
+            "Ollama",
+            "OpenAI",
+            "PyTorch",
+            "Qwen",
+            "RAG",
+            "Transformers",
+            "vLLM",
+        }
+
+        self.assertTrue(expected <= vocabulary.terms)
+
+    def test_bundled_ai_corrections_apply_without_rewriting_larger_tokens(self):
+        from text_cleaner import TextCleaner
+
+        cleaner = TextCleaner(config={"cleaner": {"fix_mistakes": True}}, base_dir=ROOT)
+
+        self.assertEqual(
+            cleaner.clean("我用扣戴克斯和奥拉玛跑拍桑项目"),
+            "我用 Codex 和 Ollama 跑 Python 项目",
+        )
+        self.assertEqual(cleaner.clean("github actions"), "GitHub actions")
+        self.assertEqual(cleaner.clean("githubactions"), "githubactions")
+
+    def test_dictionary_terms_normalize_ascii_spelling_without_touching_larger_tokens(self):
+        from text_cleaner import TextCleaner
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            kb = base / "knowledge-base"
+            kb.mkdir()
+            (kb / "builtin-ai.txt").write_text("PyTorch\nNext.js\n", encoding="utf-8")
+            (kb / "corrections.txt").write_text("", encoding="utf-8")
+            (kb / "user-dictionary.txt").write_text("AcmeAI\n", encoding="utf-8")
+            (kb / "phrases.txt").write_text("", encoding="utf-8")
+            cleaner = TextCleaner(
+                config={"cleaner": {"fix_mistakes": True}},
+                base_dir=base,
+            )
+
+            self.assertEqual(
+                cleaner.clean("pytorch 和 next.js 接入 acmeai"),
+                "PyTorch 和 Next.js 接入 AcmeAI",
+            )
+            self.assertEqual(cleaner.clean("pytorchlightning"), "pytorchlightning")
+
+    def test_dictionary_term_normalization_reloads_after_user_edit(self):
+        from text_cleaner import TextCleaner
+
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            kb = base / "knowledge-base"
+            kb.mkdir()
+            (kb / "builtin-ai.txt").write_text("PyTorch\n", encoding="utf-8")
+            (kb / "corrections.txt").write_text("", encoding="utf-8")
+            dictionary = kb / "user-dictionary.txt"
+            dictionary.write_text("", encoding="utf-8")
+            (kb / "phrases.txt").write_text("", encoding="utf-8")
+            cleaner = TextCleaner(
+                config={"cleaner": {"fix_mistakes": True}},
+                base_dir=base,
+            )
+
+            self.assertEqual(cleaner.clean("acmeai"), "acmeai")
+            dictionary.write_text("AcmeAI\n", encoding="utf-8")
+            self.assertEqual(cleaner.clean("acmeai"), "AcmeAI")
+
 
 class AccuracyLoopTests(unittest.TestCase):
     def test_cleaner_preserves_non_empty_single_character_commands(self):

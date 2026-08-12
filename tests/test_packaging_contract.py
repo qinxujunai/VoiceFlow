@@ -264,10 +264,10 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 1, 2)" in version
-    assert "prodvers=(0, 3, 1, 2)" in version
-    assert "StringStruct('FileVersion', '0.3.1.2')" in version
-    assert "StringStruct('ProductVersion', '0.3.1+260811.2')" in version
+    assert "filevers=(0, 3, 1, 4)" in version
+    assert "prodvers=(0, 3, 1, 4)" in version
+    assert "StringStruct('FileVersion', '0.3.1.4')" in version
+    assert "StringStruct('ProductVersion', '0.3.1+260812.1')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -280,11 +280,11 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     )
 
     assert 'APP_VERSION = "0.3.1"' in application
-    assert 'BUILD_ID = "260811.2"' in application
+    assert 'BUILD_ID = "260812.1"' in application
     assert "display_version()" in overlay
-    assert '#define MyAppBuildId "260811.2"' in installer
-    assert "VersionInfoVersion=0.3.1.2" in installer
-    assert "build 260811.2" in notes
+    assert '#define MyAppBuildId "260812.1"' in installer
+    assert "VersionInfoVersion=0.3.1.4" in installer
+    assert "build 260812.1" in notes
 
 
 def test_release_notes_installer_and_checksum_are_consistent():

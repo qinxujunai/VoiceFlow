@@ -126,6 +126,46 @@ def test_runtime_migration_is_non_destructive_idempotent_and_does_not_copy_model
     assert state["install_dir"] == str(install_dir.resolve())
 
 
+def test_runtime_upgrade_refreshes_builtin_vocabulary_without_overwriting_user_words(
+    tmp_path,
+):
+    from runtime_paths import AppPaths, RuntimeMode, prepare_runtime_layout
+
+    install_dir = tmp_path / "install"
+    data_dir = tmp_path / "data"
+    (install_dir / "knowledge-base").mkdir(parents=True)
+    (data_dir / "knowledge-base").mkdir(parents=True)
+    (install_dir / "config.yaml").write_text("engine: {}\n", encoding="utf-8")
+    (install_dir / "knowledge-base" / "builtin-ai.txt").write_text(
+        "OpenAI\nPyTorch\n",
+        encoding="utf-8",
+    )
+    (data_dir / "knowledge-base" / "builtin-ai.txt").write_text(
+        "OpenAI\n",
+        encoding="utf-8",
+    )
+    (data_dir / "knowledge-base" / "user-dictionary.txt").write_text(
+        "用户专有词\n",
+        encoding="utf-8",
+    )
+    paths = AppPaths(
+        mode=RuntimeMode.FROZEN,
+        install_dir=install_dir,
+        data_dir=data_dir,
+        executable=install_dir / "VoiceFlow.exe",
+    )
+
+    report = prepare_runtime_layout(paths)
+
+    assert (paths.knowledge_dir / "builtin-ai.txt").read_text(
+        encoding="utf-8"
+    ) == "OpenAI\nPyTorch\n"
+    assert (paths.knowledge_dir / "user-dictionary.txt").read_text(
+        encoding="utf-8"
+    ) == "用户专有词\n"
+    assert "knowledge-base/builtin-ai.txt" in report.copied
+
+
 def test_v3_migration_changes_the_legacy_sensevoice_default_to_auto_once(tmp_path):
     from runtime_paths import DATA_SCHEMA_VERSION, AppPaths, RuntimeMode, prepare_runtime_layout
 

@@ -1,6 +1,6 @@
 #define MyAppName "VoiceFlow"
 #define MyAppVersion "0.3.1"
-#define MyAppBuildId "260811.2"
+#define MyAppBuildId "260812.1"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 
@@ -8,7 +8,7 @@
 AppId={{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-VersionInfoVersion=0.3.1.2
+VersionInfoVersion=0.3.1.4
 VersionInfoTextVersion={#MyAppVersion}+{#MyAppBuildId}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\VoiceFlow

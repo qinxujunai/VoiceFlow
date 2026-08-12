@@ -87,7 +87,7 @@ class VoiceInputSystem:
     PREVIEW_ENDPOINT_LIMIT = 256
     FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
     FINALIZING_DELAY_SECONDS = 0.35
-    FINAL_TEXT_HOLD_SHORT_MS = 700
+    SUCCESS_DISMISS_MS = 140
     CLIPBOARD_ONLY_HOLD_MS = 1040
     RECOVERY_SAVED_HOLD_MS = 1740
 
@@ -290,6 +290,12 @@ class VoiceInputSystem:
             self._on_record_stop(triggered_at)
         elif state is RecordingState.IDLE:
             self._on_record_start(triggered_at)
+
+    def _can_record_toggle(self):
+        return self._recording_state.current in {
+            RecordingState.IDLE,
+            RecordingState.RECORDING,
+        }
 
     def _on_record_start(self, triggered_at=None):
         if not self._recording_state.claim_start():
@@ -980,15 +986,14 @@ class VoiceInputSystem:
         finally:
             lock.release()
 
-    def _final_text_hold_ms(self, _duration):
-        return self.FINAL_TEXT_HOLD_SHORT_MS
-
-    def _delivery_hold_ms(self, output_status, duration):
+    def _delivery_hold_ms(self, output_status, _duration):
+        if output_status == "clipboard_verified_paste_dispatched":
+            return self.SUCCESS_DISMISS_MS
         if output_status == "clipboard_verified_only":
             return self.CLIPBOARD_ONLY_HOLD_MS
         if output_status == "recovery_saved_clipboard_unavailable":
             return self.RECOVERY_SAVED_HOLD_MS
-        return self._final_text_hold_ms(duration)
+        return self.CLIPBOARD_ONLY_HOLD_MS
 
     def _active_engine_name(self):
         return self.config.get("engine", {}).get("active", "sensevoice")
@@ -1248,6 +1253,7 @@ class VoiceInputSystem:
             config_path=self.config_path,
             callbacks={
                 "on_record_toggle": self._on_record_toggle,
+                "can_record_toggle": self._can_record_toggle,
                 "on_record_cancel": self._on_record_cancel,
             },
         )
