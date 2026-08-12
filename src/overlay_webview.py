@@ -2126,10 +2126,6 @@ class OverlayWindow:
         self._js(f"showSettling({int(session_id)})")
 
 
-    def show_done(self):
-        self._tray_state(TRAY_ICON_IDLE)
-        self._js("showDone()")
-
     def show_delivery_state(self, status, session_id):
         self._tray_state(TRAY_ICON_IDLE)
         self._js(

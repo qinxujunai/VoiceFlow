@@ -36,8 +36,11 @@ def test_delivery_state_uses_minimal_truthful_copy():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
     assert "function showDeliveryState(" in html
-    assert "clipboard_verified_only: '已复制'" in html
-    assert "clipboard_verified_paste_dispatched: '已完成'" in html
+    assert "clipboard_verified_only: '已复制到剪贴板'" in html
+    assert "if (status === 'clipboard_verified_paste_dispatched')" in html
+    assert "pill.className = 'pill final_text delivery_dismissed';" in html
+    assert ".pill.delivery_dismissed" in html
+    assert "clipboard_verified_paste_dispatched: '已完成'" not in html
     assert "已复制并发送粘贴" not in html
     assert "check_only" not in html
     assert "def show_delivery_state(" in overlay
@@ -618,35 +621,35 @@ def test_overlay_has_processing_settling_spinner_and_final_checkmark():
     processing_block = html[processing_idx:done_idx]
     processing_ticker_block = html[html.index(".processing .ticker"):html.index(".error .ticker")]
 
-    assert ".pill.done" in html
+    assert ".pill.done" not in html
     assert ".pill.settling" in html
     assert ".final_text .mark span" in html
     assert ".processing .mark::before" in html
     assert ".settling .mark::before" in html
-    assert ".done .mark::before" in html
+    assert ".done .mark::before" not in html
     assert ".final_ready .mark::before" in html
     assert "@keyframes spin" in html
-    assert "function showDone()" in html
+    assert "function showDone()" not in html
     assert "showState('processing'" not in processing_block
     assert "setWidthForText" not in processing_block
     assert "txt.textContent" not in processing_block
     assert "color: transparent;" not in processing_ticker_block
     assert "color: var(--text);" in processing_ticker_block
     assert "pill.className = 'pill processing';" in processing_block
-    assert "showState('done', '已完成')" in html
+    assert "showState('done', '已完成')" not in html
     assert "setWidthForLabel(label || '');" in html[html.index("function showState(state, label)"):html.index("function showRecording(sessionId)")]
-    assert "position: absolute;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
-    assert "inset: 2.5px;" in html[html.index(".processing .mark::before"):html.index(".done .mark::before")]
+    assert "position: absolute;" in html[html.index(".processing .mark::before"):html.index(".final_ready .mark::before")]
+    assert "inset: 2.5px;" in html[html.index(".processing .mark::before"):html.index(".final_ready .mark::before")]
     assert "border-right: 1.8px solid var(--green);" in html
     assert "border-bottom: 1.8px solid var(--green);" in html
-    assert "def show_done(self):" in overlay
+    assert "def show_done(self):" not in overlay
     assert 'self._js("showProcessing()")' in overlay
-    assert "showDone()" in overlay
+    assert "showDone()" not in overlay
 
 
 def test_overlay_processing_only_changes_mark_state():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    processing_css = html[html.index(".pill.processing"):html.index(".pill.done")]
+    processing_css = html[html.index(".pill.processing"):html.index(".pill.final_ready")]
     processing_idx = html.index("function showProcessing()")
     processing_block = html[processing_idx:html.index("function showSettling(sessionId)", processing_idx)]
 
@@ -775,11 +778,12 @@ def test_delivery_feedback_is_minimal_truthful_and_has_accessible_detail():
     delivery_end = html.index("function showResult(", delivery_start)
     delivery = html[delivery_start:delivery_end]
 
-    assert "clipboard_verified_paste_dispatched: '已完成'" in delivery
-    assert "clipboard_verified_only: '已复制'" in delivery
+    assert "if (status === 'clipboard_verified_paste_dispatched')" in delivery
+    assert "pill.className = 'pill final_text delivery_dismissed';" in delivery
+    assert "clipboard_verified_paste_dispatched: '已完成'" not in delivery
+    assert "clipboard_verified_only: '已复制到剪贴板'" in delivery
     assert "recovery_saved_clipboard_unavailable: '已保存'" in delivery
     assert "clipboard_verified_paste_dispatched: '已复制并发送粘贴'" not in delivery
-    assert "clipboard_verified_only: '已复制到剪贴板'" not in delivery
     assert "字`" not in delivery
     assert "pill.setAttribute('aria-label'" in delivery
     assert "check_only" not in delivery
@@ -810,19 +814,20 @@ def test_final_text_replaces_the_draft_before_delivery_feedback():
     assert "pill.classList.contains('recovery')" in final
 
 
-def test_delivery_dwell_matches_the_visible_feedback_contract():
+def test_success_dismisses_quietly_while_fallback_states_remain_visible():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
 
-    assert "FINAL_REPLACEMENT_DWELL_MS = 140" in html
-    assert "FINAL_TEXT_HOLD_SHORT_MS = 700" in main
+    assert "FINAL_REPLACEMENT_DWELL_MS" not in html
+    assert "SUCCESS_DISMISS_MS = 140" in main
+    assert "FINAL_TEXT_HOLD_SHORT_MS" not in main
     assert "CLIPBOARD_ONLY_HOLD_MS = 1040" in main
     assert "RECOVERY_SAVED_HOLD_MS = 1740" in main
-    hold_start = main.index("def _final_text_hold_ms")
-    hold_end = main.index("def _delivery_hold_ms", hold_start)
+    hold_start = main.index("def _delivery_hold_ms")
+    hold_end = main.index("def _active_engine_name", hold_start)
     hold = main[hold_start:hold_end]
-    assert "return self.FINAL_TEXT_HOLD_SHORT_MS" in hold
-    assert "FINAL_TEXT_HOLD_LONG_MS" not in hold
+    assert 'if output_status == "clipboard_verified_paste_dispatched"' in hold
+    assert "return self.SUCCESS_DISMISS_MS" in hold
 
 
 def test_empty_capture_is_a_neutral_cancel_not_a_red_audio_error():

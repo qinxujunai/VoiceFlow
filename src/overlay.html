@@ -75,6 +75,10 @@ body {
     opacity: 0;
 }
 
+.pill.delivery_dismissed {
+    opacity: 0;
+}
+
 .pill.listening {
     --target-width: 86px;
     border-color: rgba(255, 69, 58, 0.18);
@@ -89,7 +93,6 @@ body {
     border-color: rgba(100, 167, 255, 0.18);
 }
 
-.pill.done,
 .pill.final_ready {
     --target-width: 112px;
     border-color: rgba(50, 215, 75, 0.22);
@@ -148,7 +151,6 @@ body {
 .processing .mark span,
 .settling .mark span,
 .final_text .mark span,
-.done .mark span,
 .final_ready .mark span {
     opacity: 0;
     animation: none;
@@ -165,7 +167,6 @@ body {
     animation: spin 780ms linear infinite;
 }
 
-.done .mark::before,
 .final_ready .mark::before {
     content: "";
     position: absolute;
@@ -204,7 +205,6 @@ body {
     color: transparent;
 }
 
-.done .ticker,
 .final_ready .ticker {
     color: var(--text);
 }
@@ -322,12 +322,10 @@ const STREAM_BASE_INTERVAL_MS = 48;
 const STREAM_MIN_INTERVAL_MS = 17;
 const STREAM_TARGET_LAG_MS = 180;
 const STREAM_HARD_LAG_MS = 600;
-const FINAL_REPLACEMENT_DWELL_MS = 140;
 let activeSession = 0;
 const streamingConfirmedQueue = [];
 const streamingVisibleTail = [];
 let streamingAppendTimer = 0;
-let deliveryStateTimer = 0;
 let streamingCharacterCount = 0;
 let streamingTargetWidth = MIN_WIDTH;
 let streamingAuthoritativeCount = 0;
@@ -518,11 +516,6 @@ function cancelStreamingQueue() {
     streamingConfirmedQueue.length = 0;
 }
 
-function cancelDeliveryStateTimer() {
-    clearTimeout(deliveryStateTimer);
-    deliveryStateTimer = 0;
-}
-
 function setTranscriptBuffers(authoritativePrefix, draftTail) {
     const authoritative = splitGraphemes(authoritativePrefix || '');
     const draft = splitGraphemes(draftTail || '');
@@ -543,7 +536,6 @@ function setTranscriptBuffers(authoritativePrefix, draftTail) {
 
 function resetTextMotion() {
     cancelStreamingQueue();
-    cancelDeliveryStateTimer();
     streamingVisibleTail.length = 0;
     streamingCharacterCount = 0;
     streamingTargetWidth = MIN_WIDTH;
@@ -654,39 +646,31 @@ function showSettling(sessionId) {
     pill.setAttribute('aria-label', '正在完成识别');
 }
 
-function showDone() {
-    showState('done', '已完成');
-}
-
 function showDeliveryState(status, sessionId) {
     if (sessionId < activeSession) return;
     activeSession = sessionId;
-    const labels = {
-        clipboard_verified_paste_dispatched: '已完成',
-        clipboard_verified_only: '已复制',
-        recovery_saved_clipboard_unavailable: '已保存'
-    };
     const accessible = {
         clipboard_verified_paste_dispatched: '文字已复制，粘贴指令已发送',
         clipboard_verified_only: '文字已复制到剪贴板',
         recovery_saved_clipboard_unavailable: '文字已安全保存，剪贴板暂不可用'
     };
-    const render = () => {
-        if (sessionId !== activeSession) return;
+    if (status === 'clipboard_verified_paste_dispatched') {
         resetTextMotion();
-        const saved = status === 'recovery_saved_clipboard_unavailable';
-        pill.className = saved
-            ? 'pill recovery'
-            : 'pill final_ready success';
-        setWidthForLabel(labels[status] ?? '已复制');
-        pill.setAttribute('aria-label', accessible[status] || '文字已复制');
-    };
-    cancelDeliveryStateTimer();
-    if (pill.classList.contains('final_text')) {
-        deliveryStateTimer = setTimeout(render, FINAL_REPLACEMENT_DWELL_MS);
-    } else {
-        render();
+        pill.className = 'pill final_text delivery_dismissed';
+        pill.setAttribute('aria-label', accessible[status]);
+        return;
     }
+    const labels = {
+        clipboard_verified_only: '已复制到剪贴板',
+        recovery_saved_clipboard_unavailable: '已保存'
+    };
+    resetTextMotion();
+    const saved = status === 'recovery_saved_clipboard_unavailable';
+    pill.className = saved
+        ? 'pill recovery'
+        : 'pill final_ready success';
+    setWidthForLabel(labels[status] ?? '已复制到剪贴板');
+    pill.setAttribute('aria-label', accessible[status] || '文字已复制');
 }
 
 function showResult(msg) {
