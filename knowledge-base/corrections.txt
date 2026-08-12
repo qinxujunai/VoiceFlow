@@ -8,6 +8,8 @@
 扣问=Qwen
 千问=Qwen
 兰钦=LangChain
+奥拉玛=Ollama
+欧拉玛=Ollama
 拍桑=Python
 拍森=Python
 快思考=Claude

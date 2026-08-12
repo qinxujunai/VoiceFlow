@@ -39,6 +39,7 @@ class TextCleaner:
 
         # --- 修正词表：音近词 → 正确形式 ---
         self.corrections = self._build_corrections(base_dir)
+        self.term_normalizations = self._build_term_normalizations()
         self._corrections_signature = self._correction_files_signature()
 
         # --- 标点 ---
@@ -147,6 +148,21 @@ class TextCleaner:
                 signature.append((str(path), None, None))
         return tuple(signature)
 
+    def _build_term_normalizations(self):
+        """Build safe, token-boundary spelling normalization for ASCII terms."""
+        if not self.vocabulary:
+            return []
+        terms = []
+        for term in self.vocabulary.terms:
+            if not term.isascii() or not any(char.isalpha() for char in term):
+                continue
+            pattern = re.compile(
+                rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])",
+                re.IGNORECASE,
+            )
+            terms.append((term, pattern))
+        return sorted(terms, key=lambda item: len(item[0]), reverse=True)
+
     def _reload_corrections_if_changed(self):
         if not self.vocabulary:
             return
@@ -155,6 +171,7 @@ class TextCleaner:
             return
         self.vocabulary.reload()
         self.corrections = self._build_corrections(self.base_dir)
+        self.term_normalizations = self._build_term_normalizations()
         self._corrections_signature = signature
 
     @staticmethod
@@ -225,11 +242,13 @@ class TextCleaner:
                 continue
             if wrong.isascii() and any(char.isalnum() for char in wrong):
                 pattern = re.compile(
-                    rf"(?<![A-Za-z0-9_]){re.escape(wrong)}(?![A-Za-z0-9_])"
+                    rf"(?<![A-Za-z0-9_.]){re.escape(wrong)}(?![A-Za-z0-9_.])"
                 )
                 text = pattern.sub(lambda _match: correct, text)
                 continue
             text = text.replace(wrong, correct)
+        for term, pattern in self.term_normalizations:
+            text = pattern.sub(lambda _match, value=term: value, text)
         return text
 
     def _add_punctuation(self, text: str) -> str:

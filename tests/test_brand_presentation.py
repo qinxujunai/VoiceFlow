@@ -61,17 +61,32 @@ def test_product_site_demo_matches_readme_demo():
     assert 'rx="48" fill="#f5f5f7"' in site_demo
     assert 'id="softPanel"' not in site_demo
     assert 'id="finalText"' in site_demo
-    assert ">已完成</text>" in site_demo
+    assert ">已完成</text>" not in site_demo
+    assert "deliveryDismissState" in site_demo
 
 
-def test_bilingual_demo_uses_the_real_short_completion_state():
+def test_bilingual_demo_uses_the_real_quiet_success_state():
     chinese_demo = _read("site/assets/voiceflow-demo.svg")
     english_demo = _read("site/assets/voiceflow-demo.en.svg")
 
-    assert ">已完成</text>" in chinese_demo
-    assert ">Done</text>" in english_demo
+    assert ">已完成</text>" not in chinese_demo
+    assert ">Done</text>" not in english_demo
+    assert "deliveryDismissState" in chinese_demo
+    assert "deliveryDismissState" in english_demo
     assert "Copied" not in english_demo
     assert "· 21" not in english_demo
+
+
+def test_public_demo_descriptions_and_metrics_are_not_stale():
+    page = _read("site/index.html")
+    copy = _read("site/app.js")
+    chinese_demo = _read("docs/voiceflow-demo.svg")
+
+    assert "终稿原位确认后安静消失" in page + copy
+    assert "quietly disappears" in copy + chinese_demo
+    assert "自动化测试</dt><dd>344" not in page
+    assert 'data-i18n="metricScopeValue">全量' in page
+    assert 'metricScopeValue: "Full suite"' in copy
 
 
 def test_public_copy_matches_stop_time_foreground_delivery_policy():

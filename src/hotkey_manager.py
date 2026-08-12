@@ -36,7 +36,10 @@ class HotkeyManager:
         self._lock = threading.Lock()
         self._pressed_triggers = set()
         self._accepting_intents = True
-        self._intent_queue = queue.Queue()
+        # Keep at most one tap waiting behind the callback that is currently
+        # changing recording state. A long finalization must never replay a
+        # backlog of stale taps as future start/stop actions.
+        self._intent_queue = queue.Queue(maxsize=1)
         self._intent_worker = threading.Thread(
             target=self._dispatch_intents,
             name="voiceflow-hotkey-intents",
@@ -80,7 +83,13 @@ class HotkeyManager:
             else:
                 self._pressed_triggers.discard(source)
                 return False
-        self._intent_queue.put(time.perf_counter())
+        can_toggle = self.callbacks.get("can_record_toggle")
+        if can_toggle and not can_toggle():
+            return False
+        try:
+            self._intent_queue.put_nowait(time.perf_counter())
+        except queue.Full:
+            return False
         return True
 
     def _dispatch_intents(self):
@@ -89,6 +98,9 @@ class HotkeyManager:
             try:
                 if triggered_at is None:
                     return
+                can_toggle = self.callbacks.get("can_record_toggle")
+                if can_toggle and not can_toggle():
+                    continue
                 callback = self.callbacks.get("on_record_toggle")
                 if callback:
                     callback(triggered_at)
@@ -181,7 +193,13 @@ class HotkeyManager:
             self._accepting_intents = False
             self._pressed_triggers.clear()
         if should_stop_worker:
-            self._intent_queue.put(None)
+            while True:
+                try:
+                    self._intent_queue.get_nowait()
+                    self._intent_queue.task_done()
+                except queue.Empty:
+                    break
+            self._intent_queue.put_nowait(None)
         if self._keyboard_backend is not None:
             try:
                 self._keyboard_backend.unhook_all()

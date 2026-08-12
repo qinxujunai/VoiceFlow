@@ -181,7 +181,7 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Regression Guards
 
-- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop atomically freezes the sample boundary, invalidates preview without joining workers, keeps the existing text unchanged for 350 ms, optionally changes only the mark to a spinner, replaces the draft with authoritative final text in place, and then shows minimal delivery feedback. Do not call `show_result(text)` for the normal recording stop path.
+- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop atomically freezes the sample boundary, invalidates preview without joining workers, keeps the existing text unchanged for 350 ms, optionally changes only the mark to a spinner, and replaces the draft with authoritative final text in place. Verified paste dispatch then fades the capsule without a success label; only fallback or failure paths stay visible. Do not call `show_result(text)` for the normal recording stop path.
 
 - **Streaming text replay and reverse motion.** The online recognizer owns one
   stream per recording and receives each new PCM sample exactly once. Its
@@ -196,9 +196,10 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   first, then invalidates the preview generation. `_stop_streaming()` may only
   signal cancellation and transfer ownership; it must not join worker threads.
   Session guards prevent stale preview work from updating settling, final, or
-  delivery states. The capsule replaces the draft with final text in place,
-  then shows a check with `已完成`, `已复制`, or `已保存` as appropriate. Never
-  restore the character-count summary or claim paste success.
+  delivery states. The capsule replaces the draft with final text in place.
+  Verified paste dispatch fades out silently; clipboard-only shows
+  `已复制到剪贴板`, and durable recovery shows `已保存`. Never restore the
+  character-count summary or claim paste success.
 
 - **Recording color stability.** Draft and authoritative provenance remains internal.
   Both render in one text color, and the three recording bars remain red until recording

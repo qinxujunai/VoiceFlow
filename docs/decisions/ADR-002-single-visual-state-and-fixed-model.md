@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; completion feedback superseded by ADR-003
 
 ## Date
 
