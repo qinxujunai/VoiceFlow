@@ -214,6 +214,11 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   Both render in one text color, and the three recording bars remain red until recording
   actually ends. Do not couple recognition confidence to visible color changes.
 
+- **One recording entry point.** Settings may include a plain text box for trying the
+  normal global shortcut, but must not add a separate Trial/试说 recording button. That
+  second action competed with the F2 session state and could freeze or terminate the
+  settings window. F2, Right Ctrl, and mouse side buttons use the same controller path.
+
 - **Long dictation preview cost and coverage.** The lightweight online preview
   and SenseVoice progressive final cache use separate workers. Active recording
   PCM must not be discarded. Progressive final segments carry explicit sample

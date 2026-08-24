@@ -1,6 +1,6 @@
 #define MyAppName "VoiceFlow"
 #define MyAppVersion "0.3.2"
-#define MyAppBuildId "260825.1"
+#define MyAppBuildId "260825.2"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
 

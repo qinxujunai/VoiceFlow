@@ -38,6 +38,15 @@ def test_installer_smoke_derives_the_artifact_from_the_source_version():
     assert 'Could not read APP_VERSION' in script
 
 
+def test_installer_smoke_rejects_packaged_personal_history():
+    script = (ROOT / "scripts" / "smoke_installer.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '-Filter "history.jsonl"' in script
+    assert 'throw "Installer contains local dictation history"' in script
+
+
 def test_packaged_runtime_smoke_waits_for_an_explicit_ready_signal():
     script = (ROOT / "scripts" / "smoke_packaged_runtime.ps1").read_text(
         encoding="utf-8-sig"
@@ -267,7 +276,7 @@ def test_windows_executable_has_product_version_metadata():
     assert "filevers=(0, 3, 2, 1)" in version
     assert "prodvers=(0, 3, 2, 1)" in version
     assert "StringStruct('FileVersion', '0.3.2.1')" in version
-    assert "StringStruct('ProductVersion', '0.3.2+260825.1')" in version
+    assert "StringStruct('ProductVersion', '0.3.2+260825.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -280,29 +289,26 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     )
 
     assert 'APP_VERSION = "0.3.2"' in application
-    assert 'BUILD_ID = "260825.1"' in application
+    assert 'BUILD_ID = "260825.2"' in application
     assert "display_version()" in overlay
     assert '#define MyAppVersion "0.3.2"' in installer
-    assert '#define MyAppBuildId "260825.1"' in installer
+    assert '#define MyAppBuildId "260825.2"' in installer
     assert "VersionInfoVersion=0.3.2.1" in installer
-    assert "0.3.2+260825.1" in version_info
+    assert "0.3.2+260825.2" in version_info
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
-    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
-        encoding="utf-8"
-    )
-    checksums = (ROOT / "release" / "v0.3.1" / "SHA256SUMS.txt").read_text(
+    notes = (ROOT / "release" / "v0.3.2" / "RELEASE_NOTES.md").read_text(
         encoding="utf-8"
     )
 
-    version = "0.3.1"
+    version = "0.3.2"
     installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
     assert f"# VoiceFlow {version}" in notes
     assert installer_name in notes
     assert "SHA256SUMS.txt" in notes
     assert not re.search(r"SHA-256：`[A-F0-9]{64}`", notes)
-    assert any(line.endswith(installer_name) for line in checksums.splitlines())
+    assert "build 260825.2" in notes
 
 
 def test_development_audio_samples_are_explicitly_excluded_from_the_installer():

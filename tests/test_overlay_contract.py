@@ -434,7 +434,8 @@ def test_settings_merges_static_hotkey_help_into_dictation():
 
     assert "def _hotkeys_page" not in settings_block
     assert "trigger_summary()" in settings_block
-    assert 'trial.clicked.connect(self._start_trial)' in settings_block
+    assert "_start_trial" not in settings_block
+    assert ".start_trial()" not in settings_block
 
 
 def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
