@@ -1386,48 +1386,10 @@ class VoiceInputSystem:
 
         def monitor():
             while not self._runtime_supervisor_stop.wait(2.0):
-                workers = [
-                    getattr(self, "audio", None),
-                    getattr(self, "transcriber", None),
-                ]
-                preview = getattr(self, "preview_transcriber", None)
-                if preview is not None:
-                    workers.append(preview)
-                self.controller.update_worker_health(
-                    worker_pids=self._worker_pids(),
-                    last_heartbeat=self._oldest_worker_heartbeat(),
-                )
-                if self.controller.phase is not RuntimePhase.READY:
-                    continue
-                unhealthy = [
-                    worker
-                    for worker in workers
-                    if worker is not None and not getattr(worker, "is_healthy", False)
-                ]
-                if not unhealthy:
-                    continue
-                if not self._runtime_supervisor_lock.acquire(blocking=False):
-                    continue
                 try:
-                    logger.warning(
-                        "runtime worker became unhealthy",
-                        extra={"event": "worker_unhealthy", "state": "restarting"},
-                    )
-                    for worker in unhealthy:
-                        worker.ensure_healthy()
-                    self.controller.mark_ready(
-                        preview_ready=preview is not None and preview.is_healthy,
-                        worker_pid=getattr(self.transcriber, "worker_pid", None),
-                        worker_pids=self._worker_pids(),
-                        last_heartbeat=self._oldest_worker_heartbeat(),
-                    )
+                    self._runtime_supervisor_tick()
                 except Exception:
-                    logger.exception("runtime worker restart failed")
-                    self.controller.mark_degraded(
-                        error_code="worker_restart_failed",
-                    )
-                finally:
-                    self._runtime_supervisor_lock.release()
+                    logger.exception("runtime supervisor tick failed")
 
         self._runtime_supervisor_thread = threading.Thread(
             target=monitor,
@@ -1435,6 +1397,50 @@ class VoiceInputSystem:
             daemon=True,
         )
         self._runtime_supervisor_thread.start()
+
+    def _runtime_supervisor_tick(self):
+        workers = [
+            getattr(self, "audio", None),
+            getattr(self, "transcriber", None),
+        ]
+        preview = getattr(self, "preview_transcriber", None)
+        if preview is not None:
+            workers.append(preview)
+        self.controller.update_worker_health(
+            worker_pids=self._worker_pids(),
+            last_heartbeat=self._oldest_worker_heartbeat(),
+        )
+        if self.controller.phase is not RuntimePhase.READY:
+            return
+        unhealthy = [
+            worker
+            for worker in workers
+            if worker is not None and not getattr(worker, "is_healthy", False)
+        ]
+        if not unhealthy:
+            return
+        if not self._runtime_supervisor_lock.acquire(blocking=False):
+            return
+        try:
+            logger.warning(
+                "runtime worker became unhealthy",
+                extra={"event": "worker_unhealthy", "state": "restarting"},
+            )
+            for worker in unhealthy:
+                worker.ensure_healthy()
+            self.controller.mark_ready(
+                preview_ready=preview is not None and preview.is_healthy,
+                worker_pid=getattr(self.transcriber, "worker_pid", None),
+                worker_pids=self._worker_pids(),
+                last_heartbeat=self._oldest_worker_heartbeat(),
+            )
+        except Exception:
+            logger.exception("runtime worker restart failed")
+            self.controller.mark_degraded(
+                error_code="worker_restart_failed",
+            )
+        finally:
+            self._runtime_supervisor_lock.release()
 
     def _start_hotkeys(self):
         self.hotkey_mgr = HotkeyManager(

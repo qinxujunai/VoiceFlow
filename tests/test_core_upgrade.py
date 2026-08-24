@@ -25,6 +25,38 @@ class UiStateTests(unittest.TestCase):
         self.assertEqual(display_for_state(UiState.IDLE).tray_state, "idle")
 
 
+class RuntimeSupervisorTests(unittest.TestCase):
+    def test_supervisor_continues_after_one_failed_health_tick(self):
+        from main import VoiceInputSystem
+
+        class StopAfterTwoTicks:
+            def __init__(self):
+                self.calls = 0
+
+            def wait(self, _timeout):
+                self.calls += 1
+                return self.calls > 2
+
+        system = object.__new__(VoiceInputSystem)
+        system._runtime_supervisor_thread = None
+        system._runtime_supervisor_stop = StopAfterTwoTicks()
+        ticks = []
+
+        def supervise_once():
+            ticks.append(len(ticks) + 1)
+            if len(ticks) == 1:
+                raise RuntimeError("injected health tick failure")
+
+        system._runtime_supervisor_tick = supervise_once
+        with mock.patch("main.logger.exception") as log_exception:
+            VoiceInputSystem._start_runtime_supervisor(system)
+            system._runtime_supervisor_thread.join(timeout=1.0)
+
+        self.assertFalse(system._runtime_supervisor_thread.is_alive())
+        self.assertEqual(ticks, [1, 2])
+        log_exception.assert_called_once()
+
+
 class HistoryStoreTests(unittest.TestCase):
     def test_appends_jsonl_and_returns_last_entry(self):
         from history_store import HistoryStore
