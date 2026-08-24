@@ -139,6 +139,9 @@ def test_pages_workflow_renders_only_a_verified_published_release():
     assert "release:" in workflow
     assert "published" in workflow
     assert "edited" in workflow
+    assert "workflow_run:" in workflow
+    assert 'workflows: ["Release"]' in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
     assert "scripts/prepare_public_site.py" in workflow
     assert "VOICEFLOW_GITHUB_TOKEN" in workflow
     assert "path: ${{ runner.temp }}/voiceflow-site" in workflow
