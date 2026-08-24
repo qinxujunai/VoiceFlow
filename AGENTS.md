@@ -34,10 +34,14 @@ venv\Scripts\python.exe test_integration.py
 
 ```text
 src/
+  app_controller.py    # stable UI/action facade and runtime state
   main.py              # orchestration, lifecycle, streaming preview
   hotkey_manager.py    # keyboard + pynput mouse side buttons
   recording_session.py # recording lifecycle
   audio_capture.py     # sounddevice microphone adapter
+  audio_worker.py      # supervised disposable microphone process
+  asr_worker.py        # supervised authoritative-ASR process
+  preview_worker.py    # supervised online-preview ASR process
   transcriber.py       # sherpa-onnx ASR
   streaming_transcriber.py # small online ASR for capsule preview
   vocabulary.py        # layered dictionary/corrections
@@ -48,6 +52,11 @@ src/
   overlay.html         # centered pill UI
   tray_icon.py         # runtime status tray icon
 ```
+
+The Qt process must not load or call native audio/ASR engines directly in the
+normal runtime. Construct `AppController` before the overlay or tray, register
+hotkeys before worker initialization, and keep worker IPC bounded. See
+`docs/decisions/ADR-004-supervised-runtime-boundary.md`.
 
 ## Product Rules
 
