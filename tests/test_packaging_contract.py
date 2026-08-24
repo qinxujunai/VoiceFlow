@@ -267,7 +267,7 @@ def test_windows_executable_has_product_version_metadata():
     assert "filevers=(0, 3, 2, 1)" in version
     assert "prodvers=(0, 3, 2, 1)" in version
     assert "StringStruct('FileVersion', '0.3.2.1')" in version
-    assert "StringStruct('ProductVersion', '0.3.2+260824.1')" in version
+    assert "StringStruct('ProductVersion', '0.3.2+260825.1')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -280,12 +280,12 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     )
 
     assert 'APP_VERSION = "0.3.2"' in application
-    assert 'BUILD_ID = "260824.1"' in application
+    assert 'BUILD_ID = "260825.1"' in application
     assert "display_version()" in overlay
     assert '#define MyAppVersion "0.3.2"' in installer
-    assert '#define MyAppBuildId "260824.1"' in installer
+    assert '#define MyAppBuildId "260825.1"' in installer
     assert "VersionInfoVersion=0.3.2.1" in installer
-    assert "0.3.2+260824.1" in version_info
+    assert "0.3.2+260825.1" in version_info
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
