@@ -340,3 +340,37 @@ def test_trial_button_dispatches_a_real_controller_action(app, paths):
         assert window.practice_box.hasFocus()
     finally:
         window.close()
+
+
+def test_settings_navigation_and_trial_binding_survive_one_thousand_actions(
+    app,
+    paths,
+):
+    class FastController:
+        def __init__(self):
+            self.calls = 0
+
+        def start_trial(self):
+            self.calls += 1
+            return type(
+                "Result",
+                (),
+                {"accepted": True, "message": "", "error_code": ""},
+            )()
+
+    controller = FastController()
+    window = _SettingsWindow(paths=paths, controller=controller)
+    try:
+        window.show()
+        app.processEvents()
+        started = time.perf_counter()
+        for index in range(1000):
+            window.sidebar.setCurrentRow(index % 4)
+            window.trial_button.click()
+            app.processEvents()
+        elapsed = time.perf_counter() - started
+
+        assert controller.calls == 1000
+        assert elapsed < 5.0
+    finally:
+        window.close()
