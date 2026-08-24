@@ -34,10 +34,14 @@ venv\Scripts\python.exe test_integration.py
 
 ```text
 src/
+  app_controller.py    # stable UI/action facade and runtime state
   main.py              # orchestration, lifecycle, streaming preview
   hotkey_manager.py    # keyboard + pynput mouse side buttons
   recording_session.py # recording lifecycle
   audio_capture.py     # sounddevice microphone adapter
+  audio_worker.py      # supervised disposable microphone process
+  asr_worker.py        # supervised authoritative-ASR process
+  preview_worker.py    # supervised online-preview ASR process
   transcriber.py       # sherpa-onnx ASR
   streaming_transcriber.py # small online ASR for capsule preview
   vocabulary.py        # layered dictionary/corrections
@@ -48,6 +52,11 @@ src/
   overlay.html         # centered pill UI
   tray_icon.py         # runtime status tray icon
 ```
+
+The Qt process must not load or call native audio/ASR engines directly in the
+normal runtime. Construct `AppController` before the overlay or tray, register
+hotkeys before worker initialization, and keep worker IPC bounded. See
+`docs/decisions/ADR-004-supervised-runtime-boundary.md`.
 
 ## Product Rules
 
@@ -204,6 +213,11 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 - **Recording color stability.** Draft and authoritative provenance remains internal.
   Both render in one text color, and the three recording bars remain red until recording
   actually ends. Do not couple recognition confidence to visible color changes.
+
+- **One recording entry point.** Settings may include a plain text box for trying the
+  normal global shortcut, but must not add a separate Trial/试说 recording button. That
+  second action competed with the F2 session state and could freeze or terminate the
+  settings window. F2, Right Ctrl, and mouse side buttons use the same controller path.
 
 - **Long dictation preview cost and coverage.** The lightweight online preview
   and SenseVoice progressive final cache use separate workers. Active recording

@@ -10,6 +10,18 @@ from pathlib import Path
 
 
 class JsonLineFormatter(logging.Formatter):
+    OPERATIONAL_FIELDS = (
+        "event",
+        "action",
+        "duration_ms",
+        "error_code",
+        "phase",
+        "source",
+        "session_id",
+        "worker_pid",
+        "state",
+    )
+
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -17,6 +29,9 @@ class JsonLineFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        for field in self.OPERATIONAL_FIELDS:
+            if hasattr(record, field):
+                payload[field] = getattr(record, field)
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)

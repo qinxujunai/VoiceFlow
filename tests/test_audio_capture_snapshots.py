@@ -142,3 +142,50 @@ def test_freeze_recording_atomically_latches_the_final_sample_boundary():
     assert capture._is_recording is False
     assert capture._is_frozen is True
     assert capture.last_total_samples == 32000
+
+
+def test_stop_recording_returns_frozen_audio_when_driver_teardown_blocks():
+    from audio_capture import AudioCapture
+
+    release_abort = threading.Event()
+    abort_started = threading.Event()
+    close_called = threading.Event()
+
+    class BlockingStream:
+        def abort(self):
+            abort_started.set()
+            release_abort.wait(timeout=2.0)
+
+        def close(self):
+            close_called.set()
+
+    capture = object.__new__(AudioCapture)
+    capture._lock = threading.Lock()
+    capture._is_recording = False
+    capture._is_frozen = True
+    capture._stream = BlockingStream()
+    capture._audio_buffer = [np.arange(1600, dtype=np.int16).reshape(-1, 1)]
+    capture._audio_buffer_ends = [1600]
+    capture._buffer_start_sample = 0
+    capture._total_samples = 1600
+    capture._last_buffer_start_sample = 0
+    capture._last_total_samples = 1600
+    capture._analysis_stop = None
+    capture._analysis_queue = None
+    capture._analysis_thread = None
+    capture._stream_teardown_threads = []
+
+    started = time.perf_counter()
+    audio = capture.stop_recording()
+    elapsed = time.perf_counter() - started
+
+    try:
+        assert abort_started.wait(timeout=0.2)
+        assert elapsed < 0.15
+        assert audio.tolist() == list(range(1600))
+        assert capture._stream is None
+        assert not close_called.is_set()
+    finally:
+        release_abort.set()
+
+    assert close_called.wait(timeout=0.5)

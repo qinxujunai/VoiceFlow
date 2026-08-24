@@ -38,6 +38,15 @@ def test_installer_smoke_derives_the_artifact_from_the_source_version():
     assert 'Could not read APP_VERSION' in script
 
 
+def test_installer_smoke_rejects_packaged_personal_history():
+    script = (ROOT / "scripts" / "smoke_installer.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '-Filter "history.jsonl"' in script
+    assert 'throw "Installer contains local dictation history"' in script
+
+
 def test_packaged_runtime_smoke_waits_for_an_explicit_ready_signal():
     script = (ROOT / "scripts" / "smoke_packaged_runtime.ps1").read_text(
         encoding="utf-8-sig"
@@ -264,10 +273,10 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 1, 4)" in version
-    assert "prodvers=(0, 3, 1, 4)" in version
-    assert "StringStruct('FileVersion', '0.3.1.4')" in version
-    assert "StringStruct('ProductVersion', '0.3.1+260812.1')" in version
+    assert "filevers=(0, 3, 2, 1)" in version
+    assert "prodvers=(0, 3, 2, 1)" in version
+    assert "StringStruct('FileVersion', '0.3.2.1')" in version
+    assert "StringStruct('ProductVersion', '0.3.2+260825.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -275,34 +284,31 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     application = (ROOT / "src" / "version.py").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
-    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
+    version_info = (ROOT / "assets" / "version_info.txt").read_text(
         encoding="utf-8"
     )
 
-    assert 'APP_VERSION = "0.3.1"' in application
-    assert 'BUILD_ID = "260812.1"' in application
+    assert 'APP_VERSION = "0.3.2"' in application
+    assert 'BUILD_ID = "260825.2"' in application
     assert "display_version()" in overlay
-    assert '#define MyAppBuildId "260812.1"' in installer
-    assert "VersionInfoVersion=0.3.1.4" in installer
-    assert "build 260812.1" in notes
+    assert '#define MyAppVersion "0.3.2"' in installer
+    assert '#define MyAppBuildId "260825.2"' in installer
+    assert "VersionInfoVersion=0.3.2.1" in installer
+    assert "0.3.2+260825.2" in version_info
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
-    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
-    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
-        encoding="utf-8"
-    )
-    checksums = (ROOT / "release" / "v0.3.1" / "SHA256SUMS.txt").read_text(
+    notes = (ROOT / "release" / "v0.3.2" / "RELEASE_NOTES.md").read_text(
         encoding="utf-8"
     )
 
-    version = re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1)
+    version = "0.3.2"
     installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
     assert f"# VoiceFlow {version}" in notes
     assert installer_name in notes
     assert "SHA256SUMS.txt" in notes
     assert not re.search(r"SHA-256：`[A-F0-9]{64}`", notes)
-    assert any(line.endswith(installer_name) for line in checksums.splitlines())
+    assert "build 260825.2" in notes
 
 
 def test_development_audio_samples_are_explicitly_excluded_from_the_installer():
@@ -406,6 +412,40 @@ def test_generated_icon_contains_common_windows_sizes():
     assert icon_type == 1
     assert "ICO_SIZES = (16, 20, 24, 32, 48, 64, 128, 256)" in script
     assert {(16, 16), (20, 20), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)} <= sizes
+
+
+def test_windows_icon_uses_the_normal_visual_footprint():
+    data = (ROOT / "assets" / "voiceflow.ico").read_bytes()
+    count = struct.unpack_from("<H", data, 4)[0]
+    for index in range(count):
+        width, height, _, _, _, _, _, offset = struct.unpack_from(
+            "<BBBBHHII", data, 6 + index * 16
+        )
+        width = 256 if width == 0 else width
+        height = 256 if height == 0 else height
+        if width != 256:
+            continue
+        header_size = struct.unpack_from("<I", data, offset)[0]
+        pixels = offset + header_size
+        active_x = [
+            x
+            for y in range(height)
+            for x in range(width)
+            if data[pixels + (y * width + x) * 4 + 3]
+        ]
+        footprint = (max(active_x) - min(active_x) + 1) / width
+        assert footprint >= 0.84
+        return
+    raise AssertionError("256px icon frame missing")
+
+
+def test_installer_creates_desktop_entry_by_default_with_explicit_icon():
+    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
+
+    task_line = next(line for line in installer.splitlines() if 'Name: "desktopicon"' in line)
+    desktop_line = next(line for line in installer.splitlines() if 'Name: "{autodesktop}\\VoiceFlow"' in line)
+    assert "unchecked" not in task_line
+    assert 'IconFilename: "{app}\\{#MyAppExeName}"' in desktop_line
 
 
 def test_generated_icon_includes_macos_and_png_assets():

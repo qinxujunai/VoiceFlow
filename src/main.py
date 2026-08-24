@@ -10,6 +10,7 @@ import time
 import argparse
 import logging
 import threading
+import multiprocessing
 import uuid
 import yaml
 import numpy as np
@@ -34,13 +35,17 @@ from audio_activity import (
     has_speech_activity,
 )
 from runtime_paths import AppPaths, prepare_runtime_layout
-from streaming_transcriber import OnlinePreviewTranscriber
 from punctuation import FinalPunctuationRestorer
 from platform_utils import open_path
 from recovery_session import RecoverySessionStore
 from safe_text import SafeTextBoundary
 from model_switch import ModelSwitchCoordinator
 from transcript_state import FinalizationTimeline, TranscriptViewState
+from app_controller import AppController, RuntimePhase
+from version import BUILD_ID
+from asr_worker import SupervisedTranscriber
+from audio_worker import SupervisedAudioCapture
+from preview_worker import SupervisedPreviewTranscriber
 
 
 logger = logging.getLogger("voiceflow.runtime")
@@ -103,6 +108,9 @@ class VoiceInputSystem:
         self.config_path = config_path
         self._recording_state = RecordingStateMachine()
         self._shutdown_started = False
+        self._runtime_supervisor_stop = threading.Event()
+        self._runtime_supervisor_thread = None
+        self._runtime_supervisor_lock = threading.Lock()
         self._streaming = False
         self._stream_stop_event = None
         self._stream_generation = 0
@@ -162,14 +170,38 @@ class VoiceInputSystem:
                 )
             except Exception:
                 logger.exception("Silero VAD unavailable; using the energy safety gate")
-        self.overlay = OverlayWindow(self.paths)
         self.history = HistoryStore(self.paths.history_file)
         self.punctuation = FinalPunctuationRestorer()
+        self._trial_session = False
+        self.controller = AppController(
+            on_record_toggle=self._on_record_toggle,
+            on_trial_toggle=self._on_trial_toggle,
+            on_cancel=self._on_record_cancel,
+            on_copy_last=self._copy_last_text,
+            on_repaste_last=self._repaste_last_text,
+            on_copy_text=self._copy_text,
+            on_output_text=self._output_text,
+            on_open_dictionary=self._open_dictionary,
+            on_quit=self.shutdown,
+            on_recording_painted=self._on_recording_painted,
+            on_preview_painted=self._on_preview_painted,
+            on_recover_session=self._recover_session,
+            on_delete_recovery=self._recovery_store.delete,
+            on_read_history=self.history.read_recent,
+            on_delete_history=self.history.delete_entry_with_undo,
+            on_clear_history=self.history.clear,
+            on_restore_history=self.history.restore_entry,
+            build_id=BUILD_ID,
+            runtime_state_path=self.paths.schema_file,
+        )
+        self.overlay = OverlayWindow(self.paths, controller=self.controller)
+        self.controller.set_status_sink(self._show_controller_status)
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
-        self.audio = AudioCapture(self.config_path)
+        self.audio = SupervisedAudioCapture(self.config_path)
         self.audio.set_level_callback(self._on_audio_levels)
+        self.audio.prepare()
         self.session = RecordingSession(self.audio)
 
         print("[启动] ASR...", flush=True)
@@ -180,7 +212,7 @@ class VoiceInputSystem:
             self.paths.config_file,
         )
         pending_switch = switch.pending()
-        self.transcriber = Transcriber(
+        self.transcriber = SupervisedTranscriber(
             self.config_path,
             asset_roots=self.paths.asset_roots,
         )
@@ -197,7 +229,7 @@ class VoiceInputSystem:
             with open(self.config_path, "r", encoding="utf-8") as stream:
                 self.config = yaml.safe_load(stream) or {}
             engine = self.config.get("engine", {}).get("active", previous or "sensevoice")
-            self.transcriber = Transcriber(
+            self.transcriber = SupervisedTranscriber(
                 self.config_path,
                 asset_roots=self.paths.asset_roots,
             )
@@ -208,11 +240,12 @@ class VoiceInputSystem:
         print(f"[启动] {engine}", flush=True)
 
         try:
-            self.preview_transcriber = OnlinePreviewTranscriber.from_config(
-                self.config,
-                resolve_asset=self.paths.resolve_asset,
+            self.preview_transcriber = SupervisedPreviewTranscriber(
+                self.config_path,
+                asset_roots=self.paths.asset_roots,
                 sample_rate=self.audio.sample_rate,
             )
+            self.preview_transcriber.load()
             print("[启动] 实时预览", flush=True)
         except Exception as exc:
             self.preview_transcriber = None
@@ -240,23 +273,14 @@ class VoiceInputSystem:
                     recovery_saved=False,
                 )
             self.output_handler.acknowledge_delivery(session_id)
-        self.overlay.set_actions(
-            on_record_toggle=self._on_record_toggle,
-            on_copy_last=self._copy_last_text,
-            on_repaste_last=self._repaste_last_text,
-            on_copy_text=self._copy_text,
-            on_output_text=self._output_text,
-            on_open_dictionary=self._open_dictionary,
-            on_quit=self.shutdown,
-            on_recording_painted=self._on_recording_painted,
-            on_preview_painted=self._on_preview_painted,
-            on_recover_session=self._recover_session,
-            on_delete_recovery=self._recovery_store.delete,
-        )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
 
     # ---- 录音 ----
+
+    def _show_controller_status(self, message):
+        self.overlay.show_result(message)
+        self.overlay.hide_after(900)
 
     def _on_audio_levels(self, levels):
         if self._recording_state.current is not RecordingState.RECORDING:
@@ -291,6 +315,14 @@ class VoiceInputSystem:
         elif state is RecordingState.IDLE:
             self._on_record_start(triggered_at)
 
+    def _on_trial_toggle(self):
+        state = self._recording_state.current
+        if state is RecordingState.IDLE:
+            self._trial_session = True
+            self._on_record_start()
+        elif state is RecordingState.RECORDING and self._trial_session:
+            self._on_record_stop()
+
     def _can_record_toggle(self):
         return self._recording_state.current in {
             RecordingState.IDLE,
@@ -318,6 +350,7 @@ class VoiceInputSystem:
             self.overlay.show_recording(generation, triggered_at)
             self.session.start()
             self._recording_state.mark_recording()
+            self.controller.mark_recording()
             if self._recovery_journal is not None:
                 self._recovery_journal.mark_state("recording")
             self._latest_text = ""
@@ -345,16 +378,21 @@ class VoiceInputSystem:
                 self._recovery_journal.close_interrupted()
                 self._recovery_journal = None
             self._recording_state.abort_start()
+            if self._trial_session:
+                self._trial_session = False
+                self.overlay.show_trial_result("")
             self.overlay.show_error(str(e))
             logger.exception("recording start failed")
             print(f"[错误] {e}", flush=True)
 
     def _on_record_stop(self, triggered_at=None):
         stop_started = triggered_at if triggered_at is not None else time.perf_counter()
+        trial_session = self._trial_session
         finalizing_done = threading.Event()
         finalizing_timer = None
         if not self._recording_state.claim_stop():
             return
+        self.controller.mark_finalizing()
 
         try:
             freeze_started = time.perf_counter()
@@ -375,6 +413,11 @@ class VoiceInputSystem:
             )
             finalizing_timer.daemon = True
             finalizing_timer.start()
+            if self._recovery_journal is not None:
+                self._recovery_journal.mark_state(
+                    "finalizing",
+                    preview_text=self._latest_text,
+                )
             teardown_started = time.perf_counter()
             try:
                 result = self.session.stop()
@@ -388,6 +431,8 @@ class VoiceInputSystem:
                     self._recovery_journal = None
                 self.overlay.show_canceled()
                 self.overlay.hide_after(650)
+                if trial_session:
+                    self.overlay.show_trial_result("")
                 return
 
             cache_handoff_started = time.perf_counter()
@@ -398,12 +443,6 @@ class VoiceInputSystem:
 
             total_samples = result.total_samples or len(data)
             duration = result.duration or (total_samples / self.audio.sample_rate)
-            if self._recovery_journal is not None:
-                self._recovery_journal.mark_state(
-                    "finalizing",
-                    preview_text=self._latest_text,
-                )
-
             transcription_started = time.perf_counter()
             final_result = self._transcribe_final_result(
                 data,
@@ -440,12 +479,13 @@ class VoiceInputSystem:
                 print(f"[转写] {text} ({duration:.1f}s)", flush=True)
                 self.overlay.show_authoritative_final(text, final_generation)
                 self._recording_state.mark_delivering()
+                self.controller.mark_delivering()
                 delivery_started = time.perf_counter()
                 delivery = self.output_handler.deliver(
                     text,
                     start_target=self._target_snapshot,
                     session_id=self._active_session_id or uuid.uuid4().hex,
-                    allow_paste=final_result.coverage_ok,
+                    allow_paste=final_result.coverage_ok and not trial_session,
                 )
                 delivery_ms = (time.perf_counter() - delivery_started) * 1000
                 timeline = FinalizationTimeline(
@@ -513,10 +553,14 @@ class VoiceInputSystem:
                 elif self._recovery_journal is not None:
                     self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
-                self.overlay.show_delivery_state(output_status, final_generation)
-                self.overlay.hide_after(
-                    self._delivery_hold_ms(output_status, duration)
-                )
+                if trial_session:
+                    self.overlay.show_trial_result(text)
+                    self.overlay.hide_after(0)
+                else:
+                    self.overlay.show_delivery_state(output_status, final_generation)
+                    self.overlay.hide_after(
+                        self._delivery_hold_ms(output_status, duration)
+                    )
                 if delivered_completely:
                     self._recording_state.mark_complete()
                 else:
@@ -529,6 +573,8 @@ class VoiceInputSystem:
                     self._recovery_journal = None
                 self._recording_state.mark_recoverable()
                 self._recording_state.acknowledge_recovery()
+                if trial_session:
+                    self.overlay.show_trial_result("")
                 self.overlay.hide_after(0)
 
         except Exception as e:
@@ -541,6 +587,8 @@ class VoiceInputSystem:
             self._recording_state.mark_recoverable()
             self._recording_state.acknowledge_recovery()
             self.overlay.show_error(str(e))
+            if trial_session:
+                self.overlay.show_trial_result("")
             self.history.append(output_status="error", error=str(e))
             logger.exception("recording finalization failed")
             import traceback
@@ -554,6 +602,22 @@ class VoiceInputSystem:
             self._recording_state.complete_processing()
             self._active_session_id = None
             self._target_snapshot = None
+            self._trial_session = False
+            if self.controller.phase.value not in {"degraded", "error"}:
+                try:
+                    self.audio.prepare()
+                except Exception as error:
+                    self.controller.mark_degraded(
+                        str(error),
+                        error_code="audio_worker_restart_failed",
+                    )
+                else:
+                    self.controller.mark_ready(
+                        preview_ready=self.preview_transcriber is not None,
+                        worker_pid=getattr(self.transcriber, "worker_pid", None),
+                        worker_pids=self._worker_pids(),
+                        last_heartbeat=self._oldest_worker_heartbeat(),
+                    )
 
     def _audio_sample_count(self):
         sample_count = getattr(self.audio, "sample_count", None)
@@ -1010,18 +1074,22 @@ class VoiceInputSystem:
             next_sample = 0
             if preview is None or preview_session is None:
                 return
-            while not stop_event.is_set():
-                try:
+            try:
+                while not stop_event.is_set():
                     next_sample = self._feed_preview_audio(
                         preview,
                         preview_session,
                         next_sample,
                         generation,
                     )
+                    stop_event.wait(self.STREAM_PREVIEW_POLL_SECONDS)
+            except Exception:
+                logger.exception("real-time streaming preview failed")
+            finally:
+                try:
+                    preview.close_session(preview_session)
                 except Exception:
-                    logger.exception("real-time streaming preview failed")
-                    return
-                stop_event.wait(self.STREAM_PREVIEW_POLL_SECONDS)
+                    pass
 
         def final_cache_loop():
             while not stop_event.is_set():
@@ -1120,10 +1188,25 @@ class VoiceInputSystem:
                 self._recovery_journal = None
             self._active_session_id = None
             self._target_snapshot = None
+            self._trial_session = False
             if hasattr(self, "output_handler"):
                 self.output_handler.cancel_target_tracking()
             self.overlay.show_canceled()
             self.overlay.hide_after(800)
+            try:
+                self.audio.prepare()
+            except Exception as error:
+                self.controller.mark_degraded(
+                    str(error),
+                    error_code="audio_worker_restart_failed",
+                )
+            else:
+                self.controller.mark_ready(
+                    preview_ready=self.preview_transcriber is not None,
+                    worker_pid=getattr(self.transcriber, "worker_pid", None),
+                    worker_pids=self._worker_pids(),
+                    last_heartbeat=self._oldest_worker_heartbeat(),
+                )
         print("[录音] 已取消", flush=True)
 
     def _copy_last_text(self):
@@ -1229,9 +1312,23 @@ class VoiceInputSystem:
 
         self.overlay.show_startup_window()
 
+        try:
+            self._start_hotkeys()
+            self.controller.mark_hotkeys("ready")
+        except Exception:
+            self.controller.mark_hotkeys("error")
+            logger.exception("global hotkeys unavailable")
+            self.overlay.show_error("快捷键不可用，请从托盘菜单开始听写")
+
         def on_done():
             try:
-                self._start_hotkeys()
+                self.controller.mark_ready(
+                    preview_ready=self.preview_transcriber is not None,
+                    worker_pid=getattr(self.transcriber, "worker_pid", None),
+                    worker_pids=self._worker_pids(),
+                    last_heartbeat=self._oldest_worker_heartbeat(),
+                )
+                self._start_runtime_supervisor()
                 recoverable = self._recovery_store.list_recoverable()
                 if recoverable:
                     self.overlay.show_recovery_available(len(recoverable))
@@ -1245,16 +1342,113 @@ class VoiceInputSystem:
         def on_error(e):
             import traceback
             traceback.print_exc()
+            self.controller.mark_degraded(
+                str(e),
+                error_code="runtime_initialization_failed",
+            )
+            self.overlay.show_error("需要处理，请重新打开 VoiceFlow")
+            logger.error(
+                "runtime initialization failed",
+                exc_info=(type(e), e, e.__traceback__),
+            )
 
         QTimer.singleShot(100, lambda: _InitWorker(self, on_done, on_error).start())
+
+    def _worker_pids(self):
+        workers = {
+            "audio": getattr(self, "audio", None),
+            "preview": getattr(self, "preview_transcriber", None),
+            "final": getattr(self, "transcriber", None),
+        }
+        return {
+            name: getattr(worker, "worker_pid", None)
+            for name, worker in workers.items()
+            if worker is not None
+        }
+
+    def _oldest_worker_heartbeat(self):
+        workers = (
+            getattr(self, "audio", None),
+            getattr(self, "preview_transcriber", None),
+            getattr(self, "transcriber", None),
+        )
+        heartbeats = [
+            float(getattr(worker, "last_heartbeat", 0.0))
+            for worker in workers
+            if worker is not None and getattr(worker, "last_heartbeat", 0.0)
+        ]
+        return min(heartbeats) if heartbeats else 0.0
+
+    def _start_runtime_supervisor(self):
+        thread = self._runtime_supervisor_thread
+        if thread is not None and thread.is_alive():
+            return
+
+        def monitor():
+            while not self._runtime_supervisor_stop.wait(2.0):
+                try:
+                    self._runtime_supervisor_tick()
+                except Exception:
+                    logger.exception("runtime supervisor tick failed")
+
+        self._runtime_supervisor_thread = threading.Thread(
+            target=monitor,
+            name="voiceflow-runtime-supervisor",
+            daemon=True,
+        )
+        self._runtime_supervisor_thread.start()
+
+    def _runtime_supervisor_tick(self):
+        workers = [
+            getattr(self, "audio", None),
+            getattr(self, "transcriber", None),
+        ]
+        preview = getattr(self, "preview_transcriber", None)
+        if preview is not None:
+            workers.append(preview)
+        self.controller.update_worker_health(
+            worker_pids=self._worker_pids(),
+            last_heartbeat=self._oldest_worker_heartbeat(),
+        )
+        if self.controller.phase is not RuntimePhase.READY:
+            return
+        unhealthy = [
+            worker
+            for worker in workers
+            if worker is not None and not getattr(worker, "is_healthy", False)
+        ]
+        if not unhealthy:
+            return
+        if not self._runtime_supervisor_lock.acquire(blocking=False):
+            return
+        try:
+            logger.warning(
+                "runtime worker became unhealthy",
+                extra={"event": "worker_unhealthy", "state": "restarting"},
+            )
+            for worker in unhealthy:
+                worker.ensure_healthy()
+            self.controller.mark_ready(
+                preview_ready=preview is not None and preview.is_healthy,
+                worker_pid=getattr(self.transcriber, "worker_pid", None),
+                worker_pids=self._worker_pids(),
+                last_heartbeat=self._oldest_worker_heartbeat(),
+            )
+        except Exception:
+            logger.exception("runtime worker restart failed")
+            self.controller.mark_degraded(
+                error_code="worker_restart_failed",
+            )
+        finally:
+            self._runtime_supervisor_lock.release()
 
     def _start_hotkeys(self):
         self.hotkey_mgr = HotkeyManager(
             config_path=self.config_path,
             callbacks={
-                "on_record_toggle": self._on_record_toggle,
-                "can_record_toggle": self._can_record_toggle,
-                "on_record_cancel": self._on_record_cancel,
+                "on_record_toggle": self.controller.toggle_recording,
+                "can_record_toggle": self.controller.can_accept_recording_intent,
+                "on_record_cancel": self.controller.cancel_recording,
             },
         )
         self.hotkey_mgr.start()
@@ -1263,6 +1457,7 @@ class VoiceInputSystem:
         if self._shutdown_started:
             return
         self._shutdown_started = True
+        self._runtime_supervisor_stop.set()
 
         self._stop_streaming()
         previous_state = self._recording_state.shutdown()
@@ -1274,6 +1469,12 @@ class VoiceInputSystem:
 
         if hasattr(self, "hotkey_mgr"):
             self.hotkey_mgr.stop()
+        if hasattr(self, "transcriber"):
+            self.transcriber.shutdown()
+        if getattr(self, "preview_transcriber", None) is not None:
+            self.preview_transcriber.shutdown()
+        if hasattr(self, "audio"):
+            self.audio.shutdown()
         if hasattr(self, "output_handler"):
             self.output_handler.shutdown()
         print("\n[系统] 已退出", flush=True)
@@ -1330,11 +1531,19 @@ def runtime_smoke(config_path=None):
 
 
 def main():
+    multiprocessing.freeze_support()
     p = argparse.ArgumentParser(description="VoiceFlow")
     p.add_argument("--test", action="store_true")
     p.add_argument("--runtime-smoke", action="store_true")
     p.add_argument("--config", default=None)
+    p.add_argument("--instance-id", default="")
+    p.add_argument("--data-dir", default="")
     args = p.parse_args()
+
+    if args.instance_id:
+        os.environ["VOICEFLOW_INSTANCE_ID"] = args.instance_id
+    if args.data_dir:
+        os.environ["VOICEFLOW_DATA_DIR"] = args.data_dir
 
     if args.runtime_smoke:
         raise SystemExit(runtime_smoke(args.config))

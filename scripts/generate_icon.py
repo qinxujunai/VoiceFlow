@@ -76,18 +76,18 @@ def _bar_alpha(x, y, cx, cy, width, height, radius):
     return _rounded_rect_alpha(x, y, left, top, right, bottom, radius)
 
 
-def _make_pixels(size, *, macos=False):
+def _make_pixels(size):
     pixels = [(0, 0, 0, 0)] * (size * size)
     scale = size / 256
-    left = 18 if macos else 34
-    right = 238 if macos else 222
-    radius = 52 if macos else 44
-    highlight_inset = 3 if macos else 3
-    highlight_inner_inset = 5 if macos else 5
+    left = 18
+    right = 238
+    radius = 52
+    highlight_inset = 3
+    highlight_inner_inset = 5
     for y in range(size):
         for x in range(size):
             # Soft shadow.
-            shadow_extent = 102 if macos else 86
+            shadow_extent = 102
             dx = max(abs(x - size / 2) - shadow_extent * scale, 0)
             dy = max(abs(y - size / 2) - shadow_extent * scale, 0)
             shadow_dist = math.hypot(dx, dy)
@@ -241,7 +241,7 @@ def main():
     print(f"Wrote {ICO_OUT}")
 
     icns_images = [
-        (size, _make_pixels(size, macos=True))
+        (size, _make_pixels(size))
         for size in ICNS_TYPES
     ]
     _write_icns(ICNS_OUT, icns_images)

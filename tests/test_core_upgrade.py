@@ -25,6 +25,38 @@ class UiStateTests(unittest.TestCase):
         self.assertEqual(display_for_state(UiState.IDLE).tray_state, "idle")
 
 
+class RuntimeSupervisorTests(unittest.TestCase):
+    def test_supervisor_continues_after_one_failed_health_tick(self):
+        from main import VoiceInputSystem
+
+        class StopAfterTwoTicks:
+            def __init__(self):
+                self.calls = 0
+
+            def wait(self, _timeout):
+                self.calls += 1
+                return self.calls > 2
+
+        system = object.__new__(VoiceInputSystem)
+        system._runtime_supervisor_thread = None
+        system._runtime_supervisor_stop = StopAfterTwoTicks()
+        ticks = []
+
+        def supervise_once():
+            ticks.append(len(ticks) + 1)
+            if len(ticks) == 1:
+                raise RuntimeError("injected health tick failure")
+
+        system._runtime_supervisor_tick = supervise_once
+        with mock.patch("main.logger.exception") as log_exception:
+            VoiceInputSystem._start_runtime_supervisor(system)
+            system._runtime_supervisor_thread.join(timeout=1.0)
+
+        self.assertFalse(system._runtime_supervisor_thread.is_alive())
+        self.assertEqual(ticks, [1, 2])
+        log_exception.assert_called_once()
+
+
 class HistoryStoreTests(unittest.TestCase):
     def test_appends_jsonl_and_returns_last_entry(self):
         from history_store import HistoryStore
@@ -82,6 +114,48 @@ class HistoryStoreTests(unittest.TestCase):
             rows = (Path(tmp) / "history.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(rows), 1)
             self.assertEqual(json.loads(rows[0])["clean_text"], "Cursor")
+
+    def test_delete_token_restores_the_exact_history_order(self):
+        from history_store import HistoryStore
+
+        with TemporaryDirectory() as tmp:
+            store = HistoryStore(Path(tmp) / "history.jsonl")
+            store.append(clean_text="第一条")
+            store.append(clean_text="第二条")
+            store.append(clean_text="第三条")
+            middle = next(
+                row for row in store.read_recent() if row["clean_text"] == "第二条"
+            )
+
+            token = store.delete_entry_with_undo(middle["_entry_id"])
+            self.assertEqual(
+                [row["clean_text"] for row in store.read_recent()],
+                ["第三条", "第一条"],
+            )
+
+            self.assertTrue(store.restore_entry(token))
+            self.assertEqual(
+                [row["clean_text"] for row in store.read_recent()],
+                ["第三条", "第二条", "第一条"],
+            )
+
+    def test_deletes_one_exact_entry_and_can_clear_all_history(self):
+        from history_store import HistoryStore
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "history.jsonl"
+            store = HistoryStore(path)
+            store.append(clean_text="第一条", session_id="session-1")
+            store.append(clean_text="第二条", session_id="session-2")
+
+            rows = store.read_recent()
+            self.assertEqual([row["clean_text"] for row in rows], ["第二条", "第一条"])
+            self.assertTrue(store.delete_entry(rows[0]["_entry_id"]))
+            self.assertEqual(store.last()["clean_text"], "第一条")
+
+            self.assertEqual(store.clear(), 1)
+            self.assertEqual(store.read_recent(), [])
+            self.assertEqual(path.read_text(encoding="utf-8"), "")
 
 
 class OutputHandlerContractTests(unittest.TestCase):
@@ -834,6 +908,31 @@ class FinalTextSelectionTests(unittest.TestCase):
 
         self.assertEqual(text, "完整结果")
         self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 20])
+
+
+def test_hotkeys_start_before_native_models_finish_initializing():
+    source = (SRC / "main.py").read_text(encoding="utf-8")
+    block = source[
+        source.index("    def _on_overlay_ready") : source.index("    def _start_hotkeys")
+    ]
+
+    assert block.index("self._start_hotkeys()") < block.index("_InitWorker(")
+    assert 'self.controller.mark_hotkeys("ready")' in block
+    assert "self.controller.mark_degraded" in block
+
+
+def test_stable_controller_exists_before_overlay_and_settings_are_constructed():
+    source = (SRC / "main.py").read_text(encoding="utf-8")
+    init = source[
+        source.index("    def __init__(self, config_path") : source.index(
+            "    def _init_modules"
+        )
+    ]
+
+    assert init.index("self.controller = AppController(") < init.index(
+        "self.overlay = OverlayWindow("
+    )
+    assert "controller=self.controller" in init
 
 
 if __name__ == "__main__":
