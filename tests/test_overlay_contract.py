@@ -218,7 +218,7 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert 'for label in ("状态", "词典", "历史", "设置")' in overlay
+    assert 'for label in ("状态", "听写", "词典", "历史")' in overlay
     assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
     assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
@@ -396,7 +396,7 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "self.sidebar = QListWidget()" in settings_block
     assert "self.stack = QStackedWidget()" in settings_block
     assert "self.sidebar.currentRowChanged.connect(self._show_primary_page)" in settings_block
-    assert "page_by_row = {0: 0, 1: 3, 2: 1, 3: 2}" in settings_block
+    assert "page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}" in settings_block
     assert "QTabWidget" not in overlay
     assert "QLabel#sectionTitle" in settings_block
 

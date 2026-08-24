@@ -79,10 +79,10 @@ def _capture_settings(
     _wait(app, lambda: not window._refresh_in_progress)
     captures = []
     primary_pages = (
-        (0, "home"),
-        (1, "dictionary"),
-        (2, "history"),
-        (3, "settings"),
+        (0, "status"),
+        (1, "dictation"),
+        (2, "dictionary"),
+        (3, "history"),
     )
     for row, name in primary_pages:
         window.sidebar.setCurrentRow(row)
