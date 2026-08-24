@@ -83,6 +83,24 @@ class HistoryStoreTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(json.loads(rows[0])["clean_text"], "Cursor")
 
+    def test_deletes_one_exact_entry_and_can_clear_all_history(self):
+        from history_store import HistoryStore
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "history.jsonl"
+            store = HistoryStore(path)
+            store.append(clean_text="第一条", session_id="session-1")
+            store.append(clean_text="第二条", session_id="session-2")
+
+            rows = store.read_recent()
+            self.assertEqual([row["clean_text"] for row in rows], ["第二条", "第一条"])
+            self.assertTrue(store.delete_entry(rows[0]["_entry_id"]))
+            self.assertEqual(store.last()["clean_text"], "第一条")
+
+            self.assertEqual(store.clear(), 1)
+            self.assertEqual(store.read_recent(), [])
+            self.assertEqual(path.read_text(encoding="utf-8"), "")
+
 
 class OutputHandlerContractTests(unittest.TestCase):
     def test_clipboard_status_is_truthful_about_paste_uncertainty(self):

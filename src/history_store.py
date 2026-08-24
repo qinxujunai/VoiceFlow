@@ -2,7 +2,10 @@
 Append-only local transcription history.
 """
 
+import hashlib
 import json
+import os
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +13,20 @@ from pathlib import Path
 class HistoryStore:
     def __init__(self, path):
         self.path = Path(path)
+        self._lock = threading.RLock()
+
+    @staticmethod
+    def _entry_id(line):
+        return hashlib.sha256(line.encode("utf-8")).hexdigest()
+
+    def _write_lines_atomic(self, lines):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_name(f".{self.path.name}.tmp")
+        content = "\n".join(lines)
+        if content:
+            content += "\n"
+        temporary.write_text(content, encoding="utf-8")
+        os.replace(temporary, self.path)
 
     def append(
         self,
@@ -139,9 +156,57 @@ class HistoryStore:
             entry["delivery_reason"] = str(delivery_reason)
         if target_evidence:
             entry["target_evidence"] = str(target_evidence)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        with self._lock:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         return entry
+
+    def read_recent(self, limit=80):
+        if not self.path.exists():
+            return []
+        with self._lock:
+            lines = [
+                line
+                for line in self.path.read_text(encoding="utf-8").splitlines()
+                if line
+            ][-max(0, int(limit)):]
+        rows = []
+        for line in reversed(lines):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(record, dict):
+                continue
+            record["_entry_id"] = self._entry_id(line)
+            rows.append(record)
+        return rows
+
+    def delete_entry(self, entry_id):
+        expected = str(entry_id or "")
+        if not expected or not self.path.exists():
+            return False
+        with self._lock:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+            for index in range(len(lines) - 1, -1, -1):
+                if self._entry_id(lines[index]) != expected:
+                    continue
+                del lines[index]
+                self._write_lines_atomic(lines)
+                return True
+        return False
+
+    def clear(self):
+        if not self.path.exists():
+            return 0
+        with self._lock:
+            lines = [
+                line
+                for line in self.path.read_text(encoding="utf-8").splitlines()
+                if line
+            ]
+            self._write_lines_atomic([])
+        return len(lines)
 
     def last(self):
         if not self.path.exists():
