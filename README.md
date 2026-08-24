@@ -18,7 +18,7 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 
 - **完全离线**：无需账户，不上传录音；断开网络照常听写。
 - **任意输入框**：留在记事本、浏览器、文档或聊天窗口，文字直接回到光标。
-- **始终可找回**：即使没有粘贴成功，剪贴板和本地历史仍有完整文字。
+- **始终可找回**：即使没有粘贴成功，剪贴板和本地历史仍有完整文字；历史支持单条删除和一键清空。
 - **完整录音优先**：胶囊只负责实时反馈，停止后会基于完整录音生成最终结果。
 
 ## 下载
@@ -45,7 +45,8 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 
 ## 隐私与联网
 
-录音、转写、词库和历史默认只保存在本机。日常运行不会自动下载模型、
+录音、转写、词库和历史默认只保存在本机。安装包不包含开发者或其他用户的
+听写历史；历史页可以删除单条记录或清空全部。日常运行不会自动下载模型、
 检查更新或调用云端识别服务。源码模式只有在用户明确准备模型时才会联网。
 
 <details>
@@ -70,7 +71,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
 - [模型策略与准入结论](docs/model-strategy.md)
 - [产品质量标准](docs/product-quality-standard.md)
-- [0.3.1 发布性能证据](docs/release-performance-evidence-2026-08-11.md)
+- [0.3.2 发布验证证据](docs/release-evidence-0.3.2.md)
 - [运行时与用户数据边界](docs/runtime-boundary.md)
 - [发布检查清单](docs/release-checklist.md)
 

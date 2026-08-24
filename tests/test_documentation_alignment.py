@@ -17,8 +17,8 @@ def test_active_docs_match_021_preview_and_release_contract():
 
     assert "fixed 48 ms cadence" in model_strategy
     assert "160 authorized" in evaluation
-    assert "VoiceFlow-0.3.1-Windows-x64.exe" in release
-    assert "release\\v0.3.1" in release
+    assert "VoiceFlow-<version>-Windows-x64.exe" in release
+    assert "release\\v<version>" in release
     assert "VoiceFlow-0.2.0-Windows-x64.exe" not in release
 
 

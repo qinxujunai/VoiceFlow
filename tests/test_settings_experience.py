@@ -15,7 +15,7 @@ def test_primary_status_pages_hide_model_and_thread_implementation_details():
     source = OVERLAY.read_text(encoding="utf-8")
     home = _block(source, "def _home_page", "def _recent_page")
     dictation = _block(source, "def _status_page", "def _dictionary_page")
-    refresh_home = _block(source, "def _refresh_home", "def _start_trial")
+    refresh_home = _block(source, "def _refresh_home", "def _dictionary_path")
 
     for block in (home, dictation, refresh_home):
         assert "SenseVoice" not in block
@@ -41,7 +41,7 @@ def test_settings_home_uses_a_quiet_command_center_hierarchy():
 
     assert "sidebar_panel.setFixedWidth(176)" in shell
     assert 'self.home_ready_title = QLabel("VoiceFlow 已就绪")' in home
-    assert 'self.trial_button = QPushButton("试说一句")' in home
+    assert 'self.trial_button = QPushButton("试说一句")' not in home
     assert 'self.practice_box.setPlaceholderText("识别结果会出现在这里")' in home
     assert 'for title in ("麦克风", "本地处理", "快捷键")' not in home
     assert 'readiness_title = QLabel("准备状态")' not in home
@@ -52,7 +52,7 @@ def test_settings_shell_keeps_diagnostics_auxiliary_and_no_model_marketplace():
     source = OVERLAY.read_text(encoding="utf-8")
     settings = _block(source, "class _SettingsWindow", "class OverlayWindow")
 
-    assert 'for label in ("状态", "词典", "历史", "设置")' in settings
+    assert 'for label in ("状态", "听写", "词典", "历史")' in settings
     assert 'QPushButton("运行检查")' in settings
     assert "model_download_button" not in settings
     assert "self.model_manager.start_download" not in settings
@@ -77,6 +77,8 @@ def test_dictionary_exposes_bundled_ai_terms_as_read_only_product_content():
 
     assert 'self.dictionary_section.addItem("内置 AI 术语", "builtin-ai.txt")' in dictionary
     assert 'readonly = filename == "builtin-ai.txt"' in rendering
+    assert "self.dictionary_add_button.setEnabled(not readonly)" in rendering
+    assert "self.dictionary_remove_button.setEnabled(not readonly)" in rendering
     assert "self.dictionary_input.setEnabled(not readonly)" in rendering
     assert "内置术语随 VoiceFlow 更新" in rendering
 
@@ -101,7 +103,7 @@ def test_help_and_settings_labels_are_short_and_task_oriented():
     assert 'help_menu.addAction("运行检查")' in shell
     assert 'help_menu.addAction("关于 VoiceFlow")' in shell
     assert 'self.help_button = QPushButton("帮助")' in shell
-    assert '"设置",\n                "选择语言、麦克风和启动方式。"' in settings
+    assert '"听写",\n                "选择语言、麦克风和启动方式。"' in settings
 
 
 def test_each_history_card_owns_copy_and_repaste_actions():
@@ -114,6 +116,20 @@ def test_each_history_card_owns_copy_and_repaste_actions():
     assert 'QPushButton("复制全部")' in recent
     assert 'QPushButton("复制")' in card
     assert 'QPushButton("再次粘贴")' in card
+    assert 'QPushButton("删除")' in card
+    assert 'QPushButton("清空历史")' in recent
+
+
+def test_ui_evidence_captures_the_current_sidebar_order():
+    script = (ROOT / "scripts" / "capture_ui_states.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '(0, "status")' in script
+    assert '(1, "dictation")' in script
+    assert '(2, "dictionary")' in script
+    assert '(3, "history")' in script
+    assert '(3, "settings")' not in script
 
 
 def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
@@ -134,9 +150,9 @@ def test_history_actions_use_the_verified_delivery_callbacks():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert "pyperclip.copy" not in copy_action
-    assert "status = self._on_copy_text(text)" in copy_action
-    assert "status = self._on_repaste_text(text)" in repaste_action
-    assert "self._output_status_label(status)" in copy_action
+    assert "self._run_history_action(text, self._on_copy_text" in copy_action
+    assert "self._run_history_action(text, self._on_repaste_text" in repaste_action
+    assert "threading.Thread(" in repaste_action
     assert "self._output_status_label(status)" in repaste_action
     assert "return self.output_handler.copy_only(text)" in main
     assert "return self.output_handler.output(text)" in main

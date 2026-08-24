@@ -267,8 +267,15 @@ def test_voice_input_system_routes_writes_to_user_data_and_assets_to_install(
     captured = {}
 
     class FakeOverlay:
-        def __init__(self, received_paths):
+        def __init__(self, received_paths, controller=None):
             captured["paths"] = received_paths
+            captured["controller"] = controller
+
+        def show_result(self, _message):
+            pass
+
+        def hide_after(self, _milliseconds):
+            pass
 
     monkeypatch.setattr(main, "OverlayWindow", FakeOverlay)
     system = main.VoiceInputSystem(paths=paths)
@@ -277,6 +284,7 @@ def test_voice_input_system_routes_writes_to_user_data_and_assets_to_install(
     assert system.config_path == str(paths.config_file)
     assert system.history.path == paths.history_file
     assert captured["paths"] is paths
+    assert captured["controller"] is system.controller
 
 
 def test_hotword_loader_uses_writable_config_directory_for_user_vocabulary(tmp_path):
