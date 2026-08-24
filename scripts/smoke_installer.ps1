@@ -1,6 +1,6 @@
 param(
     [string]$InstallerPath = "",
-    [int]$StartupSeconds = 8,
+    [int]$StartupSeconds = 30,
     [switch]$RequireStreamingPreview
 )
 
@@ -149,23 +149,52 @@ try {
     }
 
     $env:LOCALAPPDATA = $localAppData
+    $smokeDataDir = Join-Path $localAppData "VoiceFlow"
+    $instanceId = "installer-smoke-" + [guid]::NewGuid().ToString("N")
     $appProcess = Start-Process `
         -FilePath (Join-Path $installRoot "VoiceFlow.exe") `
+        -ArgumentList @(
+            "--instance-id", $instanceId,
+            "--data-dir", $smokeDataDir
+        ) `
         -WorkingDirectory $installRoot `
         -WindowStyle Hidden `
         -PassThru
-    Start-Sleep -Seconds $StartupSeconds
-    if ($appProcess.HasExited) {
-        throw "Installed VoiceFlow exited early with code $($appProcess.ExitCode)"
-    }
 
-    $runtimeState = Join-Path $localAppData "VoiceFlow\runtime-state.json"
-    if (-not (Test-Path -LiteralPath $runtimeState)) {
-        throw "Installed VoiceFlow did not create runtime-state.json"
+    $runtimeState = Join-Path $smokeDataDir "runtime-state.json"
+    $deadline = [DateTime]::UtcNow.AddSeconds($StartupSeconds)
+    $state = $null
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ($appProcess.HasExited) {
+            throw "Installed VoiceFlow exited early with code $($appProcess.ExitCode)"
+        }
+        if (Test-Path -LiteralPath $runtimeState) {
+            try {
+                $candidate = Get-Content -Raw $runtimeState | ConvertFrom-Json
+                if (
+                    $candidate.phase -eq "ready" -and
+                    $candidate.hotkeys -eq "ready" -and
+                    $candidate.worker -eq "ready" -and
+                    $candidate.final_asr -eq "ready"
+                ) {
+                    $state = $candidate
+                    break
+                }
+            }
+            catch {
+                # Atomic replacement can briefly race the reader; retry.
+            }
+        }
+        Start-Sleep -Milliseconds 100
     }
-    $state = Get-Content -Raw $runtimeState | ConvertFrom-Json
+    if ($null -eq $state) {
+        throw "Installed VoiceFlow did not reach runtime ready state"
+    }
     if ($state.runtime_mode -ne "frozen") {
         throw "Expected frozen runtime mode, got: $($state.runtime_mode)"
+    }
+    if ($RequireStreamingPreview -and $state.preview_asr -ne "ready") {
+        throw "Installed VoiceFlow streaming preview did not become ready"
     }
 
     Stop-Process -Id $appProcess.Id -Force

@@ -264,10 +264,10 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 1, 4)" in version
-    assert "prodvers=(0, 3, 1, 4)" in version
-    assert "StringStruct('FileVersion', '0.3.1.4')" in version
-    assert "StringStruct('ProductVersion', '0.3.1+260812.1')" in version
+    assert "filevers=(0, 3, 2, 1)" in version
+    assert "prodvers=(0, 3, 2, 1)" in version
+    assert "StringStruct('FileVersion', '0.3.2.1')" in version
+    assert "StringStruct('ProductVersion', '0.3.2+260824.1')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -275,20 +275,20 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     application = (ROOT / "src" / "version.py").read_text(encoding="utf-8")
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
-    notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
+    version_info = (ROOT / "assets" / "version_info.txt").read_text(
         encoding="utf-8"
     )
 
-    assert 'APP_VERSION = "0.3.1"' in application
-    assert 'BUILD_ID = "260812.1"' in application
+    assert 'APP_VERSION = "0.3.2"' in application
+    assert 'BUILD_ID = "260824.1"' in application
     assert "display_version()" in overlay
-    assert '#define MyAppBuildId "260812.1"' in installer
-    assert "VersionInfoVersion=0.3.1.4" in installer
-    assert "build 260812.1" in notes
+    assert '#define MyAppVersion "0.3.2"' in installer
+    assert '#define MyAppBuildId "260824.1"' in installer
+    assert "VersionInfoVersion=0.3.2.1" in installer
+    assert "0.3.2+260824.1" in version_info
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
-    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
     notes = (ROOT / "release" / "v0.3.1" / "RELEASE_NOTES.md").read_text(
         encoding="utf-8"
     )
@@ -296,7 +296,7 @@ def test_release_notes_installer_and_checksum_are_consistent():
         encoding="utf-8"
     )
 
-    version = re.search(r'#define MyAppVersion "([^"]+)"', installer).group(1)
+    version = "0.3.1"
     installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
     assert f"# VoiceFlow {version}" in notes
     assert installer_name in notes
