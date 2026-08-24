@@ -19,7 +19,7 @@ returns to the cursor.
 
 - **Entirely offline**: no account and no audio upload; dictation keeps working without a network.
 - **Any text field**: stay in notes, browsers, documents, or chat while words return to the cursor.
-- **Always recoverable**: if paste misses, the complete text remains in the clipboard and local history.
+- **Always recoverable**: if paste misses, the complete text remains in the clipboard and local history; entries can be deleted individually or cleared together.
 - **Complete audio first**: the capsule provides live feedback while the final result is produced from the complete recording.
 
 ## Download
@@ -47,9 +47,11 @@ Speech → Local recognition → Text cleanup → Clipboard → Current cursor �
 ## Privacy and Networking
 
 Audio, transcripts, vocabulary, and history stay on the local machine by
-default. Normal operation does not automatically download models, check for
-updates, or call cloud recognition services. Source mode uses the network only
-when the user explicitly prepares a model.
+default. The installer contains no developer or other-user dictation history;
+the History page can delete one entry or clear everything. Normal operation
+does not automatically download models, check for updates, or call cloud
+recognition services. Source mode uses the network only when the user
+explicitly prepares a model.
 
 <details>
 <summary><strong>Development, verification, and licenses</strong></summary>
@@ -73,7 +75,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
 - [Model strategy and admission decision](docs/model-strategy.md)
 - [Product quality standard](docs/product-quality-standard.md)
-- [0.3.1 release performance evidence](docs/release-performance-evidence-2026-08-11.md)
+- [0.3.2 release verification evidence](docs/release-evidence-0.3.2.md)
 - [Runtime and user-data boundary](docs/runtime-boundary.md)
 - [Release checklist](docs/release-checklist.md)
 

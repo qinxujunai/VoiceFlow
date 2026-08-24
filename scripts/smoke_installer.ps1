@@ -101,6 +101,17 @@ try {
             throw "Installed asset missing: $relative"
         }
     }
+    $shippedHistory = @(
+        Get-ChildItem `
+            -LiteralPath $installRoot `
+            -Filter "history.jsonl" `
+            -Recurse `
+            -File `
+            -ErrorAction SilentlyContinue
+    )
+    if ($shippedHistory.Count -ne 0) {
+        throw "Installer contains local dictation history"
+    }
     if (Test-Path -LiteralPath (Join-Path $installRoot "models\sensevoice\.cache")) {
         throw "Installer contains a Hugging Face cache"
     }

@@ -20,7 +20,7 @@ if str(SRC) not in sys.path:
 
 from overlay_webview import _SettingsWindow  # noqa: E402
 from overlay_webview import OverlayWindow  # noqa: E402
-from qt_compat import QApplication, QMessageBox  # noqa: E402
+from qt_compat import QApplication, QMessageBox, QPushButton  # noqa: E402
 from runtime_paths import AppPaths, RuntimeMode  # noqa: E402
 
 
@@ -314,63 +314,35 @@ def test_show_settings_restores_a_minimized_window_before_raising_it():
     assert calls == ["refresh", "showNormal", "raise", "activate"]
 
 
-def test_trial_button_dispatches_a_real_controller_action(app, paths):
-    class FakeController:
-        def __init__(self):
-            self.calls = 0
-
-        def start_trial(self):
-            self.calls += 1
-            return type(
-                "Result",
-                (),
-                {"accepted": True, "message": "正在聆听", "error_code": ""},
-            )()
-
-    controller = FakeController()
-    window = _SettingsWindow(paths=paths, controller=controller)
+def test_settings_exposes_no_competing_trial_button(app, paths):
+    window = _SettingsWindow(paths=paths)
     try:
         window.show()
         app.processEvents()
-        window._start_trial()
-        app.processEvents()
 
-        assert controller.calls == 1
-        assert window.trial_button.text() == "停止并查看"
-        assert window.practice_box.hasFocus()
+        labels = [button.text() for button in window.findChildren(QPushButton)]
+        assert "试说一句" not in labels
+        assert "试说" not in labels
+        assert "停止并查看" not in labels
+        assert not hasattr(window, "trial_button")
     finally:
         window.close()
 
 
-def test_settings_navigation_and_trial_binding_survive_one_thousand_actions(
+def test_settings_navigation_survives_one_thousand_actions(
     app,
     paths,
 ):
-    class FastController:
-        def __init__(self):
-            self.calls = 0
-
-        def start_trial(self):
-            self.calls += 1
-            return type(
-                "Result",
-                (),
-                {"accepted": True, "message": "", "error_code": ""},
-            )()
-
-    controller = FastController()
-    window = _SettingsWindow(paths=paths, controller=controller)
+    window = _SettingsWindow(paths=paths)
     try:
         window.show()
         app.processEvents()
         started = time.perf_counter()
         for index in range(1000):
             window.sidebar.setCurrentRow(index % 4)
-            window.trial_button.click()
             app.processEvents()
         elapsed = time.perf_counter() - started
 
-        assert controller.calls == 1000
         assert elapsed < 5.0
     finally:
         window.close()

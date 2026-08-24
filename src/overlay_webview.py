@@ -147,7 +147,6 @@ class _SettingsWindow(QMainWindow):
         self._history_undo_token = None
         self._history_undo_generation = 0
         self.controller = controller
-        self._trial_active = False
         self.recovery_store = RecoverySessionStore(self.paths.recovery_dir)
         self._history_rows = []
         self._dictionary_entries = {}
@@ -260,8 +259,6 @@ class _SettingsWindow(QMainWindow):
         self._on_restore_history = restore
 
     def set_trial_result(self, text):
-        self._trial_active = False
-        self.trial_button.setText("试说一句")
         self.practice_box.setPlainText(text)
         self.practice_box.moveCursor(self.practice_box.textCursor().MoveOperation.End)
         self.practice_box.setFocus()
@@ -358,13 +355,8 @@ class _SettingsWindow(QMainWindow):
         practice_note.setObjectName("sectionSubtitle")
         practice_copy.addWidget(practice_label)
         practice_copy.addWidget(practice_note)
-        self.trial_button = QPushButton("试说一句")
-        self.trial_button.setObjectName("primaryButton")
-        self.trial_button.setAccessibleName("开始一次试说")
-        self.trial_button.clicked.connect(self._start_trial)
         practice_header.addLayout(practice_copy)
         practice_header.addStretch(1)
-        practice_header.addWidget(self.trial_button)
         self.practice_box = QPlainTextEdit()
         self.practice_box.setObjectName("practiceBox")
         self.practice_box.setAccessibleName("VoiceFlow 试说输入框")
@@ -531,9 +523,6 @@ class _SettingsWindow(QMainWindow):
         hotkey_copy.addWidget(hotkey_title)
         hotkey_copy.addWidget(hotkey_value)
         hotkey_layout.addLayout(hotkey_copy, 1)
-        trial = QPushButton("试说")
-        trial.clicked.connect(self._start_trial)
-        hotkey_layout.addWidget(trial)
         layout.addWidget(hotkey_panel)
 
         actions = QHBoxLayout()
@@ -868,21 +857,6 @@ class _SettingsWindow(QMainWindow):
             "本地处理 · 可用" if model_ready else "本地处理 · 需要检查"
         )
         self.home_hotkeys.setText(f"快捷键 · {trigger_summary()}")
-        self.trial_button.setEnabled(all_ready)
-
-    def _start_trial(self):
-        self.sidebar.setCurrentRow(0)
-        self.practice_box.setFocus()
-        if self.controller is None:
-            self._set_status_badge("按快捷键开始说话")
-            return
-        result = self.controller.start_trial()
-        if not result.accepted:
-            self._set_status_badge(result.message or "需要处理", attention=True)
-            return
-        self._trial_active = not self._trial_active
-        self.trial_button.setText("停止并查看" if self._trial_active else "试说一句")
-        self._set_status_badge("正在聆听" if self._trial_active else "正在整理")
 
     def _dictionary_path(self, filename):
         return self.paths.knowledge_dir / filename

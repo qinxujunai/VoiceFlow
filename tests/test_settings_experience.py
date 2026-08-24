@@ -15,7 +15,7 @@ def test_primary_status_pages_hide_model_and_thread_implementation_details():
     source = OVERLAY.read_text(encoding="utf-8")
     home = _block(source, "def _home_page", "def _recent_page")
     dictation = _block(source, "def _status_page", "def _dictionary_page")
-    refresh_home = _block(source, "def _refresh_home", "def _start_trial")
+    refresh_home = _block(source, "def _refresh_home", "def _dictionary_path")
 
     for block in (home, dictation, refresh_home):
         assert "SenseVoice" not in block
@@ -41,7 +41,7 @@ def test_settings_home_uses_a_quiet_command_center_hierarchy():
 
     assert "sidebar_panel.setFixedWidth(176)" in shell
     assert 'self.home_ready_title = QLabel("VoiceFlow 已就绪")' in home
-    assert 'self.trial_button = QPushButton("试说一句")' in home
+    assert 'self.trial_button = QPushButton("试说一句")' not in home
     assert 'self.practice_box.setPlaceholderText("识别结果会出现在这里")' in home
     assert 'for title in ("麦克风", "本地处理", "快捷键")' not in home
     assert 'readiness_title = QLabel("准备状态")' not in home
