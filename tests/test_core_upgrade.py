@@ -83,6 +83,30 @@ class HistoryStoreTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(json.loads(rows[0])["clean_text"], "Cursor")
 
+    def test_delete_token_restores_the_exact_history_order(self):
+        from history_store import HistoryStore
+
+        with TemporaryDirectory() as tmp:
+            store = HistoryStore(Path(tmp) / "history.jsonl")
+            store.append(clean_text="第一条")
+            store.append(clean_text="第二条")
+            store.append(clean_text="第三条")
+            middle = next(
+                row for row in store.read_recent() if row["clean_text"] == "第二条"
+            )
+
+            token = store.delete_entry_with_undo(middle["_entry_id"])
+            self.assertEqual(
+                [row["clean_text"] for row in store.read_recent()],
+                ["第三条", "第一条"],
+            )
+
+            self.assertTrue(store.restore_entry(token))
+            self.assertEqual(
+                [row["clean_text"] for row in store.read_recent()],
+                ["第三条", "第二条", "第一条"],
+            )
+
     def test_deletes_one_exact_entry_and_can_clear_all_history(self):
         from history_store import HistoryStore
 
@@ -852,6 +876,31 @@ class FinalTextSelectionTests(unittest.TestCase):
 
         self.assertEqual(text, "完整结果")
         self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 20])
+
+
+def test_hotkeys_start_before_native_models_finish_initializing():
+    source = (SRC / "main.py").read_text(encoding="utf-8")
+    block = source[
+        source.index("    def _on_overlay_ready") : source.index("    def _start_hotkeys")
+    ]
+
+    assert block.index("self._start_hotkeys()") < block.index("_InitWorker(")
+    assert 'self.controller.mark_hotkeys("ready")' in block
+    assert "self.controller.mark_degraded" in block
+
+
+def test_stable_controller_exists_before_overlay_and_settings_are_constructed():
+    source = (SRC / "main.py").read_text(encoding="utf-8")
+    init = source[
+        source.index("    def __init__(self, config_path") : source.index(
+            "    def _init_modules"
+        )
+    ]
+
+    assert init.index("self.controller = AppController(") < init.index(
+        "self.overlay = OverlayWindow("
+    )
+    assert "controller=self.controller" in init
 
 
 if __name__ == "__main__":

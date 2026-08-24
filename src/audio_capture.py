@@ -64,6 +64,7 @@ class AudioCapture:
         self._last_speech_time = None
         self._on_silence_callback = None
         self._on_level_callback = None
+        self._on_pcm_callback = None
 
     def start_recording(self):
         """开始录音"""
@@ -106,6 +107,12 @@ class AudioCapture:
                 recovery_sink = self._recovery_sink
                 if recovery_sink is not None and not recovery_sink.append_pcm(block):
                     self._recovery_drop_count += 1
+                pcm_callback = self._on_pcm_callback
+                if pcm_callback is not None:
+                    try:
+                        pcm_callback(block)
+                    except Exception:
+                        pass
                 self._enqueue_analysis(block)
 
         try:
@@ -217,6 +224,10 @@ class AudioCapture:
     def set_level_callback(self, callback):
         """Receive three real RMS samples for the compact recording meter."""
         self._on_level_callback = callback
+
+    def set_pcm_callback(self, callback):
+        """Mirror captured PCM to a non-blocking process transport."""
+        self._on_pcm_callback = callback
 
     def set_recovery_sink(self, sink):
         """Attach a queue-backed recovery journal; the callback never writes disk."""
