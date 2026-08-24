@@ -183,18 +183,44 @@ class HistoryStore:
         return rows
 
     def delete_entry(self, entry_id):
+        return bool(self.delete_entry_with_undo(entry_id))
+
+    def delete_entry_with_undo(self, entry_id):
         expected = str(entry_id or "")
         if not expected or not self.path.exists():
-            return False
+            return None
         with self._lock:
             lines = self.path.read_text(encoding="utf-8").splitlines()
             for index in range(len(lines) - 1, -1, -1):
                 if self._entry_id(lines[index]) != expected:
                     continue
-                del lines[index]
+                line = lines.pop(index)
                 self._write_lines_atomic(lines)
-                return True
-        return False
+                return {"line": line, "index": index}
+        return None
+
+    def restore_entry(self, token):
+        if not isinstance(token, dict):
+            return False
+        line = token.get("line")
+        try:
+            index = int(token.get("index", -1))
+            record = json.loads(line)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return False
+        if index < 0 or not isinstance(record, dict):
+            return False
+        with self._lock:
+            lines = (
+                self.path.read_text(encoding="utf-8").splitlines()
+                if self.path.exists()
+                else []
+            )
+            if any(self._entry_id(existing) == self._entry_id(line) for existing in lines):
+                return False
+            lines.insert(min(index, len(lines)), line)
+            self._write_lines_atomic(lines)
+        return True
 
     def clear(self):
         if not self.path.exists():

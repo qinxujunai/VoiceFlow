@@ -4,6 +4,7 @@ VoiceFlow 悬浮窗。Qt 主线程 + 信号桥接，所有跨线程 UI 操作线
 
 import hashlib
 import json
+import logging
 import os
 import sys
 import time
@@ -53,9 +54,11 @@ from platform_utils import (
     trigger_summary,
 )
 from recovery_session import RecoverySessionStore
+from runtime_monitor import UiStallDetector
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
+logger = logging.getLogger("voiceflow.ui")
 
 
 class _LatestPreviewMailbox:
@@ -120,6 +123,8 @@ class _SettingsWindow(QMainWindow):
         on_read_history=None,
         on_delete_history=None,
         on_clear_history=None,
+        on_restore_history=None,
+        controller=None,
         paths=None,
     ):
         super().__init__()
@@ -138,6 +143,11 @@ class _SettingsWindow(QMainWindow):
         self._on_read_history = on_read_history
         self._on_delete_history = on_delete_history
         self._on_clear_history = on_clear_history
+        self._on_restore_history = on_restore_history
+        self._history_undo_token = None
+        self._history_undo_generation = 0
+        self.controller = controller
+        self._trial_active = False
         self.recovery_store = RecoverySessionStore(self.paths.recovery_dir)
         self._history_rows = []
         self._dictionary_entries = {}
@@ -194,7 +204,7 @@ class _SettingsWindow(QMainWindow):
 
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
-        for label in ("状态", "词典", "历史", "设置"):
+        for label in ("状态", "听写", "词典", "历史"):
             self.sidebar.addItem(QListWidgetItem(label))
         self.sidebar.setCurrentRow(0)
         self.sidebar.setAccessibleName("设置导航")
@@ -243,13 +253,25 @@ class _SettingsWindow(QMainWindow):
         self.history_action_finished.connect(self._finish_history_action)
         self.history_mutation_finished.connect(self._finish_history_mutation)
 
-    def set_history_actions(self, read=None, delete=None, clear=None):
+    def set_history_actions(self, read=None, delete=None, clear=None, restore=None):
         self._on_read_history = read
         self._on_delete_history = delete
         self._on_clear_history = clear
+        self._on_restore_history = restore
+
+    def set_trial_result(self, text):
+        self._trial_active = False
+        self.trial_button.setText("试说一句")
+        self.practice_box.setPlainText(text)
+        self.practice_box.moveCursor(self.practice_box.textCursor().MoveOperation.End)
+        self.practice_box.setFocus()
+        self._set_status_badge(
+            "可以使用" if text else "没有识别到文字，请再试一次",
+            attention=not bool(text),
+        )
 
     def _show_primary_page(self, row):
-        page_by_row = {0: 0, 1: 3, 2: 1, 3: 2}
+        page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}
         if row in page_by_row:
             self.stack.setCurrentIndex(page_by_row[row])
 
@@ -430,6 +452,11 @@ class _SettingsWindow(QMainWindow):
         clear_history = QPushButton("清空历史")
         clear_history.clicked.connect(self._clear_history)
         toolbar.addWidget(clear_history)
+        self.undo_history_button = QPushButton("撤销删除")
+        self.undo_history_button.setObjectName("textButton")
+        self.undo_history_button.setVisible(False)
+        self.undo_history_button.clicked.connect(self._undo_history_delete)
+        toolbar.addWidget(self.undo_history_button)
         layout.addLayout(toolbar)
 
         self.history_list = QListWidget()
@@ -448,7 +475,7 @@ class _SettingsWindow(QMainWindow):
         layout.setSpacing(16)
         layout.addLayout(
             self._section_header(
-                "设置",
+                "听写",
                 "选择语言、麦克风和启动方式。",
             )
         )
@@ -549,11 +576,11 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_input.setAccessibleName("新增词典条目")
         self.dictionary_input.setPlaceholderText("添加专有词")
         self.dictionary_input.returnPressed.connect(self._add_dictionary_entry)
-        add = QPushButton("添加")
-        add.setObjectName("primaryButton")
-        add.clicked.connect(self._add_dictionary_entry)
+        self.dictionary_add_button = QPushButton("添加")
+        self.dictionary_add_button.setObjectName("primaryButton")
+        self.dictionary_add_button.clicked.connect(self._add_dictionary_entry)
         add_row.addWidget(self.dictionary_input, 1)
-        add_row.addWidget(add)
+        add_row.addWidget(self.dictionary_add_button)
         layout.addLayout(add_row)
 
         self.dictionary_hint = QLabel("每项单独一行，双击可以修改。")
@@ -583,8 +610,10 @@ class _SettingsWindow(QMainWindow):
         note.setWordWrap(True)
         layout.addWidget(note)
         actions = QHBoxLayout()
-        remove = QPushButton("删除所选")
-        remove.clicked.connect(self._remove_dictionary_entries)
+        self.dictionary_remove_button = QPushButton("删除所选")
+        self.dictionary_remove_button.clicked.connect(
+            self._remove_dictionary_entries
+        )
         save = QPushButton("保存词典")
         save.setObjectName("primaryButton")
         save.clicked.connect(self._save_dictionary)
@@ -592,7 +621,7 @@ class _SettingsWindow(QMainWindow):
         open_folder.clicked.connect(
             lambda: open_path(self.paths.knowledge_dir)
         )
-        actions.addWidget(remove)
+        actions.addWidget(self.dictionary_remove_button)
         actions.addWidget(save)
         actions.addWidget(open_folder)
         actions.addStretch(1)
@@ -844,7 +873,16 @@ class _SettingsWindow(QMainWindow):
     def _start_trial(self):
         self.sidebar.setCurrentRow(0)
         self.practice_box.setFocus()
-        self._set_status_badge("可以开始说话")
+        if self.controller is None:
+            self._set_status_badge("按快捷键开始说话")
+            return
+        result = self.controller.start_trial()
+        if not result.accepted:
+            self._set_status_badge(result.message or "需要处理", attention=True)
+            return
+        self._trial_active = not self._trial_active
+        self.trial_button.setText("停止并查看" if self._trial_active else "试说一句")
+        self._set_status_badge("正在聆听" if self._trial_active else "正在整理")
 
     def _dictionary_path(self, filename):
         return self.paths.knowledge_dir / filename
@@ -881,6 +919,8 @@ class _SettingsWindow(QMainWindow):
             self.dictionary_list.addItem(item)
         self.dictionary_list.blockSignals(False)
         self.dictionary_input.setEnabled(not readonly)
+        self.dictionary_add_button.setEnabled(not readonly)
+        self.dictionary_remove_button.setEnabled(not readonly)
         corrections = filename == "corrections.txt"
         if readonly:
             self.dictionary_input.setPlaceholderText("内置术语不可编辑")
@@ -1280,13 +1320,6 @@ class _SettingsWindow(QMainWindow):
         if not entry_id or not self._on_delete_history:
             self._set_status_badge("暂时无法删除", attention=True)
             return
-        answer = QMessageBox.question(
-            self,
-            "删除这条历史",
-            "这条本地听写记录将被永久删除。继续吗？",
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
         self._run_history_mutation("delete", entry_id)
 
     def _clear_history(self):
@@ -1303,9 +1336,24 @@ class _SettingsWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
+        self._clear_history_undo()
         self._run_history_mutation("clear")
 
-    def _run_history_mutation(self, action, entry_id=""):
+    def _undo_history_delete(self):
+        token = self._history_undo_token
+        if token is None or not self._on_restore_history:
+            return
+        self._history_undo_token = None
+        self.undo_history_button.setVisible(False)
+        self._run_history_mutation("restore", token=token)
+
+    def _clear_history_undo(self):
+        self._history_undo_generation += 1
+        self._history_undo_token = None
+        if hasattr(self, "undo_history_button"):
+            self.undo_history_button.setVisible(False)
+
+    def _run_history_mutation(self, action, entry_id="", token=None):
         if self._history_action_in_progress:
             return
         self._history_action_in_progress = True
@@ -1313,11 +1361,20 @@ class _SettingsWindow(QMainWindow):
 
         def run():
             try:
+                undo_token = None
                 if action == "clear":
                     changed = int(self._on_clear_history())
+                elif action == "restore":
+                    changed = int(bool(self._on_restore_history(token)))
                 else:
-                    changed = int(bool(self._on_delete_history(entry_id)))
-                payload = {"ok": True, "action": action, "changed": changed}
+                    undo_token = self._on_delete_history(entry_id)
+                    changed = int(bool(undo_token))
+                payload = {
+                    "ok": True,
+                    "action": action,
+                    "changed": changed,
+                    "undo_token": undo_token,
+                }
             except Exception as error:
                 payload = {"ok": False, "action": action, "error": str(error)}
             self.history_mutation_finished.emit(payload)
@@ -1337,9 +1394,25 @@ class _SettingsWindow(QMainWindow):
                 attention=True,
             )
             return
-        self._set_status_badge(
-            "历史已清空" if payload.get("action") == "clear" else "历史已删除"
-        )
+        action = payload.get("action")
+        if action == "delete" and payload.get("undo_token"):
+            self._history_undo_token = payload["undo_token"]
+            self._history_undo_generation += 1
+            generation = self._history_undo_generation
+            self.undo_history_button.setVisible(True)
+            QTimer.singleShot(
+                5000,
+                lambda active=generation: (
+                    self._clear_history_undo()
+                    if active == self._history_undo_generation
+                    else None
+                ),
+            )
+            self._set_status_badge("历史已删除，可撤销")
+        elif action == "restore":
+            self._set_status_badge("已恢复")
+        else:
+            self._set_status_badge("历史已清空")
         self._refresh_history()
 
     def _empty_card(self):
@@ -1973,32 +2046,39 @@ class _SettingsWindow(QMainWindow):
 
 class OverlayWindow:
 
-    def __init__(self, paths=None):
+    def __init__(self, paths=None, controller=None):
         if paths is None:
             project_root = os.path.dirname(os.path.dirname(__file__))
             paths = AppPaths.discover(
                 config_path=os.path.join(project_root, "config.yaml")
             )
         self.paths = paths
+        self.controller = controller
         self.window = None
         self.web_view = None
         self._bridge = None
         self._tray = None
         self._tray_icons = {}
-        self._on_record_toggle = None
-        self._on_copy_last = None
-        self._on_repaste_last = None
-        self._on_copy_text = None
-        self._on_output_text = None
-        self._on_open_dictionary = None
-        self._on_quit = None
-        self._on_recording_painted = None
-        self._on_preview_painted = None
-        self._on_recover_session = None
-        self._on_delete_recovery = None
-        self._on_read_history = None
-        self._on_delete_history = None
-        self._on_clear_history = None
+        self._on_record_toggle = (
+            (lambda *_args: controller.toggle_recording(source="tray"))
+            if controller else None
+        )
+        self._on_copy_last = controller.copy_last if controller else None
+        self._on_repaste_last = controller.repaste_last if controller else None
+        self._on_copy_text = controller.copy_text if controller else None
+        self._on_output_text = controller.output_text if controller else None
+        self._on_open_dictionary = controller.open_dictionary if controller else None
+        self._on_quit = controller.quit if controller else None
+        self._on_recording_painted = (
+            controller.recording_painted if controller else None
+        )
+        self._on_preview_painted = controller.preview_painted if controller else None
+        self._on_recover_session = controller.recover_session if controller else None
+        self._on_delete_recovery = controller.delete_recovery if controller else None
+        self._on_read_history = controller.read_history if controller else None
+        self._on_delete_history = controller.delete_history if controller else None
+        self._on_clear_history = controller.clear_history if controller else None
+        self._on_restore_history = controller.restore_history if controller else None
         self._recording_feedback_lock = threading.Lock()
         self._pending_recording_feedback = None
         self._html_path = str(self.paths.install_resource("src/overlay.html"))
@@ -2012,8 +2092,16 @@ class OverlayWindow:
         self._single_instance_server = None
         self._instance_request_timer = None
         self._instance_request_path = Path(self.paths.data_dir) / "show-settings.request"
+        instance_id = os.environ.get("VOICEFLOW_INSTANCE_ID", "").strip()
+        self._instance_name = (
+            f"{SINGLE_INSTANCE_NAME}.{instance_id}"
+            if instance_id
+            else SINGLE_INSTANCE_NAME
+        )
         self._preview_paint_reporter = None
         self._web_channel = None
+        self._ui_watchdog_timer = None
+        self._ui_watchdog_stop = None
 
     def set_actions(
         self,
@@ -2031,6 +2119,7 @@ class OverlayWindow:
         on_read_history=None,
         on_delete_history=None,
         on_clear_history=None,
+        on_restore_history=None,
     ):
         self._on_record_toggle = on_record_toggle
         self._on_copy_last = on_copy_last
@@ -2046,11 +2135,13 @@ class OverlayWindow:
         self._on_read_history = on_read_history
         self._on_delete_history = on_delete_history
         self._on_clear_history = on_clear_history
+        self._on_restore_history = on_restore_history
         if self._settings_window is not None:
             self._settings_window.set_history_actions(
                 read=on_read_history,
                 delete=on_delete_history,
                 clear=on_clear_history,
+                restore=on_restore_history,
             )
 
     def start(self, on_ready=None):
@@ -2104,6 +2195,7 @@ class OverlayWindow:
         self._bridge.tray_state_requested.connect(self._set_tray_state)
         self._bridge.settings_requested.connect(self._show_settings)
         self._bridge.startup_requested.connect(self._show_startup)
+        self._bridge.trial_result_requested.connect(self._apply_trial_result)
         self._bridge.onboarding_completed_requested.connect(
             self._complete_onboarding
         )
@@ -2126,11 +2218,42 @@ class OverlayWindow:
         if self._on_ready:
             self._on_ready()
 
+        self._start_ui_watchdog(app)
+
         app.exec()
+
+    def _start_ui_watchdog(self, app):
+        detector = UiStallDetector(
+            threshold_ms=50,
+            initial_time=time.perf_counter(),
+        )
+        timer = QTimer()
+        timer.setInterval(16)
+        timer.timeout.connect(lambda: detector.tick(time.perf_counter()))
+        timer.start()
+        stop_event = threading.Event()
+
+        def watch():
+            while not stop_event.wait(0.025):
+                stall_ms = detector.poll(time.perf_counter())
+                if stall_ms is not None:
+                    logger.warning(
+                        "UI event loop stalled",
+                        extra={"event": "ui_stall", "duration_ms": stall_ms},
+                    )
+
+        threading.Thread(
+            target=watch,
+            name="voiceflow-ui-watchdog",
+            daemon=True,
+        ).start()
+        app.aboutToQuit.connect(stop_event.set)
+        self._ui_watchdog_timer = timer
+        self._ui_watchdog_stop = stop_event
 
     def _notify_existing_instance(self):
         socket = QLocalSocket()
-        socket.connectToServer(SINGLE_INSTANCE_NAME)
+        socket.connectToServer(self._instance_name)
         if not socket.waitForConnected(120):
             socket.abort()
             return False
@@ -2144,9 +2267,9 @@ class OverlayWindow:
 
     def _start_single_instance_server(self):
         server = QLocalServer()
-        if not server.listen(SINGLE_INSTANCE_NAME):
-            QLocalServer.removeServer(SINGLE_INSTANCE_NAME)
-            if not server.listen(SINGLE_INSTANCE_NAME):
+        if not server.listen(self._instance_name):
+            QLocalServer.removeServer(self._instance_name)
+            if not server.listen(self._instance_name):
                 return
         server.newConnection.connect(self._on_instance_message)
         self._single_instance_server = server
@@ -2307,6 +2430,8 @@ class OverlayWindow:
                 on_read_history=self._on_read_history,
                 on_delete_history=self._on_delete_history,
                 on_clear_history=self._on_clear_history,
+                on_restore_history=self._on_restore_history,
+                controller=self.controller,
                 paths=self.paths,
             )
         return self._settings_window
@@ -2325,6 +2450,10 @@ class OverlayWindow:
         window = self._ensure_settings_window()
         if window.needs_onboarding():
             self._show_settings()
+
+    def _apply_trial_result(self, text):
+        window = self._ensure_settings_window()
+        window.set_trial_result(text)
 
     def _complete_onboarding(self):
         if self._settings_window is not None:
@@ -2500,6 +2629,10 @@ class OverlayWindow:
         if self._bridge:
             self._bridge.onboarding_completed_requested.emit()
 
+    def show_trial_result(self, text):
+        if self._bridge:
+            self._bridge.trial_result_requested.emit(str(text))
+
     def hide_after(self, ms=2000):
         if self._bridge:
             self._bridge.hide_after_requested.emit(ms)
@@ -2521,6 +2654,7 @@ class _Bridge(QObject):
     settings_requested = Signal()
     startup_requested = Signal()
     onboarding_completed_requested = Signal()
+    trial_result_requested = Signal(str)
 
     def __init__(self, web_view, before_show=None):
         super().__init__()

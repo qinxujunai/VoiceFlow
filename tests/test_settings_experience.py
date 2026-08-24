@@ -52,7 +52,7 @@ def test_settings_shell_keeps_diagnostics_auxiliary_and_no_model_marketplace():
     source = OVERLAY.read_text(encoding="utf-8")
     settings = _block(source, "class _SettingsWindow", "class OverlayWindow")
 
-    assert 'for label in ("状态", "词典", "历史", "设置")' in settings
+    assert 'for label in ("状态", "听写", "词典", "历史")' in settings
     assert 'QPushButton("运行检查")' in settings
     assert "model_download_button" not in settings
     assert "self.model_manager.start_download" not in settings
@@ -77,6 +77,8 @@ def test_dictionary_exposes_bundled_ai_terms_as_read_only_product_content():
 
     assert 'self.dictionary_section.addItem("内置 AI 术语", "builtin-ai.txt")' in dictionary
     assert 'readonly = filename == "builtin-ai.txt"' in rendering
+    assert "self.dictionary_add_button.setEnabled(not readonly)" in rendering
+    assert "self.dictionary_remove_button.setEnabled(not readonly)" in rendering
     assert "self.dictionary_input.setEnabled(not readonly)" in rendering
     assert "内置术语随 VoiceFlow 更新" in rendering
 
@@ -101,7 +103,7 @@ def test_help_and_settings_labels_are_short_and_task_oriented():
     assert 'help_menu.addAction("运行检查")' in shell
     assert 'help_menu.addAction("关于 VoiceFlow")' in shell
     assert 'self.help_button = QPushButton("帮助")' in shell
-    assert '"设置",\n                "选择语言、麦克风和启动方式。"' in settings
+    assert '"听写",\n                "选择语言、麦克风和启动方式。"' in settings
 
 
 def test_each_history_card_owns_copy_and_repaste_actions():
@@ -111,6 +113,18 @@ def test_each_history_card_owns_copy_and_repaste_actions():
 
     assert "self.copy_button" not in recent
     assert "self.repaste_button" not in recent
+
+
+def test_ui_evidence_captures_the_current_sidebar_order():
+    script = (ROOT / "scripts" / "capture_ui_states.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '(0, "status")' in script
+    assert '(1, "dictation")' in script
+    assert '(2, "dictionary")' in script
+    assert '(3, "history")' in script
+    assert '(3, "settings")' not in script
     assert 'QPushButton("复制全部")' in recent
     assert 'QPushButton("复制")' in card
     assert 'QPushButton("再次粘贴")' in card

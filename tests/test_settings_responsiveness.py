@@ -238,11 +238,6 @@ def test_deleting_one_history_entry_never_waits_on_the_ui_thread(
         release.wait(timeout=1.0)
         return True
 
-    monkeypatch.setattr(
-        QMessageBox,
-        "question",
-        lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes,
-    )
     window = _SettingsWindow(paths=paths, on_delete_history=slow_delete)
     try:
         began = time.perf_counter()
@@ -257,6 +252,35 @@ def test_deleting_one_history_entry_never_waits_on_the_ui_thread(
             app,
             lambda: not getattr(window, "_history_action_in_progress", False),
         )
+        window.close()
+
+
+def test_single_history_delete_does_not_show_a_blocking_confirmation(
+    app, paths, monkeypatch
+):
+    confirmation_calls = []
+    deleted = threading.Event()
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: confirmation_calls.append(True),
+    )
+
+    def delete(_entry_id):
+        deleted.set()
+        return {"line": '{"clean_text":"可撤销"}', "index": 0}
+
+    window = _SettingsWindow(paths=paths, on_delete_history=delete)
+    try:
+        window.show()
+        app.processEvents()
+        window._delete_history_entry("entry-1")
+
+        assert deleted.wait(timeout=1.0)
+        assert confirmation_calls == []
+        assert _pump_until(app, lambda: not window.undo_history_button.isHidden())
+    finally:
         window.close()
 
 
@@ -288,3 +312,31 @@ def test_show_settings_restores_a_minimized_window_before_raising_it():
     overlay._show_settings()
 
     assert calls == ["refresh", "showNormal", "raise", "activate"]
+
+
+def test_trial_button_dispatches_a_real_controller_action(app, paths):
+    class FakeController:
+        def __init__(self):
+            self.calls = 0
+
+        def start_trial(self):
+            self.calls += 1
+            return type(
+                "Result",
+                (),
+                {"accepted": True, "message": "正在聆听", "error_code": ""},
+            )()
+
+    controller = FakeController()
+    window = _SettingsWindow(paths=paths, controller=controller)
+    try:
+        window.show()
+        app.processEvents()
+        window._start_trial()
+        app.processEvents()
+
+        assert controller.calls == 1
+        assert window.trial_button.text() == "停止并查看"
+        assert window.practice_box.hasFocus()
+    finally:
+        window.close()
