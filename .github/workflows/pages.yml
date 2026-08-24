@@ -3,6 +3,9 @@ name: Deploy product site
 on:
   release:
     types: [published, edited]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +19,10 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'release' || (!github.event.release.draft && !github.event.release.prerelease)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
