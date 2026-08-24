@@ -113,6 +113,11 @@ def test_each_history_card_owns_copy_and_repaste_actions():
 
     assert "self.copy_button" not in recent
     assert "self.repaste_button" not in recent
+    assert 'QPushButton("复制全部")' in recent
+    assert 'QPushButton("复制")' in card
+    assert 'QPushButton("再次粘贴")' in card
+    assert 'QPushButton("删除")' in card
+    assert 'QPushButton("清空历史")' in recent
 
 
 def test_ui_evidence_captures_the_current_sidebar_order():
@@ -125,11 +130,6 @@ def test_ui_evidence_captures_the_current_sidebar_order():
     assert '(2, "dictionary")' in script
     assert '(3, "history")' in script
     assert '(3, "settings")' not in script
-    assert 'QPushButton("复制全部")' in recent
-    assert 'QPushButton("复制")' in card
-    assert 'QPushButton("再次粘贴")' in card
-    assert 'QPushButton("删除")' in card
-    assert 'QPushButton("清空历史")' in recent
 
 
 def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
