@@ -2,9 +2,10 @@
 VoiceFlow 悬浮窗。Qt 主线程 + 信号桥接，所有跨线程 UI 操作线程安全。
 """
 
+import hashlib
+import json
 import os
 import sys
-import json
 import time
 import threading
 from datetime import datetime
@@ -52,7 +53,6 @@ from platform_utils import (
     trigger_summary,
 )
 from recovery_session import RecoverySessionStore
-from delivery import VerifiedClipboard
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
@@ -106,6 +106,10 @@ class _SettingsWindow(QMainWindow):
     doctor_finished = Signal(object)
     model_switch_finished = Signal(object)
     recovery_finished = Signal(object)
+    refresh_finished = Signal(object)
+    history_refresh_finished = Signal(object)
+    history_action_finished = Signal(object)
+    history_mutation_finished = Signal(object)
 
     def __init__(
         self,
@@ -113,6 +117,9 @@ class _SettingsWindow(QMainWindow):
         on_repaste_text=None,
         on_recover_session=None,
         on_delete_recovery=None,
+        on_read_history=None,
+        on_delete_history=None,
+        on_clear_history=None,
         paths=None,
     ):
         super().__init__()
@@ -128,6 +135,9 @@ class _SettingsWindow(QMainWindow):
         self._on_repaste_text = on_repaste_text
         self._on_recover_session = on_recover_session
         self._on_delete_recovery = on_delete_recovery
+        self._on_read_history = on_read_history
+        self._on_delete_history = on_delete_history
+        self._on_clear_history = on_clear_history
         self.recovery_store = RecoverySessionStore(self.paths.recovery_dir)
         self._history_rows = []
         self._dictionary_entries = {}
@@ -135,6 +145,12 @@ class _SettingsWindow(QMainWindow):
         self._last_diagnostics = None
         self._microphone_detected = False
         self._switch_in_progress = False
+        self._refresh_in_progress = False
+        self._history_refresh_in_progress = False
+        self._history_action_in_progress = False
+        self._doctor_in_progress = False
+        self._recovery_action_in_progress = False
+        self._history_render_generation = 0
         self.setWindowTitle("VoiceFlow")
         self.setMinimumSize(980, 660)
 
@@ -189,8 +205,8 @@ class _SettingsWindow(QMainWindow):
         self.status_badge.setAccessibleName("VoiceFlow 状态")
         sidebar_layout.addWidget(self.status_badge)
         help_menu = QMenu(self)
-        diagnostics_action = help_menu.addAction("运行检查")
-        diagnostics_action.triggered.connect(lambda: self._show_aux_page(4))
+        self.diagnostics_action = help_menu.addAction("运行检查")
+        self.diagnostics_action.triggered.connect(lambda: self._show_aux_page(4))
         about_action = help_menu.addAction("关于 VoiceFlow")
         about_action.triggered.connect(lambda: self._show_aux_page(5))
         self.help_button = QPushButton("帮助")
@@ -222,6 +238,15 @@ class _SettingsWindow(QMainWindow):
         self.doctor_finished.connect(self._finish_doctor)
         self.model_switch_finished.connect(self._finish_model_switch)
         self.recovery_finished.connect(self._finish_recovery)
+        self.refresh_finished.connect(self._finish_refresh)
+        self.history_refresh_finished.connect(self._finish_history_refresh)
+        self.history_action_finished.connect(self._finish_history_action)
+        self.history_mutation_finished.connect(self._finish_history_mutation)
+
+    def set_history_actions(self, read=None, delete=None, clear=None):
+        self._on_read_history = read
+        self._on_delete_history = delete
+        self._on_clear_history = clear
 
     def _show_primary_page(self, row):
         page_by_row = {0: 0, 1: 3, 2: 1, 3: 2}
@@ -372,11 +397,11 @@ class _SettingsWindow(QMainWindow):
         self.recover_button.clicked.connect(self._recover_selected_session)
         copy_preview = QPushButton("复制已有预览")
         copy_preview.clicked.connect(self._copy_recovery_preview)
-        delete_recovery = QPushButton("删除录音")
-        delete_recovery.clicked.connect(self._delete_recovery)
+        self.delete_recovery_button = QPushButton("删除录音")
+        self.delete_recovery_button.clicked.connect(self._delete_recovery)
         recovery_actions.addWidget(self.recover_button)
         recovery_actions.addWidget(copy_preview)
-        recovery_actions.addWidget(delete_recovery)
+        recovery_actions.addWidget(self.delete_recovery_button)
         recovery_actions.addStretch(1)
         recovery_layout.addWidget(self.recovery_summary)
         recovery_layout.addWidget(self.recovery_detail)
@@ -388,7 +413,13 @@ class _SettingsWindow(QMainWindow):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("搜索最近转录")
         self.search_box.setAccessibleName("搜索历史转录")
-        self.search_box.textChanged.connect(self._render_history)
+        self._history_search_timer = QTimer(self)
+        self._history_search_timer.setSingleShot(True)
+        self._history_search_timer.setInterval(140)
+        self._history_search_timer.timeout.connect(self._render_history)
+        self.search_box.textChanged.connect(
+            lambda _text: self._history_search_timer.start()
+        )
         toolbar.addWidget(self.search_box, 1)
         refresh = QPushButton("刷新")
         refresh.clicked.connect(self._refresh_history)
@@ -396,6 +427,9 @@ class _SettingsWindow(QMainWindow):
         copy_all = QPushButton("复制全部")
         copy_all.clicked.connect(self._copy_all_visible)
         toolbar.addWidget(copy_all)
+        clear_history = QPushButton("清空历史")
+        clear_history.clicked.connect(self._clear_history)
+        toolbar.addWidget(clear_history)
         layout.addLayout(toolbar)
 
         self.history_list = QListWidget()
@@ -677,15 +711,88 @@ class _SettingsWindow(QMainWindow):
         return page
 
     def refresh(self):
-        config = self._load_config()
-        active = config.get("engine", {}).get("active", "sensevoice")
-        ready = self._engine_ready(active, config)
-        self._set_status_badge("就绪" if ready else "需要设置")
-        self._refresh_settings_controls(config)
-        self._refresh_history()
+        if self._refresh_in_progress or self._history_refresh_in_progress:
+            return
+        self._refresh_in_progress = True
+        self._set_status_badge("正在检查")
+
+        def run():
+            try:
+                config = self._load_config()
+                active = config.get("engine", {}).get("active", "sensevoice")
+                payload = {
+                    "ok": True,
+                    "config": config,
+                    "ready": self._engine_ready(active, config),
+                    "microphones": self._query_microphones(),
+                    "history_rows": self._read_history_rows(),
+                    "dictionary_entries": self._read_dictionary_entries(),
+                    "recovery_sessions": self.recovery_store.list_recoverable(),
+                }
+            except Exception as error:
+                payload = {"ok": False, "error": str(error)}
+            self.refresh_finished.emit(payload)
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-settings-refresh",
+            daemon=True,
+        ).start()
+
+    @Slot(object)
+    def _finish_refresh(self, payload):
+        self._refresh_in_progress = False
+        if not payload.get("ok"):
+            self._set_status_badge(
+                f"状态刷新失败：{payload.get('error', '未知错误')}",
+                attention=True,
+            )
+            return
+        config = payload["config"]
+        self._history_rows = payload["history_rows"]
+        self._dictionary_entries = payload["dictionary_entries"]
+        self._active_dictionary_filename = self.dictionary_section.currentData()
+        self._refresh_settings_controls(config, payload["microphones"])
         self._refresh_home(config)
-        self._load_dictionary()
-        self._refresh_recovery()
+        self._refresh_home_history()
+        self._render_history()
+        self._render_dictionary_section()
+        self._apply_recovery_sessions(payload["recovery_sessions"])
+        self._set_status_badge("就绪" if payload["ready"] else "需要设置")
+
+    @staticmethod
+    def _query_microphones():
+        devices = []
+        try:
+            import sounddevice as sd
+
+            for index, device in enumerate(sd.query_devices()):
+                if int(device.get("max_input_channels", 0)) > 0:
+                    devices.append((str(device.get("name", index)), index))
+        except Exception:
+            pass
+        return devices
+
+    def _read_dictionary_entries(self):
+        entries = {}
+        for filename in (
+            "builtin-ai.txt",
+            "user-dictionary.txt",
+            "phrases.txt",
+            "corrections.txt",
+        ):
+            try:
+                raw = self._dictionary_path(filename).read_text(encoding="utf-8")
+                entries[filename] = [
+                    line
+                    for line in raw.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                ]
+            except FileNotFoundError:
+                entries[filename] = []
+            except Exception:
+                entries[filename] = []
+        return entries
 
     def _set_status_badge(self, text, attention=None):
         if attention is None:
@@ -743,24 +850,7 @@ class _SettingsWindow(QMainWindow):
         return self.paths.knowledge_dir / filename
 
     def _load_dictionary(self):
-        for filename in (
-            "builtin-ai.txt",
-            "user-dictionary.txt",
-            "phrases.txt",
-            "corrections.txt",
-        ):
-            try:
-                raw = self._dictionary_path(filename).read_text(encoding="utf-8")
-                self._dictionary_entries[filename] = [
-                    line
-                    for line in raw.splitlines()
-                    if line.strip() and not line.lstrip().startswith("#")
-                ]
-            except FileNotFoundError:
-                self._dictionary_entries[filename] = []
-            except Exception as error:
-                self._dictionary_entries[filename] = []
-                self._set_status_badge(f"词典读取失败: {error}")
+        self._dictionary_entries = self._read_dictionary_entries()
         self._active_dictionary_filename = self.dictionary_section.currentData()
         self._render_dictionary_section()
 
@@ -920,7 +1010,7 @@ class _SettingsWindow(QMainWindow):
     def _engine_ready(self, engine, config):
         return self.model_manager.status(engine, config).state is ModelState.READY
 
-    def _refresh_settings_controls(self, config):
+    def _refresh_settings_controls(self, config, microphones=None):
         engine = config.get("engine", {})
         active = engine.get("active", "sensevoice")
         self._populate_language_options(active, config)
@@ -928,14 +1018,9 @@ class _SettingsWindow(QMainWindow):
         self.microphone_combo.clear()
         self.microphone_combo.addItem("系统默认麦克风", None)
         self._microphone_detected = False
-        try:
-            import sounddevice as sd
-            for index, device in enumerate(sd.query_devices()):
-                if int(device.get("max_input_channels", 0)) > 0:
-                    self._microphone_detected = True
-                    self.microphone_combo.addItem(str(device.get("name", index)), index)
-        except Exception:
-            pass
+        for name, index in microphones or ():
+            self._microphone_detected = True
+            self.microphone_combo.addItem(name, index)
         selected_device = config.get("audio", {}).get("device_index")
         selected_index = self.microphone_combo.findData(selected_device)
         self.microphone_combo.setCurrentIndex(max(0, selected_index))
@@ -970,6 +1055,7 @@ class _SettingsWindow(QMainWindow):
                     language=payload["language"],
                     device_index=payload["device_index"],
                 )
+                set_autostart(self.paths, bool(payload.get("autostart")))
                 payload["ok"] = True
             except Exception as error:
                 payload["ok"] = False
@@ -984,11 +1070,6 @@ class _SettingsWindow(QMainWindow):
         self.save_settings_button.setEnabled(True)
         if not payload.get("ok"):
             self._set_status_badge(f"设置保存失败：{payload.get('error', '未知错误')}")
-            return
-        try:
-            set_autostart(self.paths, bool(payload.get("autostart")))
-        except Exception as error:
-            self._set_status_badge(f"听写设置已保存；自动启动设置失败：{error}")
             return
         self._set_status_badge("设置已保存，重启后生效")
 
@@ -1026,28 +1107,58 @@ class _SettingsWindow(QMainWindow):
             return value
 
     def _refresh_history(self):
+        if self._history_refresh_in_progress or self._refresh_in_progress:
+            return
+        self._history_refresh_in_progress = True
+        self._set_status_badge("正在刷新历史")
+
+        def run():
+            try:
+                payload = {"ok": True, "rows": self._read_history_rows()}
+            except Exception as error:
+                payload = {"ok": False, "error": str(error)}
+            self.history_refresh_finished.emit(payload)
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-history-refresh",
+            daemon=True,
+        ).start()
+
+    def _read_history_rows(self):
+        if self._on_read_history:
+            return list(self._on_read_history())
         path = self.paths.history_file
         if not path.exists():
-            self._history_rows = []
-            self._render_history()
-            self._refresh_home_history()
+            return []
+        with path.open("r", encoding="utf-8") as f:
+            rows = [line for line in f.read().splitlines() if line][-80:]
+        parsed = []
+        for row in reversed(rows):
+            try:
+                record = json.loads(row)
+            except Exception:
+                continue
+            if isinstance(record, dict):
+                record["_entry_id"] = hashlib.sha256(
+                    row.encode("utf-8")
+                ).hexdigest()
+                parsed.append(record)
+        return parsed
+
+    @Slot(object)
+    def _finish_history_refresh(self, payload):
+        self._history_refresh_in_progress = False
+        if not payload.get("ok"):
+            self._set_status_badge(
+                f"历史读取失败：{payload.get('error', '未知错误')}",
+                attention=True,
+            )
             return
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                rows = [line for line in f.read().splitlines() if line][-80:]
-            parsed = []
-            for row in reversed(rows):
-                try:
-                    parsed.append(json.loads(row))
-                except Exception:
-                    pass
-            self._history_rows = parsed
-            self._render_history()
-            self._refresh_home_history()
-        except Exception as e:
-            self._history_rows = [{"error": f"历史读取失败: {e}"}]
-            self._render_history()
-            self._refresh_home_history()
+        self._history_rows = payload["rows"]
+        self._render_history()
+        self._refresh_home_history()
+        self._set_status_badge("历史已刷新")
 
     def _refresh_home_history(self):
         if not hasattr(self, "home_recent_labels"):
@@ -1079,7 +1190,10 @@ class _SettingsWindow(QMainWindow):
         if not hasattr(self, "history_list"):
             return
         query = self.search_box.text().strip().lower() if hasattr(self, "search_box") else ""
+        self._history_render_generation += 1
+        generation = self._history_render_generation
         self.history_list.clear()
+        cards = []
         for row in self._history_rows:
             text = row.get("corrected_text") or row.get("clean_text") or row.get("error") or ""
             if query and query not in text.lower():
@@ -1091,19 +1205,38 @@ class _SettingsWindow(QMainWindow):
             meta_parts = [part for part in (timestamp, f"{float(duration):.1f}s" if duration is not None else "", status) if part]
             if tail:
                 meta_parts.append(f"尾部 {tail}")
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, text)
-            item.setSizeHint(QSize(0, 104))
-            self.history_list.addItem(item)
-            self.history_list.setItemWidget(item, self._history_card(text, " · ".join(meta_parts)))
-        if self.history_list.count() == 0:
+            cards.append((text, " · ".join(meta_parts), row.get("_entry_id", "")))
+        self._pending_history_cards = cards
+        if not cards:
             empty = QListWidgetItem()
             empty.setData(Qt.ItemDataRole.UserRole, "")
             empty.setSizeHint(QSize(0, 68))
             self.history_list.addItem(empty)
             self.history_list.setItemWidget(empty, self._empty_card())
+            return
+        self._render_history_batch(generation)
 
-    def _history_card(self, text, meta):
+    def _render_history_batch(self, generation):
+        if generation != self._history_render_generation:
+            return
+        batch = self._pending_history_cards[:8]
+        del self._pending_history_cards[: len(batch)]
+        for text, meta, entry_id in batch:
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, text)
+            item.setSizeHint(QSize(0, 104))
+            self.history_list.addItem(item)
+            self.history_list.setItemWidget(
+                item,
+                self._history_card(text, meta, entry_id),
+            )
+        if self._pending_history_cards:
+            QTimer.singleShot(
+                0,
+                lambda active=generation: self._render_history_batch(active),
+            )
+
+    def _history_card(self, text, meta, entry_id=""):
         card = QWidget()
         card.setObjectName("historyCard")
         row = QHBoxLayout(card)
@@ -1134,7 +1267,80 @@ class _SettingsWindow(QMainWindow):
             lambda _=False, value=text: self._repaste_text(value)
         )
         row.addWidget(repaste)
+        delete = QPushButton("删除")
+        delete.setObjectName("inlineDeleteButton")
+        delete.setEnabled(bool(entry_id))
+        delete.clicked.connect(
+            lambda _=False, value=entry_id: self._delete_history_entry(value)
+        )
+        row.addWidget(delete)
         return card
+
+    def _delete_history_entry(self, entry_id):
+        if not entry_id or not self._on_delete_history:
+            self._set_status_badge("暂时无法删除", attention=True)
+            return
+        answer = QMessageBox.question(
+            self,
+            "删除这条历史",
+            "这条本地听写记录将被永久删除。继续吗？",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._run_history_mutation("delete", entry_id)
+
+    def _clear_history(self):
+        if not self._history_rows:
+            self._set_status_badge("没有历史记录")
+            return
+        if not self._on_clear_history:
+            self._set_status_badge("暂时无法清空", attention=True)
+            return
+        answer = QMessageBox.question(
+            self,
+            "清空全部历史",
+            f"将永久删除全部 {len(self._history_rows)} 条本地听写记录。继续吗？",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._run_history_mutation("clear")
+
+    def _run_history_mutation(self, action, entry_id=""):
+        if self._history_action_in_progress:
+            return
+        self._history_action_in_progress = True
+        self._set_status_badge("正在删除历史")
+
+        def run():
+            try:
+                if action == "clear":
+                    changed = int(self._on_clear_history())
+                else:
+                    changed = int(bool(self._on_delete_history(entry_id)))
+                payload = {"ok": True, "action": action, "changed": changed}
+            except Exception as error:
+                payload = {"ok": False, "action": action, "error": str(error)}
+            self.history_mutation_finished.emit(payload)
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-history-delete",
+            daemon=True,
+        ).start()
+
+    @Slot(object)
+    def _finish_history_mutation(self, payload):
+        self._history_action_in_progress = False
+        if not payload.get("ok"):
+            self._set_status_badge(
+                f"历史删除失败：{payload.get('error', '未知错误')}",
+                attention=True,
+            )
+            return
+        self._set_status_badge(
+            "历史已清空" if payload.get("action") == "clear" else "历史已删除"
+        )
+        self._refresh_history()
 
     def _empty_card(self):
         card = QWidget()
@@ -1167,9 +1373,7 @@ class _SettingsWindow(QMainWindow):
         if not self._on_copy_text:
             self._set_status_badge("复制失败", attention=True)
             return
-        status = self._on_copy_text(text)
-        label = self._output_status_label(status)
-        self._set_status_badge(label, attention=label in {"失败", "未知"})
+        self._run_history_action(text, self._on_copy_text, "正在复制")
 
     def _repaste_selected(self):
         text = self._selected_text()
@@ -1182,12 +1386,42 @@ class _SettingsWindow(QMainWindow):
         if not self._on_repaste_text:
             self._set_status_badge("粘贴失败", attention=True)
             return
-        status = self._on_repaste_text(text)
+        self._run_history_action(text, self._on_repaste_text, "正在准备粘贴")
+
+    def _run_history_action(self, text, callback, pending_label):
+        if self._history_action_in_progress:
+            self._set_status_badge("上一项操作仍在进行")
+            return
+        self._history_action_in_progress = True
+        self._set_status_badge(pending_label)
+
+        def run():
+            try:
+                payload = {"ok": True, "status": callback(text)}
+            except Exception as error:
+                payload = {"ok": False, "error": str(error)}
+            self.history_action_finished.emit(payload)
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-history-action",
+            daemon=True,
+        ).start()
+
+    @Slot(object)
+    def _finish_history_action(self, payload):
+        self._history_action_in_progress = False
+        if not payload.get("ok"):
+            self._set_status_badge("操作失败", attention=True)
+            return
+        status = payload.get("status", "unknown")
         label = self._output_status_label(status)
         self._set_status_badge(label, attention=label in {"失败", "未知"})
 
     def _refresh_recovery(self):
-        sessions = self.recovery_store.list_recoverable()
+        self._apply_recovery_sessions(self.recovery_store.list_recoverable())
+
+    def _apply_recovery_sessions(self, sessions):
         self.recovery_combo.clear()
         for session in sessions:
             minutes = session.sample_count / max(1, session.sample_rate) / 60
@@ -1207,9 +1441,15 @@ class _SettingsWindow(QMainWindow):
 
     def _recover_selected_session(self):
         session_id = self.recovery_combo.currentData()
-        if not session_id or not self._on_recover_session:
+        if (
+            not session_id
+            or not self._on_recover_session
+            or self._recovery_action_in_progress
+        ):
             return
+        self._recovery_action_in_progress = True
         self.recover_button.setEnabled(False)
+        self.delete_recovery_button.setEnabled(False)
         self._set_status_badge("正在从本地录音恢复文字")
 
         def run():
@@ -1217,13 +1457,24 @@ class _SettingsWindow(QMainWindow):
                 result = self._on_recover_session(str(session_id))
             except Exception as error:
                 result = {"ok": False, "error": str(error)}
+            result = dict(result or {})
+            result["action"] = "recover"
             self.recovery_finished.emit(result)
 
         threading.Thread(target=run, daemon=True).start()
 
     @Slot(object)
     def _finish_recovery(self, result):
+        self._recovery_action_in_progress = False
         self.recover_button.setEnabled(True)
+        self.delete_recovery_button.setEnabled(True)
+        if result.get("action") == "delete":
+            if result.get("ok"):
+                self._set_status_badge("恢复录音已删除")
+                self.refresh()
+            else:
+                self._set_status_badge("没有找到这段恢复录音")
+            return
         if result.get("ok"):
             self._set_status_badge("恢复完成，文字已复制到剪贴板")
             self._refresh_history()
@@ -1236,16 +1487,15 @@ class _SettingsWindow(QMainWindow):
         if not preview:
             self._set_status_badge("这段录音还没有可复制的预览文字")
             return
-        import pyperclip
-
-        result = VerifiedClipboard(copy=pyperclip.copy, paste=pyperclip.paste).write_verified(preview)
-        self._set_status_badge(
-            "预览文字已复制" if result.verified else "预览文字仍在恢复记录中"
-        )
+        self._copy_text(preview)
 
     def _delete_recovery(self):
         session_id = self.recovery_combo.currentData()
-        if not session_id or not self._on_delete_recovery:
+        if (
+            not session_id
+            or not self._on_delete_recovery
+            or self._recovery_action_in_progress
+        ):
             return
         answer = QMessageBox.question(
             self,
@@ -1254,11 +1504,24 @@ class _SettingsWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        if self._on_delete_recovery(str(session_id)):
-            self._set_status_badge("恢复录音已删除")
-            self._refresh_recovery()
-        else:
-            self._set_status_badge("没有找到这段恢复录音")
+        self._recovery_action_in_progress = True
+        self.recover_button.setEnabled(False)
+        self.delete_recovery_button.setEnabled(False)
+        self._set_status_badge("正在删除恢复录音")
+
+        def run():
+            try:
+                ok = bool(self._on_delete_recovery(str(session_id)))
+                result = {"ok": ok, "action": "delete"}
+            except Exception as error:
+                result = {"ok": False, "action": "delete", "error": str(error)}
+            self.recovery_finished.emit(result)
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-recovery-delete",
+            daemon=True,
+        ).start()
 
     def _copy_all_visible(self):
         texts = []
@@ -1269,9 +1532,7 @@ class _SettingsWindow(QMainWindow):
         if not texts:
             self._set_status_badge("无可复制")
             return
-        import pyperclip
-        pyperclip.copy("\n\n".join(texts))
-        self._set_status_badge("已复制")
+        self._copy_text("\n\n".join(texts))
 
     def _populate_language_options(self, engine, config):
         configured = (
@@ -1298,9 +1559,13 @@ class _SettingsWindow(QMainWindow):
         self.language_combo.blockSignals(False)
 
     def _run_doctor(self):
+        if self._doctor_in_progress:
+            return
+        self._doctor_in_progress = True
         self.doctor_summary.setText("正在检查 VoiceFlow…")
         self.doctor_list.clear()
         self.doctor_button.setEnabled(False)
+        self.diagnostics_action.setEnabled(False)
 
         def run():
             try:
@@ -1324,6 +1589,7 @@ class _SettingsWindow(QMainWindow):
 
     @Slot(object)
     def _finish_doctor(self, result):
+        self._doctor_in_progress = False
         self._last_diagnostics = result
         self.doctor_list.clear()
         labels = {
@@ -1362,6 +1628,7 @@ class _SettingsWindow(QMainWindow):
             else "发现需要处理的项目。请根据列表修复后再次检查。"
         )
         self.doctor_button.setEnabled(True)
+        self.diagnostics_action.setEnabled(True)
         self._set_status_badge(
             "检查完成" if ok else "需要处理",
             attention=not ok,
@@ -1396,10 +1663,7 @@ class _SettingsWindow(QMainWindow):
         if not self._last_diagnostics:
             self._set_status_badge("请先运行检查")
             return
-        import pyperclip
-
-        pyperclip.copy(format_diagnostics(self._last_diagnostics))
-        self._set_status_badge("诊断报告已复制")
+        self._copy_text(format_diagnostics(self._last_diagnostics))
 
     def _high_contrast_enabled(self):
         if os.name != "nt":
@@ -1732,6 +1996,9 @@ class OverlayWindow:
         self._on_preview_painted = None
         self._on_recover_session = None
         self._on_delete_recovery = None
+        self._on_read_history = None
+        self._on_delete_history = None
+        self._on_clear_history = None
         self._recording_feedback_lock = threading.Lock()
         self._pending_recording_feedback = None
         self._html_path = str(self.paths.install_resource("src/overlay.html"))
@@ -1761,6 +2028,9 @@ class OverlayWindow:
         on_preview_painted=None,
         on_recover_session=None,
         on_delete_recovery=None,
+        on_read_history=None,
+        on_delete_history=None,
+        on_clear_history=None,
     ):
         self._on_record_toggle = on_record_toggle
         self._on_copy_last = on_copy_last
@@ -1773,6 +2043,15 @@ class OverlayWindow:
         self._on_preview_painted = on_preview_painted
         self._on_recover_session = on_recover_session
         self._on_delete_recovery = on_delete_recovery
+        self._on_read_history = on_read_history
+        self._on_delete_history = on_delete_history
+        self._on_clear_history = on_clear_history
+        if self._settings_window is not None:
+            self._settings_window.set_history_actions(
+                read=on_read_history,
+                delete=on_delete_history,
+                clear=on_clear_history,
+            )
 
     def start(self, on_ready=None):
         self._on_ready = on_ready
@@ -2025,6 +2304,9 @@ class OverlayWindow:
                 on_repaste_text=self._on_output_text,
                 on_recover_session=self._on_recover_session,
                 on_delete_recovery=self._on_delete_recovery,
+                on_read_history=self._on_read_history,
+                on_delete_history=self._on_delete_history,
+                on_clear_history=self._on_clear_history,
                 paths=self.paths,
             )
         return self._settings_window
@@ -2032,7 +2314,10 @@ class OverlayWindow:
     def _show_settings(self):
         self._ensure_settings_window()
         self._settings_window.refresh()
-        self._settings_window.show()
+        if self._settings_window.isMinimized():
+            self._settings_window.showNormal()
+        else:
+            self._settings_window.show()
         self._settings_window.raise_()
         self._settings_window.activateWindow()
 

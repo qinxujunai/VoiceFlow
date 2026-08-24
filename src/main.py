@@ -252,6 +252,9 @@ class VoiceInputSystem:
             on_preview_painted=self._on_preview_painted,
             on_recover_session=self._recover_session,
             on_delete_recovery=self._recovery_store.delete,
+            on_read_history=self.history.read_recent,
+            on_delete_history=self.history.delete_entry,
+            on_clear_history=self.history.clear,
         )
         self.cleaner = TextCleaner(self.config, base_dir=self.base_dir)
         print("[启动] 就绪", flush=True)
@@ -375,6 +378,11 @@ class VoiceInputSystem:
             )
             finalizing_timer.daemon = True
             finalizing_timer.start()
+            if self._recovery_journal is not None:
+                self._recovery_journal.mark_state(
+                    "finalizing",
+                    preview_text=self._latest_text,
+                )
             teardown_started = time.perf_counter()
             try:
                 result = self.session.stop()
@@ -398,12 +406,6 @@ class VoiceInputSystem:
 
             total_samples = result.total_samples or len(data)
             duration = result.duration or (total_samples / self.audio.sample_rate)
-            if self._recovery_journal is not None:
-                self._recovery_journal.mark_state(
-                    "finalizing",
-                    preview_text=self._latest_text,
-                )
-
             transcription_started = time.perf_counter()
             final_result = self._transcribe_final_result(
                 data,

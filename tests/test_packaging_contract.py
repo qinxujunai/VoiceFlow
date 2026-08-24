@@ -408,6 +408,40 @@ def test_generated_icon_contains_common_windows_sizes():
     assert {(16, 16), (20, 20), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)} <= sizes
 
 
+def test_windows_icon_uses_the_normal_visual_footprint():
+    data = (ROOT / "assets" / "voiceflow.ico").read_bytes()
+    count = struct.unpack_from("<H", data, 4)[0]
+    for index in range(count):
+        width, height, _, _, _, _, _, offset = struct.unpack_from(
+            "<BBBBHHII", data, 6 + index * 16
+        )
+        width = 256 if width == 0 else width
+        height = 256 if height == 0 else height
+        if width != 256:
+            continue
+        header_size = struct.unpack_from("<I", data, offset)[0]
+        pixels = offset + header_size
+        active_x = [
+            x
+            for y in range(height)
+            for x in range(width)
+            if data[pixels + (y * width + x) * 4 + 3]
+        ]
+        footprint = (max(active_x) - min(active_x) + 1) / width
+        assert footprint >= 0.84
+        return
+    raise AssertionError("256px icon frame missing")
+
+
+def test_installer_creates_desktop_entry_by_default_with_explicit_icon():
+    installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
+
+    task_line = next(line for line in installer.splitlines() if 'Name: "desktopicon"' in line)
+    desktop_line = next(line for line in installer.splitlines() if 'Name: "{autodesktop}\\VoiceFlow"' in line)
+    assert "unchecked" not in task_line
+    assert 'IconFilename: "{app}\\{#MyAppExeName}"' in desktop_line
+
+
 def test_generated_icon_includes_macos_and_png_assets():
     icns = ROOT / "assets" / "voiceflow.icns"
     png = ROOT / "assets" / "voiceflow.png"

@@ -76,6 +76,7 @@ def _capture_settings(
     window = _SettingsWindow(paths=paths)
     window.refresh()
     window.show()
+    _wait(app, lambda: not window._refresh_in_progress)
     captures = []
     primary_pages = (
         (0, "home"),

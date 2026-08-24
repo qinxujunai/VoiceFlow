@@ -370,18 +370,19 @@ def test_settings_window_has_recent_history_copy_controls():
     settings_block = overlay[settings_idx:overlay_window_idx]
 
     assert "self.history_list = QListWidget()" in settings_block
-    assert "setItemWidget(item, self._history_card" in settings_block
+    assert "self._history_card(text, meta, entry_id)" in settings_block
     assert "self.search_box.setPlaceholderText(\"搜索最近转录\")" in settings_block
     assert "QPushButton(\"复制\")" in settings_block
     assert "QPushButton(\"再次粘贴\")" in settings_block
     assert "QPushButton(\"复制全部\")" in settings_block
     assert "copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))" in settings_block
     assert "meta_parts.append(f\"尾部 {tail}\")" in settings_block
-    assert "status = self._on_copy_text(text)" in settings_block
+    assert "self._run_history_action(text, self._on_copy_text" in settings_block
+    assert 'name="voiceflow-history-action"' in settings_block
     assert "label = self._output_status_label(status)" in settings_block
     assert "pyperclip.copy(text)" not in settings_block
-    assert "pyperclip.copy(\"\\n\\n\".join(texts))" in settings_block
-    assert "self._on_repaste_text(text)" in settings_block
+    assert "self._copy_text(\"\\n\\n\".join(texts))" in settings_block
+    assert "self._run_history_action(text, self._on_repaste_text" in settings_block
     assert "self._set_status_badge(\"无可复制\")" in settings_block
 
 

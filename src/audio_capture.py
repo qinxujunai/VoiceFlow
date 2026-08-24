@@ -5,6 +5,7 @@
 
 import os
 import queue
+import logging
 import threading
 import time
 from bisect import bisect_left, bisect_right
@@ -12,6 +13,9 @@ from bisect import bisect_left, bisect_right
 import numpy as np
 import sounddevice as sd
 import yaml
+
+
+logger = logging.getLogger(__name__)
 
 
 class AudioCapture:
@@ -47,6 +51,7 @@ class AudioCapture:
         self._last_total_samples = 0
         self._lock = threading.Lock()
         self._stream = None
+        self._stream_teardown_threads = []
         self._recording_start_time = None
         self._analysis_queue = None
         self._analysis_stop = None
@@ -64,6 +69,12 @@ class AudioCapture:
         """开始录音"""
         if self._is_recording:
             return
+
+        self._stream_teardown_threads = [
+            thread
+            for thread in self._stream_teardown_threads
+            if thread.is_alive()
+        ]
 
         with self._lock:
             self._audio_buffer = []
@@ -130,13 +141,7 @@ class AudioCapture:
         if self._is_recording:
             self.freeze_recording()
 
-        if self._stream is not None:
-            try:
-                self._stream.stop()
-                self._stream.close()
-            except Exception:
-                pass
-            self._stream = None
+        self._teardown_stream_async()
         self._stop_analysis_worker()
 
         with self._lock:
@@ -159,13 +164,7 @@ class AudioCapture:
         with self._lock:
             self._is_recording = False
             self._is_frozen = False
-        if self._stream is not None:
-            try:
-                self._stream.stop()
-                self._stream.close()
-            except Exception:
-                pass
-            self._stream = None
+        self._teardown_stream_async()
         self._stop_analysis_worker()
         with self._lock:
             self._audio_buffer = []
@@ -173,6 +172,43 @@ class AudioCapture:
             self._buffer_start_sample = 0
             self._total_samples = 0
         self._recording_start_time = None
+
+    def _teardown_stream_async(self):
+        """Detach the device before teardown so a driver cannot wedge VoiceFlow."""
+        stream = self._stream
+        self._stream = None
+        if stream is None:
+            return
+
+        def teardown():
+            started = time.perf_counter()
+            try:
+                stream.abort()
+            except Exception:
+                logger.exception("audio stream abort failed")
+            finally:
+                try:
+                    stream.close()
+                except Exception:
+                    logger.exception("audio stream close failed")
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                if elapsed_ms > 500:
+                    logger.warning(
+                        "audio stream teardown was slow: %.1fms",
+                        elapsed_ms,
+                    )
+
+        thread = threading.Thread(
+            target=teardown,
+            name="voiceflow-audio-teardown",
+            daemon=True,
+        )
+        teardown_threads = getattr(self, "_stream_teardown_threads", None)
+        if teardown_threads is None:
+            teardown_threads = []
+            self._stream_teardown_threads = teardown_threads
+        teardown_threads.append(thread)
+        thread.start()
 
     def set_silence_callback(self, callback):
         """设置静音超时回调"""

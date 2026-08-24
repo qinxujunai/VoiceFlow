@@ -114,6 +114,8 @@ def test_each_history_card_owns_copy_and_repaste_actions():
     assert 'QPushButton("复制全部")' in recent
     assert 'QPushButton("复制")' in card
     assert 'QPushButton("再次粘贴")' in card
+    assert 'QPushButton("删除")' in card
+    assert 'QPushButton("清空历史")' in recent
 
 
 def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
@@ -134,9 +136,9 @@ def test_history_actions_use_the_verified_delivery_callbacks():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert "pyperclip.copy" not in copy_action
-    assert "status = self._on_copy_text(text)" in copy_action
-    assert "status = self._on_repaste_text(text)" in repaste_action
-    assert "self._output_status_label(status)" in copy_action
+    assert "self._run_history_action(text, self._on_copy_text" in copy_action
+    assert "self._run_history_action(text, self._on_repaste_text" in repaste_action
+    assert "threading.Thread(" in repaste_action
     assert "self._output_status_label(status)" in repaste_action
     assert "return self.output_handler.copy_only(text)" in main
     assert "return self.output_handler.output(text)" in main
