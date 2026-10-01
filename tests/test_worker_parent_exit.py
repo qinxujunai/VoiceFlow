@@ -34,7 +34,8 @@ def worker(commands, events, heartbeat):
 if __name__ == "__main__":
     ctx = mp.get_context("spawn")
     commands, events = ctx.Queue(), ctx.Queue()
-    child = ctx.Process(target=worker, args=(commands, events, ctx.Value("d", 0)), daemon=True)
+    heartbeat = ctx.Value("d", 0)
+    child = ctx.Process(target=worker, args=(commands, events, heartbeat), daemon=True)
     child.start()
     assert events.get(timeout=15)["kind"] == "ready"
     Path(sys.argv[2]).write_text(str(child.pid))
