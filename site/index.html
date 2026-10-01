@@ -6,7 +6,7 @@
   <meta name="description" content="VoiceFlow 是 Windows 上的离线语音输入工具。按下 F2 说话，文字回到当前光标；不需要账户，也不上传录音。">
   <meta name="theme-color" content="#ffffff">
   <meta property="og:title" content="VoiceFlow — 离线语音输入">
-  <meta property="og:description" content="开口，文字就位。离线识别，常用输入框，剪贴板与本地恢复兜底。">
+  <meta property="og:description" content="开口，文字就位。离线识别，说完，接着写。，剪贴板与本地恢复兜底。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://qinxujunai.github.io/VoiceFlow/">
   <meta property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-demo.svg">
@@ -38,7 +38,7 @@
       </a>
       <nav aria-label="主要导航" data-i18n-aria="primaryNav">
         <a href="#values" data-i18n="navValues">产品</a>
-        <a href="#privacy" data-i18n="navPrivacy">隐私</a>
+        <a href="#privacy" data-i18n="navPrivacy">体验</a>
         <a href="https://github.com/qinxujunai/VoiceFlow" data-i18n="navGithub">GitHub</a>
       </nav>
       <div class="language-switch" role="group" aria-label="语言" data-i18n-aria="languageSwitch">
@@ -65,70 +65,40 @@
           </a>
         </div>
         <p class="compatibility" data-i18n="compatibility">Windows 10 / 11 · x64 · v__VOICEFLOW_VERSION__</p>
-        <p class="release-status" data-i18n="releaseStatus">完全离线 · 内置模型 · 无需登录</p>
+        <p class="release-status" data-i18n="releaseStatus">离线使用 · 无需登录</p>
       </div>
 
       <figure class="product-stage">
-        <img src="assets/voiceflow-demo.svg" alt="VoiceFlow 胶囊显示实时文字，终稿原位确认后安静消失" data-i18n-alt="demoAlt" data-i18n-src="demoSrc">
+        <img src="assets/voiceflow-demo.svg" alt="VoiceFlow 听写时显示文字，完成后收起" data-i18n-alt="demoAlt" data-i18n-src="demoSrc">
       </figure>
     </section>
 
     <section class="values" id="values" aria-label="VoiceFlow 核心价值" data-i18n-aria="valuesAria">
       <article>
-        <p class="value-label" data-i18n="valueOfflineLabel">声音不出电脑</p>
+        <p class="value-label" data-i18n="valueOfflineLabel">无需联网</p>
         <h2 data-i18n="valueOffline">完全离线</h2>
-        <p data-i18n="valueOfflineBody">无需账户，不上传录音；断开网络照常听写。</p>
+        <p data-i18n="valueOfflineBody">安装后即可离线听写。录音和识别都在你的电脑上完成。</p>
       </article>
       <article>
         <p class="value-label" data-i18n="valueEverywhereLabel">思路不中断</p>
-        <h2 data-i18n="valueEverywhere">常用输入框</h2>
-        <p data-i18n="valueEverywhereBody">停止时仍在普通应用，就发送一次粘贴；明确不可输入时自动保留在剪贴板。</p>
+        <h2 data-i18n="valueEverywhere">说完，接着写。</h2>
+        <p data-i18n="valueEverywhereBody">写邮件、记笔记、回消息。在输入框中按下 F2，说完再按一下。</p>
       </article>
       <article>
-        <p class="value-label" data-i18n="valueRecoveryLabel">交付有兜底</p>
-        <h2 data-i18n="valueRecovery">剪贴板与恢复</h2>
-        <p data-i18n="valueRecoveryBody">粘贴未落入输入框时，可从剪贴板或历史找回；复制受阻时保留临时恢复录音并提示失败。</p>
+        <p class="value-label" data-i18n="valueRecoveryLabel">随时回看</p>
+        <h2 data-i18n="valueRecovery">想法，有迹可循。</h2>
+        <p data-i18n="valueRecoveryBody">在本地历史中查看和复制听写内容。需要时，也可以手动粘贴。</p>
       </article>
-    </section>
-
-    <section class="next-release" id="next-release" aria-labelledby="next-title">
-      <div class="next-heading">
-        <p class="value-label" data-i18n="nextEyebrow">本版本 · 可靠性升级</p>
-        <h2 id="next-title" data-i18n="nextTitle">先保留结果，<br>再优化体验。</h2>
-        <p data-i18n="nextBody">v__VOICEFLOW_VERSION__ 聚焦长时间听写、真实剪贴板验证、焦点安全与崩溃恢复。优先验证交付与恢复，再优化速度与准确率。</p>
-      </div>
-      <div class="next-grid">
-        <article>
-          <span class="proof-number">01</span>
-          <h3 data-i18n="nextRecoveryTitle">校验后交付</h3>
-          <p data-i18n="nextRecoveryBody">先保存、再校验、后粘贴。停止时仍在普通应用，就发送一次粘贴；明确受限时保留剪贴板。</p>
-        </article>
-        <article>
-          <span class="proof-number">02</span>
-          <h3 data-i18n="nextBilingualTitle">诚实的中英模型</h3>
-          <p data-i18n="nextBilingualBody">默认安装已经包含完整离线识别能力，无需下载或切换模型；内部候选只有通过同机质量门槛后才会进入产品决策。</p>
-        </article>
-        <article class="evidence-card">
-          <span class="evidence-badge" data-i18n="evidenceBadge">发布前验证</span>
-          <h3 data-i18n="evidenceTitle">不是演示，是发布门槛</h3>
-          <dl>
-            <div><dt data-i18n="metricLatency">快捷键序列</dt><dd>10,000</dd></div>
-            <div><dt data-i18n="metricCer">录音生命周期</dt><dd>500</dd></div>
-            <div><dt data-i18n="metricMemory">验证范围</dt><dd data-i18n="metricScopeValue">全量</dd></div>
-          </dl>
-          <p class="evidence-note" data-i18n="evidenceNote">这些是工程压力与回归测试，不等同于自然语料准确率；未完成的准确率证据不会写成宣传结论。</p>
-        </article>
-      </div>
     </section>
 
     <section class="privacy" id="privacy">
       <div class="privacy-copy">
         <p class="privacy-kicker" data-i18n="privacyEyebrow">为安静的工作流而设计</p>
-        <h2 data-i18n="privacyTitle">只在需要时出现。<br>完成后，继续做你的事。</h2>
+        <h2 data-i18n="privacyTitle">只在需要时出现。</h2>
       </div>
       <div class="privacy-detail">
         <p data-i18n="privacyBody">
-          小胶囊负责告诉你正在听。停止说话后，完整结果先进入剪贴板，再回到当前光标，并保存在本地历史中。
+          录音时，小胶囊显示正在识别的文字。完成后自动收起，让你继续眼前的事。
         </p>
         <a class="privacy-link" href="https://github.com/qinxujunai/VoiceFlow/blob/master/README.md#隐私与联网" data-i18n="privacyLink" data-i18n-href="privacyHref">
           了解隐私与联网
