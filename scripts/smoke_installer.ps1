@@ -236,6 +236,15 @@ try {
         Start-Sleep -Milliseconds 100
     }
     if ($null -eq $state) {
+        if (Test-Path -LiteralPath $runtimeState) {
+            Write-Output "Runtime state at startup failure:"
+            Get-Content -LiteralPath $runtimeState
+        }
+        $runtimeLog = Join-Path $smokeDataDir "logs\runtime.jsonl"
+        if (Test-Path -LiteralPath $runtimeLog) {
+            Write-Output "Isolated installer-smoke runtime log:"
+            Get-Content -LiteralPath $runtimeLog -Tail 20
+        }
         throw "Installed VoiceFlow did not reach runtime ready state"
     }
     if ($state.runtime_mode -ne "frozen") {
