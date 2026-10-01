@@ -104,6 +104,7 @@ def test_help_and_settings_labels_are_short_and_task_oriented():
     assert 'help_menu.addAction("关于 VoiceFlow")' in shell
     assert 'self.help_button = QPushButton("帮助")' in shell
     assert '"听写",\n                "选择语言、麦克风和启动方式。"' in settings
+    assert 'self.check_update_button = QPushButton("检查更新")' in source
 
 
 def test_each_history_card_owns_copy_and_repaste_actions():
@@ -118,6 +119,7 @@ def test_each_history_card_owns_copy_and_repaste_actions():
     assert 'QPushButton("再次粘贴")' in card
     assert 'QPushButton("删除")' in card
     assert 'QPushButton("清空历史")' in recent
+    assert 'QPushButton("清除本机数据")' in recent
 
 
 def test_ui_evidence_captures_the_current_sidebar_order():

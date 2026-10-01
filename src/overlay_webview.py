@@ -38,7 +38,8 @@ from settings_store import (
     update_runtime_settings,
 )
 from runtime_paths import AppPaths, RuntimeMode
-from version import display_version
+from version import APP_VERSION, display_version
+from update_checker import check_latest_release
 from runtime_services import (
     ModelManager,
     ModelState,
@@ -113,6 +114,7 @@ class _SettingsWindow(QMainWindow):
     history_refresh_finished = Signal(object)
     history_action_finished = Signal(object)
     history_mutation_finished = Signal(object)
+    update_finished = Signal(object)
 
     def __init__(
         self,
@@ -123,6 +125,7 @@ class _SettingsWindow(QMainWindow):
         on_read_history=None,
         on_delete_history=None,
         on_clear_history=None,
+        on_clear_local_data=None,
         on_restore_history=None,
         controller=None,
         paths=None,
@@ -143,6 +146,7 @@ class _SettingsWindow(QMainWindow):
         self._on_read_history = on_read_history
         self._on_delete_history = on_delete_history
         self._on_clear_history = on_clear_history
+        self._on_clear_local_data = on_clear_local_data
         self._on_restore_history = on_restore_history
         self._history_undo_token = None
         self._history_undo_generation = 0
@@ -251,11 +255,20 @@ class _SettingsWindow(QMainWindow):
         self.history_refresh_finished.connect(self._finish_history_refresh)
         self.history_action_finished.connect(self._finish_history_action)
         self.history_mutation_finished.connect(self._finish_history_mutation)
+        self.update_finished.connect(self._finish_update_check)
 
-    def set_history_actions(self, read=None, delete=None, clear=None, restore=None):
+    def set_history_actions(
+        self,
+        read=None,
+        delete=None,
+        clear=None,
+        restore=None,
+        clear_local_data=None,
+    ):
         self._on_read_history = read
         self._on_delete_history = delete
         self._on_clear_history = clear
+        self._on_clear_local_data = clear_local_data
         self._on_restore_history = restore
 
     def set_trial_result(self, text):
@@ -444,6 +457,9 @@ class _SettingsWindow(QMainWindow):
         clear_history = QPushButton("清空历史")
         clear_history.clicked.connect(self._clear_history)
         toolbar.addWidget(clear_history)
+        clear_local_data = QPushButton("清除本机数据")
+        clear_local_data.clicked.connect(self._clear_local_data)
+        toolbar.addWidget(clear_local_data)
         self.undo_history_button = QPushButton("撤销删除")
         self.undo_history_button.setObjectName("textButton")
         self.undo_history_button.setVisible(False)
@@ -725,8 +741,52 @@ class _SettingsWindow(QMainWindow):
         actions.addWidget(open_licenses)
         actions.addStretch(1)
         layout.addLayout(actions)
+
+        update_row = QHBoxLayout()
+        self.check_update_button = QPushButton("检查更新")
+        self.check_update_button.clicked.connect(self._check_for_update)
+        self.update_status = QLabel("仅在点击后检查；日常运行不会联网。")
+        self.update_status.setObjectName("sectionSubtitle")
+        self.update_status.setWordWrap(True)
+        update_row.addWidget(self.check_update_button)
+        update_row.addWidget(self.update_status, 1)
+        layout.addLayout(update_row)
         layout.addStretch(1)
         return page
+
+    def _check_for_update(self):
+        if getattr(self, "_update_check_in_progress", False):
+            return
+        self._update_check_in_progress = True
+        self.check_update_button.setEnabled(False)
+        self.update_status.setText("正在核对稳定 Release 和 SHA-256…")
+
+        def run():
+            result = check_latest_release(APP_VERSION)
+            self.update_finished.emit(result.as_dict())
+
+        threading.Thread(
+            target=run,
+            name="voiceflow-update-check",
+            daemon=True,
+        ).start()
+
+    @Slot(object)
+    def _finish_update_check(self, result):
+        self._update_check_in_progress = False
+        self.check_update_button.setEnabled(True)
+        state = result.get("state")
+        if state == "available":
+            url = result.get("installer_url", "")
+            self.update_status.setText(
+                f"{result.get('message', '发现新版本')} "
+                f"<a href=\"{url}\">下载 VoiceFlow {result.get('latest_version', '')}</a>"
+            )
+            self.update_status.setOpenExternalLinks(True)
+        else:
+            self.update_status.setText(
+                result.get("message", "更新检查未完成")
+            )
 
     def refresh(self):
         if self._refresh_in_progress or self._history_refresh_in_progress:
@@ -1313,6 +1373,20 @@ class _SettingsWindow(QMainWindow):
         self._clear_history_undo()
         self._run_history_mutation("clear")
 
+    def _clear_local_data(self):
+        if not self._on_clear_local_data or self._history_action_in_progress:
+            self._set_status_badge("暂时无法清除本机数据", attention=True)
+            return
+        answer = QMessageBox.question(
+            self,
+            "清除本机听写数据",
+            "将永久删除本地历史和未交付录音，不会删除配置、词典或模型。继续吗？",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._clear_history_undo()
+        self._run_history_mutation("clear_local")
+
     def _undo_history_delete(self):
         token = self._history_undo_token
         if token is None or not self._on_restore_history:
@@ -1338,6 +1412,12 @@ class _SettingsWindow(QMainWindow):
                 undo_token = None
                 if action == "clear":
                     changed = int(self._on_clear_history())
+                elif action == "clear_local":
+                    result = self._on_clear_local_data()
+                    changed = int(
+                        result.get("history_entries", 0)
+                        + result.get("recovery_sessions", 0)
+                    )
                 elif action == "restore":
                     changed = int(bool(self._on_restore_history(token)))
                 else:
@@ -1385,6 +1465,8 @@ class _SettingsWindow(QMainWindow):
             self._set_status_badge("历史已删除，可撤销")
         elif action == "restore":
             self._set_status_badge("已恢复")
+        elif action == "clear_local":
+            self._set_status_badge("本机听写数据已清除")
         else:
             self._set_status_badge("历史已清空")
         self._refresh_history()
@@ -2052,6 +2134,9 @@ class OverlayWindow:
         self._on_read_history = controller.read_history if controller else None
         self._on_delete_history = controller.delete_history if controller else None
         self._on_clear_history = controller.clear_history if controller else None
+        self._on_clear_local_data = (
+            controller.clear_local_data if controller else None
+        )
         self._on_restore_history = controller.restore_history if controller else None
         self._recording_feedback_lock = threading.Lock()
         self._pending_recording_feedback = None
@@ -2093,6 +2178,7 @@ class OverlayWindow:
         on_read_history=None,
         on_delete_history=None,
         on_clear_history=None,
+        on_clear_local_data=None,
         on_restore_history=None,
     ):
         self._on_record_toggle = on_record_toggle
@@ -2109,12 +2195,14 @@ class OverlayWindow:
         self._on_read_history = on_read_history
         self._on_delete_history = on_delete_history
         self._on_clear_history = on_clear_history
+        self._on_clear_local_data = on_clear_local_data
         self._on_restore_history = on_restore_history
         if self._settings_window is not None:
             self._settings_window.set_history_actions(
                 read=on_read_history,
                 delete=on_delete_history,
                 clear=on_clear_history,
+                clear_local_data=on_clear_local_data,
                 restore=on_restore_history,
             )
 
@@ -2404,6 +2492,7 @@ class OverlayWindow:
                 on_read_history=self._on_read_history,
                 on_delete_history=self._on_delete_history,
                 on_clear_history=self._on_clear_history,
+                on_clear_local_data=self._on_clear_local_data,
                 on_restore_history=self._on_restore_history,
                 controller=self.controller,
                 paths=self.paths,

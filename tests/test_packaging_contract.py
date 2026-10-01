@@ -279,10 +279,10 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
 def test_windows_executable_has_product_version_metadata():
     version = (ROOT / "assets" / "version_info.txt").read_text(encoding="utf-8")
 
-    assert "filevers=(0, 3, 3, 1)" in version
-    assert "prodvers=(0, 3, 3, 1)" in version
-    assert "StringStruct('FileVersion', '0.3.3.1')" in version
-    assert "StringStruct('ProductVersion', '0.3.3+261001.1')" in version
+    assert "filevers=(0, 3, 4, 1)" in version
+    assert "prodvers=(0, 3, 4, 1)" in version
+    assert "StringStruct('FileVersion', '0.3.4.1')" in version
+    assert "StringStruct('ProductVersion', '0.3.4+261001.2')" in version
     assert "StringStruct('OriginalFilename', 'VoiceFlow.exe')" in version
 
 
@@ -294,27 +294,27 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
         encoding="utf-8"
     )
 
-    assert 'APP_VERSION = "0.3.3"' in application
-    assert 'BUILD_ID = "261001.1"' in application
+    assert 'APP_VERSION = "0.3.4"' in application
+    assert 'BUILD_ID = "261001.2"' in application
     assert "display_version()" in overlay
-    assert '#define MyAppVersion "0.3.3"' in installer
-    assert '#define MyAppBuildId "261001.1"' in installer
-    assert "VersionInfoVersion=0.3.3.1" in installer
-    assert "0.3.3+261001.1" in version_info
+    assert '#define MyAppVersion "0.3.4"' in installer
+    assert '#define MyAppBuildId "261001.2"' in installer
+    assert "VersionInfoVersion=0.3.4.1" in installer
+    assert "0.3.4+261001.2" in version_info
 
 
 def test_release_notes_installer_and_checksum_are_consistent():
-    notes = (ROOT / "release" / "v0.3.3" / "RELEASE_NOTES.md").read_text(
+    notes = (ROOT / "release" / "v0.3.4" / "RELEASE_NOTES.md").read_text(
         encoding="utf-8"
     )
 
-    version = "0.3.3"
+    version = "0.3.4"
     installer_name = f"VoiceFlow-{version}-Windows-x64.exe"
     assert f"# VoiceFlow {version}" in notes
     assert installer_name in notes
     assert "SHA256SUMS.txt" in notes
     assert not re.search(r"SHA-256：`[A-F0-9]{64}`", notes)
-    assert "build 261001.1" in notes
+    assert "build 261001.2" in notes
 
 
 def test_development_audio_samples_are_explicitly_excluded_from_the_installer():
@@ -387,6 +387,9 @@ def test_release_uses_pyside6_lgpl_runtime_instead_of_pyqt_gpl():
     assert "PyQt5" not in hidden_imports
     assert '"PyQt6"' in spec and '"PyQt5"' in spec
     assert 'QT_BINDING = "PySide6"' in compatibility
+    assert 'pyinstaller_qt_runtime_hook.py' in spec
+    assert '"icuuc.dll", "icudt78.dll"' in spec
+    assert "_prepare_frozen_qt_dll_search" in compatibility
 
 
 def test_release_bundles_offline_silero_vad_asset():

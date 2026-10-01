@@ -65,7 +65,9 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[
+        str(PROJECT_ROOT / "scripts" / "pyinstaller_qt_runtime_hook.py"),
+    ],
     excludes=[
         "matplotlib",
         "pandas",
@@ -80,6 +82,15 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+# PyInstaller may discover an ICU pair from an unrelated host tool such as
+# Poppler. Qt6Core expects the Windows ICU ABI; bundling that host pair makes
+# the frozen app fail with WinError 127 before user data is initialized.
+a.binaries = [
+    entry
+    for entry in a.binaries
+    if Path(entry[0]).name.lower() not in {"icuuc.dll", "icudt78.dll"}
+]
 
 pyz = PYZ(a.pure)
 

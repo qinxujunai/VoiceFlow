@@ -29,6 +29,18 @@ The installer includes the default offline model and does not require Python.
 
 Requirements: Windows 10 / 11 x64 and a working microphone.
 
+### Updates and local data
+
+VoiceFlow never checks for updates or connects in the background. To upgrade,
+open Settings from the tray, choose “About VoiceFlow,” and click “Check for
+updates.” A download link appears only when the matching GitHub Release
+contains both the versioned installer and `SHA256SUMS.txt`, with a unique
+checksum entry for that installer. Running the installer preserves the
+configuration, vocabulary, and models under `%LOCALAPPDATA%\VoiceFlow`.
+“Clear local data” on the History page requires confirmation and removes local
+dictation history plus undelivered recovery recordings while keeping those
+settings.
+
 ## Controls
 
 | Key | Action |
@@ -75,8 +87,9 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
 - [Model strategy and admission decision](docs/model-strategy.md)
 - [Product quality standard](docs/product-quality-standard.md)
-- [0.3.3 release verification evidence](docs/release-evidence-0.3.3.md)
+- [0.3.4 release verification evidence](docs/release-evidence-0.3.4.md)
 - [Runtime and user-data boundary](docs/runtime-boundary.md)
+- [Upgrade and local-data contract](docs/upgrade-and-data-contract.md)
 - [Release checklist](docs/release-checklist.md)
 
 VoiceFlow source code is available under the [MIT License](LICENSE). Models and
