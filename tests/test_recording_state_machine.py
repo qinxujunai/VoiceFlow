@@ -48,7 +48,11 @@ def test_cancel_returns_recording_to_idle_without_completed_cycle():
 
     assert state.claim_start() is True
     assert state.claim_cancel() is True
-
+    assert state.current is RecordingState.CANCELING
+    assert not state.claim_start()
+    with state.idle_operation() as claimed:
+        assert not claimed
+    assert state.complete_cancel()
     assert state.current is RecordingState.IDLE
     assert state.completed_cycles == 0
 

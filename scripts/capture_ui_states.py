@@ -88,6 +88,7 @@ def _capture_settings(
         window.sidebar.setCurrentRow(row)
         for _ in range(5):
             app.processEvents()
+            time.sleep(0.01)
         captures.append(_save_widget(window, output_dir / f"settings-{name}.png"))
     for index, name in ((4, "diagnostics"), (5, "about")):
         window._show_aux_page(index)
@@ -95,6 +96,7 @@ def _capture_settings(
             window._finish_doctor(run_runtime_diagnostics(window.paths))
         for _ in range(5):
             app.processEvents()
+            time.sleep(0.01)
         captures.append(_save_widget(window, output_dir / f"settings-{name}.png"))
     window.close()
     return captures

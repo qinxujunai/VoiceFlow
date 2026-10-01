@@ -32,6 +32,7 @@ def stress_state_machine(cycles: int = 10_000) -> dict:
         assert machine.claim_start()
         if rng.random() < 0.04:
             assert machine.claim_cancel()
+            assert machine.complete_cancel()
             outcomes["cancel"] += 1
             continue
         assert machine.mark_recording()

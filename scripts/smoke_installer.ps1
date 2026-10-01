@@ -1,5 +1,6 @@
 param(
     [string]$InstallerPath = "",
+    [string]$PreviousInstallerPath = "",
     [int]$StartupSeconds = 30,
     [switch]$RequireStreamingPreview
 )
@@ -56,6 +57,36 @@ function Remove-SmokeRoot {
 }
 
 try {
+    $env:LOCALAPPDATA = $localAppData
+    $smokeDataDir = Join-Path $localAppData "VoiceFlow"
+    $previousInstaller = if ($PreviousInstallerPath) {
+        (Resolve-Path -LiteralPath $PreviousInstallerPath).Path
+    } else {
+        $resolvedInstaller
+    }
+    $previousInstall = Start-Process `
+        -FilePath $previousInstaller `
+        -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS",
+            "/DIR=$installRoot"
+        ) `
+        -WindowStyle Hidden -Wait -PassThru
+    if ($previousInstall.ExitCode -ne 0) {
+        throw "Previous installer exited with code $($previousInstall.ExitCode)"
+    }
+    $null = New-Item -ItemType Directory -Path (Join-Path $smokeDataDir "logs") -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $smokeDataDir "knowledge-base") -Force
+    $preservedFiles = @{
+        "config.yaml" = (Get-Content -LiteralPath (Join-Path $installRoot "config.yaml") -Raw)
+        "knowledge-base\user-dictionary.txt" = "UpgradeSentinelTerm"
+        "logs\history.jsonl" = '{"timestamp":"2026-10-01T00:00:00","clean_text":"upgrade sentinel","session_id":"upgrade-sentinel"}'
+    }
+    $preservedHashes = @{}
+    foreach ($relative in $preservedFiles.Keys) {
+        $target = Join-Path $smokeDataDir $relative
+        Set-Content -LiteralPath $target -Value $preservedFiles[$relative] -Encoding utf8
+        $preservedHashes[$relative] = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    }
     $install = Start-Process `
         -FilePath $resolvedInstaller `
         -ArgumentList @(
@@ -70,6 +101,12 @@ try {
         -PassThru
     if ($install.ExitCode -ne 0) {
         throw "Installer exited with code $($install.ExitCode)"
+    }
+    foreach ($relative in $preservedHashes.Keys) {
+        $actual = (Get-FileHash -LiteralPath (Join-Path $smokeDataDir $relative) -Algorithm SHA256).Hash
+        if ($actual -ne $preservedHashes[$relative]) {
+            throw "Upgrade modified user data: $relative"
+        }
     }
 
     $required = @(
@@ -206,6 +243,12 @@ try {
     }
     if ($RequireStreamingPreview -and $state.preview_asr -ne "ready") {
         throw "Installed VoiceFlow streaming preview did not become ready"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $smokeDataDir "logs\history.jsonl") -SimpleMatch "upgrade sentinel" -Quiet)) {
+        throw "First startup lost preserved history"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $smokeDataDir "knowledge-base\user-dictionary.txt") -SimpleMatch "UpgradeSentinelTerm" -Quiet)) {
+        throw "First startup lost preserved vocabulary"
     }
 
     Stop-Process -Id $appProcess.Id -Force

@@ -186,7 +186,7 @@ class VoiceInputSystem:
             on_recording_painted=self._on_recording_painted,
             on_preview_painted=self._on_preview_painted,
             on_recover_session=self._recover_session,
-            on_delete_recovery=self._recovery_store.delete,
+            on_delete_recovery=self._delete_recovery_session,
             on_read_history=self.history.read_recent,
             on_delete_history=self.history.delete_entry_with_undo,
             on_clear_history=self.history.clear,
@@ -199,12 +199,21 @@ class VoiceInputSystem:
         self.controller.set_status_sink(self._show_controller_status)
 
     def _clear_local_dictation_data(self):
-        history_count = int(self.history.clear())
-        recovery_count = len(self._recovery_store.clear_all())
-        return {
-            "history_entries": history_count,
-            "recovery_sessions": recovery_count,
-        }
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                raise RuntimeError("请先结束当前听写或恢复操作，再清除本机数据")
+            history_count = int(self.history.clear())
+            recovery_count = len(self._recovery_store.clear_all())
+            return {
+                "history_entries": history_count,
+                "recovery_sessions": recovery_count,
+            }
+
+    def _delete_recovery_session(self, session_id):
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                raise RuntimeError("请先结束当前听写或恢复操作，再删除录音")
+            return self._recovery_store.delete(session_id)
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
@@ -1189,33 +1198,45 @@ class VoiceInputSystem:
     def _on_record_cancel(self):
         should_cancel = self._recording_state.claim_cancel()
         if should_cancel:
-            self._stop_streaming()
-            self.session.cancel()
-            self.audio.set_recovery_sink(None)
-            if self._recovery_journal is not None:
-                self._recovery_journal.close_without_recovery()
-                self._recovery_journal = None
-            self._active_session_id = None
-            self._target_snapshot = None
-            self._trial_session = False
-            if hasattr(self, "output_handler"):
-                self.output_handler.cancel_target_tracking()
-            self.overlay.show_canceled()
-            self.overlay.hide_after(800)
             try:
-                self.audio.prepare()
+                self._stop_streaming()
+                self.session.cancel()
+                self.audio.set_recovery_sink(None)
+                if self._recovery_journal is not None:
+                    self._recovery_journal.close_without_recovery()
+                    self._recovery_journal = None
+                self._active_session_id = None
+                self._target_snapshot = None
+                self._trial_session = False
+                if hasattr(self, "output_handler"):
+                    self.output_handler.cancel_target_tracking()
+                self.overlay.show_canceled()
+                self.overlay.hide_after(800)
+                try:
+                    self.audio.prepare()
+                except Exception as error:
+                    self.controller.mark_degraded(
+                        str(error),
+                        error_code="audio_worker_restart_failed",
+                    )
+                else:
+                    self.controller.mark_ready(
+                        preview_ready=self.preview_transcriber is not None,
+                        worker_pid=getattr(self.transcriber, "worker_pid", None),
+                        worker_pids=self._worker_pids(),
+                        last_heartbeat=self._oldest_worker_heartbeat(),
+                    )
             except Exception as error:
+                self._recording_state.mark_error()
                 self.controller.mark_degraded(
-                    str(error),
-                    error_code="audio_worker_restart_failed",
+                    "取消录音失败，请退出并重新启动 VoiceFlow",
+                    error_code="recording_cancel_failed",
                 )
-            else:
-                self.controller.mark_ready(
-                    preview_ready=self.preview_transcriber is not None,
-                    worker_pid=getattr(self.transcriber, "worker_pid", None),
-                    worker_pids=self._worker_pids(),
-                    last_heartbeat=self._oldest_worker_heartbeat(),
-                )
+                self.overlay.show_error("取消失败，请重新启动")
+                logger.exception("recording cancellation failed")
+                raise
+            finally:
+                self._recording_state.complete_cancel()
         print("[录音] 已取消", flush=True)
 
     def _copy_last_text(self):
@@ -1243,8 +1264,12 @@ class VoiceInputSystem:
         return "empty"
 
     def _recover_session(self, session_id):
-        if self._recording_state.current is not RecordingState.IDLE:
-            return {"ok": False, "error": "请先结束当前听写"}
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                return {"ok": False, "error": "请先结束当前听写或数据操作"}
+            return self._recover_idle_session(session_id)
+
+    def _recover_idle_session(self, session_id):
         audio = self._recovery_store.read_pcm(session_id)
         if not len(audio):
             return {"ok": False, "error": "恢复录音不存在或为空"}

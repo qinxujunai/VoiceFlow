@@ -170,9 +170,32 @@ jobs:
               Remove-Item -LiteralPath $certificatePath -Force
             }
           }
-      - name: Smoke installer lifecycle
+      - name: Verify previous stable installer for upgrade smoke
         shell: pwsh
-        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $previous = (gh release view --repo $env:GITHUB_REPOSITORY --json tagName | ConvertFrom-Json).tagName
+          if ($LASTEXITCODE -ne 0 -or -not ($previous -match '^v\d+\.\d+\.\d+$')) {
+            throw "Could not identify previous stable release"
+          }
+          $directory = Join-Path $env:RUNNER_TEMP "previous-voiceflow-release"
+          gh release download $previous --repo $env:GITHUB_REPOSITORY --dir $directory `
+            --pattern "VoiceFlow-*-Windows-x64.exe" --pattern "SHA256SUMS.txt"
+          if ($LASTEXITCODE -ne 0) { throw "Could not download previous release" }
+          $name = "VoiceFlow-$($previous.TrimStart('v'))-Windows-x64.exe"
+          $installer = Join-Path $directory $name
+          $matching = @(Get-Content -LiteralPath (Join-Path $directory "SHA256SUMS.txt") | Where-Object {
+            $_ -match ('^([0-9a-fA-F]{64})\s+[* ]?' + [regex]::Escape($name) + '\s*$')
+          })
+          if ($matching.Count -ne 1) { throw "Previous installer checksum is not unique" }
+          $expected = ($matching[0] -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Previous installer checksum mismatch" }
+          "PREVIOUS_INSTALLER=$installer" >> $env:GITHUB_ENV
+      - name: Smoke installer lifecycle and previous-version upgrade
+        shell: pwsh
+        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview -PreviousInstallerPath $env:PREVIOUS_INSTALLER
       - name: Generate checksums, SBOM, and notices
         shell: pwsh
         run: |
