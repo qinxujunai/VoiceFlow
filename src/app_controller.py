@@ -61,6 +61,7 @@ class AppController:
         on_read_history: Callable | None = None,
         on_delete_history: Callable | None = None,
         on_clear_history: Callable | None = None,
+        on_clear_local_data: Callable | None = None,
         on_restore_history: Callable | None = None,
         on_status: Callable[[str], None] | None = None,
         build_id: str = "",
@@ -98,6 +99,7 @@ class AppController:
             "read_history": on_read_history,
             "delete_history": on_delete_history,
             "clear_history": on_clear_history,
+            "clear_local_data": on_clear_local_data,
             "restore_history": on_restore_history,
         }
         self._action_in_flight = False
@@ -260,6 +262,9 @@ class AppController:
 
     def clear_history(self):
         return self._call("clear_history")
+
+    def clear_local_data(self):
+        return self._call("clear_local_data")
 
     def restore_history(self, token):
         return self._call("restore_history", token)

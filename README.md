@@ -28,6 +28,14 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 
 系统要求：Windows 10 / 11 x64、可用麦克风。
 
+### 更新与本地数据
+
+VoiceFlow 不会在后台联网或静默更新。需要升级时，在托盘菜单打开设置，进入
+“关于 VoiceFlow”并点击“检查更新”；只有 GitHub Release 同时提供匹配版本的
+安装包和 `SHA256SUMS.txt`，且校验文件明确包含该安装包摘要时，界面才会显示下载链接。
+运行安装包升级不会删除 `%LOCALAPPDATA%\VoiceFlow` 中的配置、词典和模型。
+历史页的“清除本机数据”会在确认后删除本地听写历史和未交付录音，不会删除这些设置。
+
 ## 使用
 
 | 按键 | 行为 |
@@ -71,8 +79,9 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
 - [模型策略与准入结论](docs/model-strategy.md)
 - [产品质量标准](docs/product-quality-standard.md)
-- [0.3.3 发布验证证据](docs/release-evidence-0.3.3.md)
+- [0.3.4 发布验证证据](docs/release-evidence-0.3.4.md)
 - [运行时与用户数据边界](docs/runtime-boundary.md)
+- [更新与本地数据契约](docs/upgrade-and-data-contract.md)
 - [发布检查清单](docs/release-checklist.md)
 
 项目代码基于 [MIT License](LICENSE) 开源。模型及第三方组件遵循各自许可证：

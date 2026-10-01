@@ -244,6 +244,27 @@ class RecoverySessionStore:
         shutil.rmtree(session.session_dir, ignore_errors=True)
         return not session.session_dir.exists()
 
+    def clear_all(self) -> tuple[str, ...]:
+        """Delete every local recovery directory, including malformed journals."""
+        removed: list[str] = []
+        failures: list[str] = []
+        if not self.root.is_dir():
+            return ()
+        for session_dir in tuple(self.root.iterdir()):
+            if not session_dir.is_dir() or session_dir.is_symlink():
+                continue
+            try:
+                shutil.rmtree(session_dir)
+            except OSError:
+                failures.append(session_dir.name)
+            else:
+                removed.append(session_dir.name)
+        if failures:
+            raise OSError(
+                "无法删除恢复录音目录：" + ", ".join(sorted(failures))
+            )
+        return tuple(removed)
+
     def _find_exact(self, session_id: str) -> RecoverableSession | None:
         expected = str(session_id)
         return next(

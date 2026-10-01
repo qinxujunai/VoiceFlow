@@ -190,12 +190,21 @@ class VoiceInputSystem:
             on_read_history=self.history.read_recent,
             on_delete_history=self.history.delete_entry_with_undo,
             on_clear_history=self.history.clear,
+            on_clear_local_data=self._clear_local_dictation_data,
             on_restore_history=self.history.restore_entry,
             build_id=BUILD_ID,
             runtime_state_path=self.paths.schema_file,
         )
         self.overlay = OverlayWindow(self.paths, controller=self.controller)
         self.controller.set_status_sink(self._show_controller_status)
+
+    def _clear_local_dictation_data(self):
+        history_count = int(self.history.clear())
+        recovery_count = len(self._recovery_store.clear_all())
+        return {
+            "history_entries": history_count,
+            "recovery_sessions": recovery_count,
+        }
 
     def _init_modules(self):
         print("[启动] 音频...", flush=True)
