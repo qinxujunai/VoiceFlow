@@ -285,10 +285,6 @@ a:focus-visible {
   font-size: 14px;
 }
 
-.next-heading .value-label {
-  color: #0066cc;
-}
-
 .values h2 {
   margin: 0 0 10px;
   font-size: 27px;
@@ -300,114 +296,6 @@ a:focus-visible {
   color: var(--ink-secondary);
   font-size: 16px;
   line-height: 1.6;
-}
-
-.next-release {
-  width: min(var(--stage-width), calc(100% - 56px));
-  margin: 116px auto 0;
-  padding: 88px 92px 92px;
-  border-radius: 48px;
-  background: #f5f5f7;
-}
-
-.next-heading {
-  max-width: 780px;
-}
-
-.next-heading h2 {
-  margin: 10px 0 24px;
-  font-size: clamp(42px, 4.5vw, 62px);
-  letter-spacing: -0.052em;
-  line-height: 1.08;
-}
-
-.next-heading > p:last-child {
-  max-width: 720px;
-  margin: 0;
-  color: var(--ink-secondary);
-  font-size: 18px;
-  line-height: 1.68;
-}
-
-.next-grid {
-  margin-top: 58px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.next-grid article {
-  min-height: 218px;
-  padding: 30px 32px;
-  border: 1px solid rgba(29, 29, 31, 0.1);
-  border-radius: 28px;
-  background: #fff;
-}
-
-.proof-number,
-.evidence-badge {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.evidence-card .evidence-badge {
-  color: #66b2ff;
-}
-
-.next-grid h3 {
-  margin: 34px 0 10px;
-  font-size: 27px;
-  letter-spacing: -0.035em;
-}
-
-.next-grid p {
-  margin: 0;
-  color: var(--ink-secondary);
-  font-size: 16px;
-  line-height: 1.62;
-}
-
-.next-grid .evidence-card {
-  grid-column: 1 / -1;
-  min-height: 0;
-  background: #111113;
-  color: #f5f5f7;
-}
-
-.evidence-card h3 {
-  margin-top: 12px;
-}
-
-.evidence-card dl {
-  margin: 26px 0 20px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  overflow: hidden;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.evidence-card dl div {
-  padding: 22px;
-  background: #1c1c1e;
-}
-
-.evidence-card dt {
-  color: #a1a1a6;
-  font-size: 13px;
-}
-
-.evidence-card dd {
-  margin: 5px 0 0;
-  font-size: 25px;
-  font-weight: 650;
-}
-
-.evidence-card .evidence-note {
-  color: #a1a1a6;
-  font-size: 14px;
 }
 
 .privacy {
@@ -509,10 +397,6 @@ footer > div {
     padding: 72px 64px 76px;
   }
 
-  .next-release {
-    padding: 72px 64px 76px;
-  }
-
   footer {
     grid-template-columns: 1fr auto;
   }
@@ -610,30 +494,6 @@ footer > div {
     gap: 38px;
     padding: 54px 28px 58px;
     border-radius: 32px;
-  }
-
-  .next-release {
-    width: calc(100% - 36px);
-    margin-top: 78px;
-    padding: 54px 28px 58px;
-    border-radius: 32px;
-  }
-
-  .next-heading h2 {
-    font-size: 36px;
-    overflow-wrap: anywhere;
-  }
-
-  .next-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .next-grid .evidence-card {
-    grid-column: auto;
-  }
-
-  .evidence-card dl {
-    grid-template-columns: 1fr;
   }
 
   .privacy h2 {

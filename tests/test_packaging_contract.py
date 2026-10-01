@@ -147,11 +147,11 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert "Not available yet" not in copy
     assert index.count("data-download") == 1
     assert (
-        'data-i18n="releaseStatus">完全离线 · 内置模型 · 无需登录</p>'
+        'data-i18n="releaseStatus">离线使用 · 无需登录</p>'
         in index
     )
-    assert 'releaseStatus: "完全离线 · 内置模型 · 无需登录"' in copy
-    assert 'releaseStatus: "Fully offline · Built-in models · No sign-in"' in copy
+    assert 'releaseStatus: "离线使用 · 无需登录"' in copy
+    assert 'releaseStatus: "Works offline · No sign-in"' in copy
     assert "未代码签名" not in index + copy
     assert "not code-signed" not in index + copy
     assert "Beta" not in index
