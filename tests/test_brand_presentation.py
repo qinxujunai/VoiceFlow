@@ -46,8 +46,7 @@ def test_product_site_uses_only_the_real_demo():
     assert page.count("data-download") == 1
     assert "SenseVoice" not in page
     assert "Qwen3" not in page
-    assert "无需下载或切换模型" in page
-    assert "本版本" in page
+    assert "安装后即可离线听写" in page
     assert "__VOICEFLOW_VERSION__" in page
     assert "v0.2.2" not in page
     assert 'class="download"' not in page
@@ -82,22 +81,21 @@ def test_bilingual_demo_uses_the_real_quiet_success_state():
 def test_public_demo_descriptions_and_metrics_are_not_stale():
     page = _read("site/index.html")
     copy = _read("site/app.js")
-    chinese_demo = _read("docs/voiceflow-demo.svg")
 
-    assert "终稿原位确认后安静消失" in page + copy
-    assert "quietly disappears" in copy + chinese_demo
-    assert "自动化测试</dt><dd>344" not in page
-    assert 'data-i18n="metricScopeValue">全量' in page
-    assert 'metricScopeValue: "Full suite"' in copy
+    assert "听写时显示文字，完成后收起" in page + copy
+    assert "shows words during dictation" in copy
+    for phrase in ("发布门槛", "内部候选", "10,000", "metricScopeValue",
+                   "release gate", "Internal candidates"):
+        assert phrase not in page + copy
 
 
-def test_public_copy_matches_stop_time_foreground_delivery_policy():
+def test_public_copy_describes_user_actions_and_manual_paste():
     page = _read("site/index.html")
     copy = _read("site/app.js")
 
-    assert "停止时仍在普通应用，就发送一次粘贴" in page
-    assert "停止时仍在普通应用，就发送一次粘贴" in copy
-    assert "At stop time, VoiceFlow sends one paste" in copy
+    assert "在输入框中按下 F2" in page + copy
+    assert "手动粘贴" in page + copy
+    assert "Paste manually" in copy
     assert "未知输入框只复制" not in page + copy
     assert "focus remains in a verified editor" not in copy
 

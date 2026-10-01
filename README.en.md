@@ -17,10 +17,10 @@ returns to the cursor.
 
 ## Why VoiceFlow
 
-- **Entirely offline**: no account and no audio upload; dictation keeps working without a network.
-- **Common text fields**: send one paste to an ordinary app; restricted targets keep the clipboard fallback.
-- **Delivery fallback**: use the clipboard or history if paste misses; blocked clipboard delivery retains temporary recovery audio and reports failure.
-- **Complete audio first**: the capsule provides live feedback while the final result is produced from the complete recording.
+- **Works offline**: dictate after installation. Recording and recognition stay on your PC.
+- **Speak. Keep writing.**: write emails, take notes, reply to messages. Press F2 in a text field, speak, then press again.
+- **Revisit your words**: review and copy dictation in local history, or paste manually.
+- **A quiet presence**: the capsule shows words while you dictate and disappears when you finish.
 
 ## Download
 
