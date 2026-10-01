@@ -45,6 +45,11 @@ the idle state atomically; busy operations reject deletion before touching
 history or audio. Failed cancellation keeps the recording state blocked instead
 of exposing potentially active audio as idle.
 
+Native audio, final-ASR and preview workers monitor their owning process
+sentinel. If the UI process dies, the workers terminate even if native calls
+are stuck. Interrupted recovery PCM remains local; parent-exit handling does
+not acknowledge delivery or delete recovery files.
+
 ## Evidence
 
 - `src/update_checker.py` and `tests/test_update_checker.py` cover the public
