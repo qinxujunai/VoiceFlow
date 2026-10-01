@@ -46,21 +46,45 @@ claim.
 The previous clean GitHub Windows Release runner passed the same packaged
 runtime smoke and installer smoke for v0.3.2 in run
 https://github.com/qinxujunai/VoiceFlow/actions/runs/32756233090. The v0.3.3
-tag workflow must pass those checks again before this evidence is considered
-final.
+Windows quality run also passed the unit, integration, and package smoke gates
+on a clean runner:
+https://github.com/qinxujunai/VoiceFlow/actions/runs/36795670250.
+
+The local packaged-runtime limitation remains recorded above. The v0.3.3
+release runner passed the corresponding clean-runner checks, including
+packaged runtime smoke and full installer lifecycle smoke:
+https://github.com/qinxujunai/VoiceFlow/actions/runs/36796628282.
 
 ## Public-surface checks after publishing
 
-The following checks remain release gates and must be recorded against the
-published v0.3.3 assets:
+The following checks were recorded against the published v0.3.3 assets:
 
-- GitHub Release is stable, points at the v0.3.3 tag, and contains exactly the
-  Windows installer plus `SHA256SUMS.txt`, `SBOM.cdx.json`, and
-  `THIRD_PARTY_NOTICES.md`.
-- The installer asset digest equals the v0.3.3 `SHA256SUMS.txt` entry.
-- README Chinese and English links resolve to this evidence document.
-- GitHub Pages `release-metadata.json`, rendered version, download URL, and
-  asset digests all identify v0.3.3.
+- GitHub Release: https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.3
+  is stable and points to tag `v0.3.3`, resolved at commit
+  `a9b9d707bb61e6fc3a9510c0ad4ae0a2dfa32c28`.
+- Release assets are exactly:
+  `VoiceFlow-0.3.3-Windows-x64.exe` (`362504336` bytes,
+  `73c17d5af0e257ba1781beed9f35b52ca77a780648c098d56a6fc4e986308a2f`),
+  `SHA256SUMS.txt` (`270` bytes,
+  `260ec7425df95aa5bfe608ca75e6636642a1e61488e84e3d46475eb11b05bb11`),
+  `SBOM.cdx.json` (`16825` bytes,
+  `d5283bfe672aaace22c6b2a1a768f16b7b19d6e80903b65cacd8a86a12c0af3d`),
+  and `THIRD_PARTY_NOTICES.md` (`3363` bytes,
+  `94a2f5c8118e6c286b463057f70eb8255b30183f3e61d7d36ad8622489a59033`).
+- The installer digest equals the `SHA256SUMS.txt` entry. The three
+  compliance asset digests also match the published asset metadata.
+- README Chinese and English evidence links resolve with HTTP 200 to this
+  document:
+  https://github.com/qinxujunai/VoiceFlow/blob/master/docs/release-evidence-0.3.3.md
+- GitHub Pages deployment run
+  https://github.com/qinxujunai/VoiceFlow/actions/runs/36797496829 passed
+  from the release commit. The live metadata at
+  https://qinxujunai.github.io/VoiceFlow/release-metadata.json identifies
+  version `0.3.3`, tag `v0.3.3`, the matching installer URL, size, installer
+  digest, and compliance digests.
 - The deployed bilingual copy contains `完全离线 · 内置模型 · 无需登录` and
-  `Fully offline · Built-in models · No sign-in`, without unresolved release
-  markers.
+  `Fully offline · Built-in models · No sign-in`, with no unresolved release
+  markers. The rendered page and download URL identify `v0.3.3`.
+- The release workflow had no Windows signing certificate configured;
+  Authenticode verification passed for the expected `NotSigned` state, and
+  the release notes disclose that Windows may show a security prompt.
