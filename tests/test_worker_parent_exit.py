@@ -52,7 +52,16 @@ if __name__ == "__main__":
         deadline = time.monotonic() + 20
         while not pid_file.exists() and parent.poll() is None and time.monotonic() < deadline:
             time.sleep(0.02)
-        assert pid_file.exists(), "isolated worker did not reach readiness"
+        if not pid_file.exists():
+            if parent.poll() is None:
+                parent.kill()
+            try:
+                _, error = parent.communicate(timeout=5)
+            except subprocess.TimeoutExpired as expired:
+                error = expired.stderr or b""
+            raise AssertionError(
+                "isolated worker did not reach readiness: " + error.decode(errors="replace")
+            )
         child_pid = int(pid_file.read_text())
 
         def read_to_exit():
