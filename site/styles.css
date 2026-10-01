@@ -232,7 +232,7 @@ a:focus-visible {
 
 .compatibility {
   margin: 17px 0 0;
-  color: #86868b;
+  color: var(--ink-secondary);
   font-size: 14px;
 }
 
@@ -283,6 +283,10 @@ a:focus-visible {
 .value-label {
   margin-bottom: 9px;
   font-size: 14px;
+}
+
+.next-heading .value-label {
+  color: #0066cc;
 }
 
 .values h2 {
@@ -345,6 +349,10 @@ a:focus-visible {
   color: var(--accent);
   font-size: 13px;
   font-weight: 650;
+}
+
+.evidence-card .evidence-badge {
+  color: #66b2ff;
 }
 
 .next-grid h3 {
