@@ -167,7 +167,6 @@ function setLanguage(language) {
     );
   });
 
-  localStorage.setItem("voiceflow-language", selected);
   const url = new URL(window.location.href);
   if (selected === "en") {
     url.searchParams.set("lang", "en");
@@ -182,5 +181,4 @@ languageButtons.forEach((button) => {
 });
 
 const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
-const savedLanguage = localStorage.getItem("voiceflow-language");
-setLanguage(requestedLanguage || savedLanguage || "zh");
+setLanguage(requestedLanguage || "zh");
