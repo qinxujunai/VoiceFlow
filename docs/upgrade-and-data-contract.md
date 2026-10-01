@@ -14,8 +14,14 @@ The app exposes a download link only when all of these checks pass:
 - the Release tag is a stable `vX.Y.Z` version;
 - `VoiceFlow-X.Y.Z-Windows-x64.exe` exists;
 - `SHA256SUMS.txt` exists;
-- both download URLs point to that exact tag; and
-- the checksum file has exactly one SHA-256 entry for that installer name.
+- both assets are uploaded, nonempty, and have GitHub SHA-256 digests;
+- both download URLs point to that exact tag;
+- the downloaded checksum file matches its GitHub size and digest; and
+- its unique installer entry matches the installer asset's GitHub digest.
+
+Duplicate asset names and oversized responses are rejected. This validates
+release metadata and the checksum manifest; it does not hash an installer
+download on the user's machine or replace publisher code signing.
 
 The check does not download or execute an installer. The user starts the
 versioned installer manually. A normal upgrade keeps `%LOCALAPPDATA%\VoiceFlow`
@@ -32,6 +38,12 @@ and models.
 If a recovery directory cannot be deleted, the action reports failure instead
 of claiming that all data was removed. The recovery store skips symlinks and
 never follows them during the bulk operation.
+
+Recording startup, cancellation, final delivery, recovery, and recovery-data
+deletion cannot overlap. Data clearing and single-recording deletion reserve
+the idle state atomically; busy operations reject deletion before touching
+history or audio. Failed cancellation keeps the recording state blocked instead
+of exposing potentially active audio as idle.
 
 ## Evidence
 

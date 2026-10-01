@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import threading
+from contextlib import contextmanager
 from enum import Enum
 
 
 class RecordingState(str, Enum):
     IDLE = "idle"
+    MAINTENANCE = "maintenance"
+    CANCELING = "canceling"
     ARMING = "arming"
     RECORDING = "recording"
     FINALIZING = "finalizing"
@@ -36,6 +39,21 @@ class RecordingStateMachine:
                 return False
             self._state = RecordingState.ARMING
             return True
+
+    @contextmanager
+    def idle_operation(self):
+        """Reserve idle atomically so recording and local data work cannot overlap."""
+        with self._lock:
+            claimed = self._state is RecordingState.IDLE
+            if claimed:
+                self._state = RecordingState.MAINTENANCE
+        try:
+            yield claimed
+        finally:
+            if claimed:
+                with self._lock:
+                    if self._state is RecordingState.MAINTENANCE:
+                        self._state = RecordingState.IDLE
 
     def mark_recording(self) -> bool:
         with self._lock:
@@ -115,6 +133,13 @@ class RecordingStateMachine:
     def claim_cancel(self) -> bool:
         with self._lock:
             if self._state not in {RecordingState.ARMING, RecordingState.RECORDING}:
+                return False
+            self._state = RecordingState.CANCELING
+            return True
+
+    def complete_cancel(self) -> bool:
+        with self._lock:
+            if self._state is not RecordingState.CANCELING:
                 return False
             self._state = RecordingState.IDLE
             return True
