@@ -1,7 +1,10 @@
 # VoiceFlow 0.3.5 release verification evidence
 
-Status: candidate verification in progress, 2026-10-01. Public verification
-must complete before this release is called shipped.
+Status: WITHHELD on 2026-10-01. The candidate tag remains immutable.
+The release workflow was canceled before publication after one installer
+startup timeout. Exact-source Windows validation subsequently passed, but
+further fault injection reproduced orphan native workers after UI termination.
+The corrected candidate is v0.3.6; no v0.3.5 installer is advertised.
 
 ## Identity and review
 

@@ -18,6 +18,8 @@ from streaming_transcriber import PreviewEvent
 
 def _preview_worker_main(commands, responses, heartbeat, worker_config):
     """Own the native online recognizer and every recognizer stream."""
+    from worker_lifecycle import watch_parent_exit
+    watch_parent_exit()
     from streaming_transcriber import OnlinePreviewTranscriber
 
     stop_heartbeat = threading.Event()

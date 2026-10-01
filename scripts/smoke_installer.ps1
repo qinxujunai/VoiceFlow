@@ -264,6 +264,21 @@ try {
     Wait-Process -Id $appProcess.Id -Timeout 10 -ErrorAction SilentlyContinue
     $appProcess = $null
 
+    $workerIds = @($state.worker_pids.PSObject.Properties | ForEach-Object { [int]$_.Value })
+    $workerDeadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $remainingWorkers = @($workerIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+        if ($remainingWorkers.Count -eq 0) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $workerDeadline)
+    if ($remainingWorkers.Count -ne 0) {
+        throw "Native workers outlived the UI: $($remainingWorkers -join ', ')"
+    }
+    $uninstallHashes = @{}
+    foreach ($relative in $preservedFiles.Keys) {
+        $uninstallHashes[$relative] = (Get-FileHash -LiteralPath (Join-Path $smokeDataDir $relative) -Algorithm SHA256).Hash
+    }
+
     $uninstall = Start-Process `
         -FilePath (Join-Path $installRoot "unins000.exe") `
         -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") `
@@ -278,6 +293,12 @@ try {
     }
     if (-not (Test-Path -LiteralPath $runtimeState)) {
         throw "Uninstaller removed user-owned VoiceFlow data"
+    }
+    foreach ($relative in $uninstallHashes.Keys) {
+        $actual = (Get-FileHash -LiteralPath (Join-Path $smokeDataDir $relative) -Algorithm SHA256).Hash
+        if ($actual -ne $uninstallHashes[$relative]) {
+            throw "Uninstaller modified user data: $relative"
+        }
     }
 
     Write-Output "Installer smoke: ok"

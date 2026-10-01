@@ -20,6 +20,8 @@ def _asr_worker_main(
     engine,
 ):
     """Load and run the native recognizer outside the Qt process."""
+    from worker_lifecycle import watch_parent_exit
+    watch_parent_exit()
     from transcriber import Transcriber
 
     stop_heartbeat = threading.Event()

@@ -15,6 +15,8 @@ import yaml
 
 
 def _audio_worker_main(commands, events, heartbeat, config_path):
+    from worker_lifecycle import watch_parent_exit
+    watch_parent_exit()
     from audio_capture import AudioCapture
 
     stop_heartbeat = threading.Event()
