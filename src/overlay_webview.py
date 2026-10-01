@@ -1847,7 +1847,7 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#appSubtitle, QLabel#sidebarVersion {
             font-size: 12px;
-            color: #86868b;
+            color: #6b6b70;
         }
         QLabel#statusBadge {
             padding: 7px 2px;
