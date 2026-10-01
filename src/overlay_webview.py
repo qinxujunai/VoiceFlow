@@ -1946,7 +1946,7 @@ class _SettingsWindow(QMainWindow):
             font-weight: 500;
         }
         QLabel#readinessValue {
-            color: #248a3d;
+            color: #24753d;
             font-weight: 600;
         }
         QLabel#hotkeyValue {
@@ -2052,7 +2052,7 @@ class _SettingsWindow(QMainWindow):
             font-weight: 500;
         }
         QLabel#historyMeta {
-            color: #86868b;
+            color: #6b6b70;
             font-size: 13px;
         }
         QPushButton {
@@ -2072,9 +2072,9 @@ class _SettingsWindow(QMainWindow):
             border: 2px solid #007aff;
         }
         QPushButton#primaryButton {
-            background: #007aff;
+            background: #0071e3;
             color: white;
-            border: 1px solid #007aff;
+            border: 1px solid #0071e3;
             font-weight: 600;
         }
         QPushButton#primaryButton:hover {
@@ -2088,7 +2088,7 @@ class _SettingsWindow(QMainWindow):
         QPushButton#textButton {
             border: none;
             background: transparent;
-            color: #007aff;
+            color: #0066cc;
             padding-left: 8px;
             padding-right: 8px;
         }
