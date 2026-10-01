@@ -18,8 +18,8 @@ returns to the cursor.
 ## Why VoiceFlow
 
 - **Entirely offline**: no account and no audio upload; dictation keeps working without a network.
-- **Any text field**: stay in notes, browsers, documents, or chat while words return to the cursor.
-- **Always recoverable**: if paste misses, the complete text remains in the clipboard and local history; entries can be deleted individually or cleared together.
+- **Common text fields**: send one paste to an ordinary app; restricted targets keep the clipboard fallback.
+- **Delivery fallback**: use the clipboard or history if paste misses; blocked clipboard delivery retains temporary recovery audio and reports failure.
 - **Complete audio first**: the capsule provides live feedback while the final result is produced from the complete recording.
 
 ## Download
@@ -35,9 +35,9 @@ VoiceFlow never checks for updates or connects in the background. To upgrade,
 open Settings from the tray, choose “About VoiceFlow,” and click “Check for
 updates.” A download link appears only when the matching GitHub Release
 contains both the versioned installer and `SHA256SUMS.txt`, with a unique
-checksum entry for that installer. Running the installer preserves the
+checksum entry matching the installer asset digest, and a verified checksum-file digest. Running the installer preserves the
 configuration, vocabulary, and models under `%LOCALAPPDATA%\VoiceFlow`.
-“Clear local data” on the History page requires confirmation and removes local
+“Clear local data” on the History page requires an idle recording/recovery state and confirmation. It removes local
 dictation history plus undelivered recovery recordings while keeping those
 settings.
 
