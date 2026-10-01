@@ -75,7 +75,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR evaluation plan](docs/asr-evaluation-plan.md)
 - [Model strategy and admission decision](docs/model-strategy.md)
 - [Product quality standard](docs/product-quality-standard.md)
-- [0.3.2 release verification evidence](docs/release-evidence-0.3.2.md)
+- [0.3.3 release verification evidence](docs/release-evidence-0.3.3.md)
 - [Runtime and user-data boundary](docs/runtime-boundary.md)
 - [Release checklist](docs/release-checklist.md)
 

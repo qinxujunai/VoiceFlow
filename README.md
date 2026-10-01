@@ -71,7 +71,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [ASR 评测计划](docs/asr-evaluation-plan.md)
 - [模型策略与准入结论](docs/model-strategy.md)
 - [产品质量标准](docs/product-quality-standard.md)
-- [0.3.2 发布验证证据](docs/release-evidence-0.3.2.md)
+- [0.3.3 发布验证证据](docs/release-evidence-0.3.3.md)
 - [运行时与用户数据边界](docs/runtime-boundary.md)
 - [发布检查清单](docs/release-checklist.md)
 
