@@ -1,5 +1,7 @@
 from pathlib import Path
 import json
+import hashlib
+import pytest
 import subprocess
 import sys
 
@@ -154,6 +156,20 @@ def test_existing_tag_update_does_not_restart_public_release_build():
     assert "if: github.event.created == true" in workflow
 
 
+
+def _set_site_fixture_digests(release, checksum_file, release_file):
+    for asset in release["assets"]:
+        asset["browser_download_url"] = (
+            "https://github.com/qinxujunai/VoiceFlow/releases/download/"
+            f"{release['tag_name']}/{asset['name']}"
+        )
+        if asset["name"] == "SHA256SUMS.txt":
+            data = checksum_file.read_bytes()
+            asset["size"] = len(data)
+            asset["digest"] = f"sha256:{hashlib.sha256(data).hexdigest()}"
+    release_file.write_text(json.dumps(release), encoding="utf-8")
+
+
 def test_public_site_renderer_validates_digest_and_replaces_placeholders(tmp_path):
     installer_name = "VoiceFlow-0.3.0-Windows-x64.exe"
     digest = "a" * 64
@@ -199,6 +215,7 @@ def test_public_site_renderer_validates_digest_and_replaces_placeholders(tmp_pat
     release_file.write_text(json.dumps(release), encoding="utf-8")
     checksum_file = tmp_path / "SHA256SUMS.txt"
     checksum_file.write_text(f"{digest}  {installer_name}\n", encoding="utf-8")
+    _set_site_fixture_digests(release, checksum_file, release_file)
     output_dir = tmp_path / "site"
 
     subprocess.run(
@@ -269,6 +286,8 @@ def test_public_site_renderer_rejects_a_checksum_mismatch(tmp_path):
         f"{'b' * 64}  {installer_name}\n",
         encoding="utf-8",
     )
+
+    _set_site_fixture_digests(release, checksum_file, release_file)
 
     result = subprocess.run(
         [
@@ -365,3 +384,28 @@ def test_visual_capture_fixtures_use_natural_speech_not_engineering_copy():
 
     assert "正在稳定追加完整转写" not in capture
     assert "明早十点，把方案同步给团队。" in capture
+
+
+@pytest.mark.parametrize("change", ["url", "checksum_digest", "checksum_size"])
+def test_public_site_rejects_asset_source_and_manifest_tampering(tmp_path, change):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("site_renderer", PROJECT_ROOT / "scripts/prepare_public_site.py")
+    renderer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(renderer)
+    installer = "VoiceFlow-0.3.5-Windows-x64.exe"
+    checksum_file = tmp_path / "SHA256SUMS.txt"
+    checksum_file.write_bytes(f"{'a' * 64}  {installer}\n".encode())
+    release = {"tag_name": "v0.3.5", "assets": [
+        {"name": name, "size": 123, "digest": "sha256:" + "a" * 64,
+         "state": "uploaded"} for name in
+        (installer, "SHA256SUMS.txt", "SBOM.cdx.json", "THIRD_PARTY_NOTICES.md")
+    ]}
+    _set_site_fixture_digests(release, checksum_file, tmp_path / "release.json")
+    if change == "url":
+        release["assets"][0]["browser_download_url"] = "https://example.invalid/wrong.exe"
+    elif change == "checksum_digest":
+        release["assets"][1]["digest"] = "sha256:" + "b" * 64
+    else:
+        release["assets"][1]["size"] += 1
+    with pytest.raises(ValueError):
+        renderer._validated_release(release, checksums_file=str(checksum_file), token="")

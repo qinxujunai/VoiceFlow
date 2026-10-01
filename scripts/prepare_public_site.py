@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -41,15 +42,15 @@ def _load_release(path: str | None, *, repository: str, token: str) -> dict:
     return json.loads(payload.decode("utf-8"))
 
 
-def _load_checksums(path: str | None, *, url: str, token: str) -> str:
+def _load_checksums(path: str | None, *, url: str, token: str) -> bytes:
     if path:
-        return Path(path).read_text(encoding="utf-8")
+        return Path(path).read_bytes()
     payload = _request(
         url,
         token=token,
         accept="application/octet-stream",
     )
-    return payload.decode("utf-8")
+    return payload
 
 
 def _asset_by_name(release: dict, name: str) -> dict:
@@ -101,6 +102,7 @@ def _validated_release(
     *,
     checksums_file: str | None,
     token: str,
+    repository: str = "qinxujunai/VoiceFlow",
 ) -> dict:
     match = VERSION_PATTERN.fullmatch(str(release.get("tag_name") or ""))
     if match is None:
@@ -120,13 +122,25 @@ def _validated_release(
         "SBOM.cdx.json": _asset_digest(sbom),
         "THIRD_PARTY_NOTICES.md": _asset_digest(notices),
     }
+    for asset in (installer, checksums, sbom, notices):
+        expected_url = (
+            f"https://github.com/{repository}/releases/download/"
+            f"v{version}/{asset['name']}"
+        )
+        if asset["browser_download_url"] != expected_url:
+            raise ValueError("release asset URL does not match versioned repository digest source")
 
-    checksum_text = _load_checksums(
+    checksum_bytes = _load_checksums(
         checksums_file,
         url=str(checksums["browser_download_url"]),
         token=token,
     )
-    published_digest = _checksum_for(checksum_text, installer_name)
+    if (
+        len(checksum_bytes) != int(checksums["size"])
+        or hashlib.sha256(checksum_bytes).hexdigest() != compliance_digests["SHA256SUMS.txt"]
+    ):
+        raise ValueError("checksum file size or digest differs from GitHub asset")
+    published_digest = _checksum_for(checksum_bytes.decode("utf-8"), installer_name)
     if published_digest != asset_digest:
         raise ValueError("installer digest does not match SHA256SUMS.txt")
 
@@ -198,6 +212,7 @@ def main() -> int:
             release,
             checksums_file=args.checksums_file,
             token=token,
+            repository=args.repository,
         )
         _render_site(Path(args.site_dir), Path(args.output_dir), metadata)
     except (OSError, ValueError, json.JSONDecodeError) as exc:

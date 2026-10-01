@@ -8,16 +8,17 @@ must complete before this release is called shipped.
 - Version `0.3.5`, build `261001.3`.
 - Expected installer `VoiceFlow-0.3.5-Windows-x64.exe`.
 - Adversarial review found destructive data-clear/recovery races, premature
-  idle state during cancellation, and insufficient update digest validation.
+  idle state during cancellation, and insufficient update/site digest and URL validation.
 - Regression tests cover recording phases, competing clear/recovery/start,
   failed cancellation, shutdown preservation, inconsistent digests, duplicate
-  assets, incomplete uploads, empty assets, and bounded network responses.
+  assets, incomplete uploads, empty assets, and bounded network responses. Website tests also reject mismatched asset
+  URLs and checksum-file size/digest tampering.
 - Data and update behavior is specified in `upgrade-and-data-contract.md`.
 
 ## Verification scope
 
 Full local release verification passed for the final versioned candidate:
-416 tests, 500 recording-state cycles, fixed-model benchmark, 10,000-cycle
+419 tests, 500 recording-state cycles, fixed-model benchmark, 10,000-cycle
 fault stress, one-hour PCM recovery, Unicode fuzz, DPI UI captures, capsule
 motion, recorded performance evidence, and integration transcription.
 
