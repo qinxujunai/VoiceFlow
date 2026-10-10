@@ -118,7 +118,12 @@ jobs:
           }
       - name: Smoke packaged runtime
         shell: pwsh
-        run: ./scripts/smoke_packaged_runtime.ps1
+        run: |
+          # Match the offline assets added by the installer before startup smoke.
+          New-Item -ItemType Directory -Path dist\VoiceFlow\models -Force | Out-Null
+          Copy-Item -LiteralPath models\sensevoice -Destination dist\VoiceFlow\models -Recurse
+          Copy-Item -LiteralPath models\streaming-preview -Destination dist\VoiceFlow\models -Recurse
+          ./scripts/smoke_packaged_runtime.ps1
       - name: Build full offline installer
         shell: pwsh
         run: |
