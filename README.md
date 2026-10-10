@@ -9,6 +9,8 @@
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 
+![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
+
 VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，再按一下完成；
 无需切换应用，声音在本机变成文字，结果回到当前光标。
 

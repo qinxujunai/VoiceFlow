@@ -733,7 +733,7 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## 为什么是 VoiceFlow" in readme
     assert "## 下载" in readme
     assert "## 使用" in readme
-    assert "docs/voiceflow-demo.svg" not in readme
+    assert "docs/voiceflow-demo.svg" in readme
     assert "省略最后一个句号" in readme
     assert "Ctrl+V" in readme
     assert "面试" not in readme
@@ -744,7 +744,7 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## Why VoiceFlow" in english
     assert "## Download" in english
     assert "## Controls" in english
-    assert "docs/voiceflow-demo.svg" not in english
+    assert "docs/voiceflow-demo.svg" in english
     assert "Ctrl+V" in english
 
 

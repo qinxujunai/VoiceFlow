@@ -9,6 +9,8 @@
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![Download for Windows](https://img.shields.io/badge/Windows-download-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 
+![VoiceFlow animated demo](docs/voiceflow-demo.svg)
+
 VoiceFlow is offline dictation for Windows. Press `F2` once to start and again
 to finish. Stay in the current app while speech becomes text on your PC and
 returns to the cursor.
