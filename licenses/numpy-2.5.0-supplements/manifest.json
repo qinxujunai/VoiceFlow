@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "scope": "unchanged original supplementary NumPy DLL/embedded loader copyright notices; not a complete static component review",
+  "license_review_complete": false,
+  "numpy_wheel_sha256": "6f2d6873e2940c860a309d21e25b1e69af6aaffdd80aa056b04c16380db1c4f2",
+  "delvewheel_template_exact_match": true,
+  "delvewheel_template_sha256": "b85ffb24faaf9be010edf5152e735875d986786e1b20200f4a34c410121fb5d0",
+  "delvewheel_source_file_sha256": "330f21299461afc1f8fe900617dd98273c6fe0827076ace8b7db1a2e8dfa69b1",
+  "numpy_init_wheel_sha256": "a6958cb364663b7acce81ccfd58eeb65a2b34d5376157f924777b97211a73be4",
+  "template_comparison_normalized_line_endings_only": true,
+  "packaged_openblas_sha256": "b788215d9d47792bcba3a2e2a71143205a57282828a483f1fb071ca2c159f616",
+  "openblas_official_wheel_dll_exact_match": true,
+  "original_sources": [
+    {
+      "path": "delvewheel-1.11.2-LICENSE",
+      "bytes": 1073,
+      "sha256": "e43d93da16aa3b61ef0969fff2130b135984859a05664fbce423ad126688c5d3",
+      "archive_member": "delvewheel-1.11.2/LICENSE",
+      "archive_url": "https://files.pythonhosted.org/packages/e0/e1/cf5ee89909c955d434896c73172be835fb114041367c94216c043b77a2e1/delvewheel-1.11.2.tar.gz",
+      "archive_sha256": "a9abf51b01871fa717efca0138bbaebb5aa88cc9dc36e26af37d1045eadefc2f"
+    },
+    {
+      "path": "scipy-openblas64-0.3.33.112.0-LICENSE.txt",
+      "bytes": 46462,
+      "sha256": "7317b3a9eb806cc83a0cc6b1c7c2fbe6018eed556daa9996e6e3a727a2a5bfbe",
+      "archive_member": "scipy_openblas64-0.3.33.112.0.dist-info/licenses/LICENSE.txt",
+      "archive_url": "https://files.pythonhosted.org/packages/85/ed/950dc195b40c0d72e79997c1cb83775175e95d870c0186697bf12ad0ca4b/scipy_openblas64-0.3.33.112.0-py3-none-win_amd64.whl",
+      "archive_sha256": "d18ac7fc6239fabddbb3e0c9e130a994eb7e1d5dd94fd4ad2c82d14062001384"
+    }
+  ]
+}

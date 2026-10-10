@@ -24,6 +24,13 @@ def test_start_bat_runs_bootstrap_before_launching_app():
     assert start.index("scripts\\bootstrap.py --ensure-shortcut") < start.index("venv\\Scripts\\python.exe -u src\\main.py")
 
 
+def test_frozen_worker_dispatch_happens_before_heavy_main_imports():
+    source = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+
+    assert source.index("multiprocessing.freeze_support()") < source.index("import yaml")
+    assert source.index("multiprocessing.freeze_support()") < source.index("import numpy")
+
+
 def test_desktop_shortcut_uses_windowed_launcher_not_bat():
     shortcut = (ROOT / "scripts" / "create_shortcut.ps1").read_text(encoding="utf-8")
 
@@ -76,3 +83,77 @@ def test_bootstrap_uses_current_interpreter_as_valid_python():
     from scripts import bootstrap
 
     assert bootstrap.is_python_usable(sys.executable) is True
+
+
+def test_bootstrap_rejects_incompatible_python_without_replacing_existing_venv(monkeypatch):
+    from scripts import bootstrap
+    import subprocess
+    import pytest
+
+    monkeypatch.setattr(bootstrap, "_run", lambda command, **kwargs:
+                        subprocess.CompletedProcess(command, 0, "3.11 64\n"))
+    monkeypatch.setattr(bootstrap, "_safe_remove_venv", lambda: pytest.fail("must preserve the existing venv"))
+    monkeypatch.setattr(bootstrap, "_install_requirements", lambda: pytest.fail("must not install with the wrong ABI"))
+    with pytest.raises(RuntimeError, match="3.12.*64"):
+        bootstrap.ensure_venv(sys.executable)
+
+
+def test_bootstrap_repairs_stale_native_build_even_if_imports_succeed(monkeypatch):
+    from scripts import bootstrap
+
+    calls = []
+    monkeypatch.setattr(bootstrap, "_require_supported_python", lambda *_args: None)
+    monkeypatch.setattr(bootstrap, "is_python_usable", lambda *_args: True)
+    monkeypatch.setattr(bootstrap, "_missing_imports", lambda: [])
+    monkeypatch.setattr(bootstrap, "_native_runtime_ready", lambda: False)
+    monkeypatch.setattr(bootstrap, "_install_requirements", lambda: calls.append("install"))
+    bootstrap.ensure_venv(sys.executable)
+    assert calls == ["install"]
+
+
+def test_bootstrap_checks_wheel_hash_before_install_and_native_afterwards(monkeypatch):
+    from scripts import bootstrap
+    import subprocess
+
+    commands = []
+    def run(command, **kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "")
+    monkeypatch.setattr(bootstrap, "_run", run)
+    bootstrap._install_requirements()
+    assert commands[0][-1] == "--hash-only"
+    assert commands[1][-2:] == ["-r", str(bootstrap.REQUIREMENTS)]
+    assert commands[2][-1].endswith("asr_runtime_assets.py")
+
+
+def test_bootstrap_fast_path_checks_native_runtime(monkeypatch):
+    from scripts import bootstrap
+
+    monkeypatch.setattr(bootstrap, "is_python_usable", lambda *_args: True)
+    monkeypatch.setattr(bootstrap, "_models_present", lambda: True)
+    monkeypatch.setattr(bootstrap, "_startup_signature", lambda: {"fixture": 1})
+    monkeypatch.setattr(bootstrap, "_read_bootstrap_state", lambda: {"signature": {"fixture": 1}})
+    monkeypatch.setattr(bootstrap, "_native_runtime_ready", lambda: False)
+    assert bootstrap.is_fast_path_ready() is False
+
+
+def test_bootstrap_startup_signature_tracks_native_input_changes(monkeypatch, tmp_path):
+    from scripts import bootstrap
+    import json
+
+    assets = tmp_path / "vendor/windows"
+    assets.mkdir(parents=True)
+    (assets / "asr-runtime.json").write_text(json.dumps({"wheel": {"file": "fixture.whl"}}))
+    wheel = assets / "fixture.whl"
+    wheel.write_bytes(b"before")
+    monkeypatch.setattr(bootstrap, "ROOT", tmp_path)
+    monkeypatch.setattr(bootstrap, "MODEL_FILES", ())
+    import hashlib
+    manifest = {"schema_version": 1, "wheel": {"file": "fixture.whl", "bytes": 6,
+                "sha256": hashlib.sha256(b"before").hexdigest()}}
+    (assets / "asr-runtime.json").write_text(json.dumps(manifest))
+    before = bootstrap._startup_signature()
+    wheel.write_bytes(b"after")
+    manifest["wheel"].update(bytes=5, sha256=hashlib.sha256(b"after").hexdigest())
+    (assets / "asr-runtime.json").write_text(json.dumps(manifest))
+    assert bootstrap._startup_signature() != before

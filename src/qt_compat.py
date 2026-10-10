@@ -43,18 +43,18 @@ _prepare_frozen_qt_dll_search()
 
 try:
     QT_BINDING = "PySide6"
-    from PySide6.QtCore import Qt, QUrl, QSize, QObject, Signal, Slot, QTimer, QPointF
+    from PySide6.QtCore import Qt, QUrl, QSize, QObject, Signal, Slot, QTimer, QPointF, QRectF, QTextBoundaryFinder, QEvent
     from PySide6.QtGui import (
         QAction,
         QColor,
+        QFont,
         QIcon,
         QPainter,
         QPen,
         QPixmap,
+        QFontMetricsF,
     )
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
-    from PySide6.QtWebChannel import QWebChannel
-    from PySide6.QtWebEngineWidgets import QWebEngineView
     from PySide6.QtWidgets import (
         QApplication,
         QGridLayout,
@@ -68,9 +68,9 @@ try:
         QMainWindow,
         QMessageBox,
         QMenu,
-        QPlainTextEdit,
         QProgressBar,
         QPushButton,
+        QScrollArea,
         QStackedWidget,
         QSystemTrayIcon,
         QVBoxLayout,
@@ -88,18 +88,21 @@ except ImportError as pyside_error:  # Development bridge for an existing pre-mi
             pyqtSlot as Slot,
             QTimer,
             QPointF,
+            QRectF,
+            QTextBoundaryFinder,
+            QEvent,
         )
         from PyQt6.QtGui import (
             QAction,
             QColor,
+            QFont,
             QIcon,
             QPainter,
             QPen,
             QPixmap,
+            QFontMetricsF,
         )
         from PyQt6.QtNetwork import QLocalServer, QLocalSocket
-        from PyQt6.QtWebChannel import QWebChannel
-        from PyQt6.QtWebEngineWidgets import QWebEngineView
         from PyQt6.QtWidgets import (
             QApplication,
             QGridLayout,
@@ -113,9 +116,9 @@ except ImportError as pyside_error:  # Development bridge for an existing pre-mi
             QMainWindow,
             QMessageBox,
             QMenu,
-            QPlainTextEdit,
             QProgressBar,
             QPushButton,
+            QScrollArea,
             QStackedWidget,
             QSystemTrayIcon,
             QVBoxLayout,
@@ -126,3 +129,14 @@ except ImportError as pyside_error:  # Development bridge for an existing pre-mi
             "VoiceFlow could not load PySide6 or the development PyQt6 bridge: "
             f"PySide6={pyside_error}; PyQt6={pyqt_error}"
         ) from pyside_error
+
+
+def __getattr__(name):
+    """The legacy renderer is a development comparison, not a startup dependency."""
+    if name not in {"QWebChannel", "QWebEngineView"}:
+        raise AttributeError(name)
+    import importlib
+    module = "QtWebChannel" if name == "QWebChannel" else "QtWebEngineWidgets"
+    value = getattr(importlib.import_module(f"{QT_BINDING}.{module}"), name)
+    globals()[name] = value
+    return value

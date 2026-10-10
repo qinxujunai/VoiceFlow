@@ -16,6 +16,13 @@ import yaml
 from streaming_transcriber import PreviewEvent
 
 
+def _preview_event_payload(event):
+    payload = asdict(event)
+    payload.pop("committed_text")
+    payload["committed_characters"] = len(event.committed_text)
+    return payload
+
+
 def _preview_worker_main(commands, responses, heartbeat, worker_config):
     """Own the native online recognizer and every recognizer stream."""
     from worker_lifecycle import watch_parent_exit
@@ -75,7 +82,7 @@ def _preview_worker_main(commands, responses, heartbeat, worker_config):
                         pcm,
                         int(command["sample_rate"]),
                     )
-                    payload = {"ok": True, "event": asdict(event)}
+                    payload = {"ok": True, "event": _preview_event_payload(event)}
                 elif kind == "close_session":
                     sessions.pop(command["session_id"], None)
                     payload = {"ok": True}
@@ -136,19 +143,42 @@ class SupervisedPreviewTranscriber:
         self._heartbeat = None
         self._process = None
         self._ready = False
+        self._lifecycle_lock = threading.RLock()
         self._request_lock = threading.Lock()
+        self._stop_requested = threading.Event()
 
     @property
     def is_ready(self):
-        return bool(self._ready and self._process and self._process.is_alive())
+        if not self._lifecycle_lock.acquire(blocking=False):
+            return False
+        try:
+            return self._is_ready_locked()
+        finally:
+            self._lifecycle_lock.release()
+
+    def _is_ready_locked(self):
+        process = self._process
+        return bool(self._ready and process is not None and process.is_alive())
 
     @property
     def worker_pid(self):
-        return self._process.pid if self._process is not None else None
+        if not self._lifecycle_lock.acquire(blocking=False):
+            return None
+        try:
+            process = self._process
+            return process.pid if process is not None else None
+        finally:
+            self._lifecycle_lock.release()
 
     @property
     def last_heartbeat(self):
-        return float(self._heartbeat.value) if self._heartbeat is not None else 0.0
+        if not self._lifecycle_lock.acquire(blocking=False):
+            return 0.0
+        try:
+            heartbeat = self._heartbeat
+            return float(heartbeat.value) if heartbeat is not None else 0.0
+        finally:
+            self._lifecycle_lock.release()
 
     @property
     def is_healthy(self):
@@ -158,16 +188,22 @@ class SupervisedPreviewTranscriber:
         )
 
     def ensure_healthy(self):
-        if self.is_healthy:
-            return True
-        self._terminate_worker()
-        self.load()
-        return self.is_healthy
+        with self._lifecycle_lock:
+            if self.is_healthy:
+                return True
+            self._terminate_worker()
+            self.load()
+            return self.is_healthy
 
     def load(self):
+        with self._lifecycle_lock:
+            self._load_locked()
+
+    def _load_locked(self):
         if self.is_ready:
             return
-        self.shutdown()
+        self._shutdown_locked()
+        self._stop_requested.clear()
         self._commands = self._context.Queue(maxsize=8)
         self._responses = self._context.Queue(maxsize=8)
         self._heartbeat = self._context.Value("d", time.monotonic())
@@ -189,6 +225,9 @@ class SupervisedPreviewTranscriber:
         self._process.start()
         deadline = time.monotonic() + self.startup_timeout
         while time.monotonic() < deadline:
+            if self._stop_requested.is_set():
+                self._shutdown_locked()
+                raise RuntimeError("实时预览启动已取消")
             if not self._process.is_alive():
                 self.shutdown()
                 raise RuntimeError("实时预览进程启动失败")
@@ -219,7 +258,14 @@ class SupervisedPreviewTranscriber:
             pcm=samples.tobytes(),
             sample_rate=int(sample_rate),
         )
-        event = PreviewEvent(**response["event"])
+        payload = dict(response["event"])
+        expected_length = payload.pop("committed_characters", None)
+        delta = payload.get("delta")
+        if (type(expected_length) is not int or not isinstance(delta, str)
+                or expected_length != len(session.committed_text) + len(delta)
+                or "committed_text" in payload):
+            raise RuntimeError("实时预览增量不完整，已停止预览；终稿仍使用完整录音")
+        event = PreviewEvent(**payload, committed_text=session.committed_text + delta)
         session.committed_text = event.committed_text
         return event
 
@@ -228,6 +274,11 @@ class SupervisedPreviewTranscriber:
             self._request("close_session", session_id=session.session_id)
 
     def shutdown(self):
+        self._stop_requested.set()
+        with self._lifecycle_lock:
+            self._shutdown_locked()
+
+    def _shutdown_locked(self):
         process = self._process
         if process is not None and process.is_alive():
             try:
@@ -238,48 +289,65 @@ class SupervisedPreviewTranscriber:
         self._terminate_worker()
 
     def _request(self, kind, **payload):
-        if not self.is_ready:
-            raise RuntimeError("实时预览尚未就绪")
         with self._request_lock:
+            with self._lifecycle_lock:
+                if not self._is_ready_locked():
+                    raise RuntimeError("实时预览尚未就绪")
+                process = self._process
+                commands = self._commands
+                responses = self._responses
+                heartbeat = self._heartbeat
             request_id = uuid.uuid4().hex
             try:
-                self._commands.put(
+                commands.put(
                     {"kind": kind, "request_id": request_id, **payload},
                     timeout=0.5,
                 )
             except queue.Full as error:
-                self._terminate_worker()
+                self._terminate_worker(expected_process=process)
                 raise RuntimeError("实时预览任务拥堵") from error
+            except (OSError, ValueError, AttributeError) as error:
+                self._terminate_worker(expected_process=process)
+                raise RuntimeError("实时预览进程不可用") from error
             deadline = time.monotonic() + self.command_timeout
             while time.monotonic() < deadline:
-                if self._process is None or not self._process.is_alive():
-                    self._terminate_worker()
+                if not process.is_alive():
+                    self._terminate_worker(expected_process=process)
                     raise RuntimeError("实时预览进程意外退出")
-                if time.monotonic() - self.last_heartbeat > self.heartbeat_timeout:
-                    self._terminate_worker()
+                if time.monotonic() - float(heartbeat.value) > self.heartbeat_timeout:
+                    self._terminate_worker(expected_process=process)
                     raise RuntimeError("实时预览进程无响应")
                 try:
-                    response = self._responses.get(timeout=0.05)
+                    response = responses.get(timeout=0.05)
                 except queue.Empty:
                     continue
+                except (OSError, ValueError, AttributeError) as error:
+                    self._terminate_worker(expected_process=process)
+                    raise RuntimeError("实时预览进程已关闭") from error
                 if response.get("request_id") != request_id:
                     continue
                 if response.get("ok"):
                     return response
                 raise RuntimeError(response.get("error") or "实时预览失败")
-            self._terminate_worker()
+            self._terminate_worker(expected_process=process)
             raise RuntimeError("实时预览超时")
 
-    def _terminate_worker(self):
+    def _terminate_worker(self, expected_process=None):
+        with self._lifecycle_lock:
+            self._terminate_worker_locked(expected_process)
+
+    def _terminate_worker_locked(self, expected_process=None):
         process = self._process
+        if expected_process is not None and process is not expected_process:
+            return
         if process is not None and process.is_alive():
             process.terminate()
             process.join(timeout=1.0)
         for channel in (self._commands, self._responses):
             if channel is not None:
                 try:
+                    channel.cancel_join_thread()
                     channel.close()
-                    channel.join_thread()
                 except (OSError, ValueError):
                     pass
         self._process = None

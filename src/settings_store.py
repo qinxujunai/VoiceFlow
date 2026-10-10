@@ -6,10 +6,21 @@ import os
 import plistlib
 import re
 import sys
+import threading
+from functools import wraps
 from pathlib import Path
 
 
 MACOS_LAUNCH_AGENT_LABEL = "ai.voiceflow.app"
+_config_update_lock = threading.RLock()
+
+
+def _serialized_config_update(update):
+    @wraps(update)
+    def locked(*args, **kwargs):
+        with _config_update_lock:
+            return update(*args, **kwargs)
+    return locked
 
 
 def _yaml_scalar(value) -> str:
@@ -41,6 +52,7 @@ def _replace_section_value(text: str, section: str, key: str, value) -> str:
     return text[:section_match.end()] + updated + text[end:]
 
 
+@_serialized_config_update
 def update_runtime_settings(
     config_path: str | Path,
     *,
@@ -92,6 +104,7 @@ def onboarding_completed(config_path: str | Path) -> bool:
     return bool(config.get("ui", {}).get("onboarding_completed", False))
 
 
+@_serialized_config_update
 def set_onboarding_completed(config_path: str | Path, completed: bool = True) -> None:
     path = Path(config_path)
     text = path.read_text(encoding="utf-8")

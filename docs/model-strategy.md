@@ -16,7 +16,7 @@ models stay in the internal evaluation lab even after they improve a named user
 scenario; ordinary settings continue to use one reviewed bundled default until
 a later product decision explicitly changes that contract.
 
-## Same-machine evidence
+## Historical 0.2 same-machine evidence
 
 The following results were produced on the release development machine with
 `eval/public-smoke.jsonl` and strict pathological-output checks. The corpus has
@@ -59,9 +59,10 @@ committed only after consecutive hypotheses confirm a common prefix. Permanent
 hypothesis divergence freezes that segment, records the event, and resets at the
 next endpoint so the rest of the session can continue.
 
-The UI reveals confirmed graphemes at a fixed 48 ms cadence. The first
-grapheme is immediate; there is no catch-up acceleration, full-text replay, or
-horizontal translation. Run the measured model gate with:
+The native UI normally reveals confirmed graphemes at a 48 ms cadence. The first
+grapheme is immediate; backlog accelerates the cadence to at least 17 ms and
+coalesces after 600 ms. There is no full-text replay or horizontal translation.
+Run the measured model gate with:
 
 ```bat
 venv\Scripts\python.exe scripts\evaluate_streaming_preview.py --enforce

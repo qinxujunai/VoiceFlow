@@ -46,7 +46,6 @@ class AppController:
         self,
         *,
         on_record_toggle: Callable | None = None,
-        on_trial_toggle: Callable | None = None,
         on_cancel: Callable | None = None,
         on_copy_last: Callable | None = None,
         on_repaste_last: Callable | None = None,
@@ -59,6 +58,9 @@ class AppController:
         on_recover_session: Callable | None = None,
         on_delete_recovery: Callable | None = None,
         on_read_history: Callable | None = None,
+        on_query_microphones: Callable | None = None,
+        on_query_dictation_preferences: Callable | None = None,
+        on_update_dictation_preferences: Callable | None = None,
         on_delete_history: Callable | None = None,
         on_clear_history: Callable | None = None,
         on_clear_local_data: Callable | None = None,
@@ -84,7 +86,6 @@ class AppController:
         self._status_sink = on_status
         self._callbacks = {
             "record": on_record_toggle,
-            "trial": on_trial_toggle,
             "cancel": on_cancel,
             "copy_last": on_copy_last,
             "repaste_last": on_repaste_last,
@@ -97,6 +98,9 @@ class AppController:
             "recover_session": on_recover_session,
             "delete_recovery": on_delete_recovery,
             "read_history": on_read_history,
+            "query_microphones": on_query_microphones,
+            "query_dictation_preferences": on_query_dictation_preferences,
+            "update_dictation_preferences": on_update_dictation_preferences,
             "delete_history": on_delete_history,
             "clear_history": on_clear_history,
             "clear_local_data": on_clear_local_data,
@@ -210,31 +214,20 @@ class AppController:
             lambda: self._call("record", triggered_at),
         )
 
-    def start_trial(self) -> ActionResult:
-        phase = self.phase
-        if phase is RuntimePhase.STARTING:
-            return self._reject("正在准备", "runtime_starting", "trial")
-        if phase in {RuntimePhase.DEGRADED, RuntimePhase.ERROR}:
-            code = self.runtime_snapshot()["last_error_code"] or "runtime_unavailable"
-            return self._reject("暂时无法听写", code, "trial")
-        if phase in {RuntimePhase.FINALIZING, RuntimePhase.DELIVERING}:
-            return self._reject("正在整理", "runtime_busy", "trial")
-        return self._enqueue("trial_toggle", lambda: self._call("trial"))
-
     def cancel_recording(self):
         return self._enqueue("cancel", lambda: self._call("cancel"))
 
     def copy_last(self):
-        return self._call("copy_last")
+        return self._enqueue("copy_last", lambda: self._call("copy_last"))
 
     def repaste_last(self):
-        return self._call("repaste_last")
+        return self.copy_last()
 
     def copy_text(self, text):
         return self._call("copy_text", text)
 
     def output_text(self, text):
-        return self._call("output_text", text)
+        return self.copy_text(text)
 
     def open_dictionary(self):
         return self._call("open_dictionary")
@@ -256,6 +249,15 @@ class AppController:
 
     def read_history(self):
         return self._call("read_history") or []
+
+    def query_microphones(self):
+        return self._call("query_microphones") or []
+
+    def query_dictation_preferences(self):
+        return self._call("query_dictation_preferences") or {}
+
+    def update_dictation_preferences(self, options):
+        return self._call("update_dictation_preferences", options)
 
     def delete_history(self, entry_id):
         return self._call("delete_history", entry_id)

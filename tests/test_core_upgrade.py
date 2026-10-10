@@ -26,6 +26,30 @@ class UiStateTests(unittest.TestCase):
 
 
 class RuntimeSupervisorTests(unittest.TestCase):
+    def test_recovery_fault_requests_one_normal_stop_without_canceling_audio(self):
+        from main import VoiceInputSystem
+        from app_controller import RuntimePhase, ActionResult
+        from types import SimpleNamespace
+
+        system = object.__new__(VoiceInputSystem)
+        from recording_state import RecordingStateMachine
+        system._recording_state = RecordingStateMachine()
+        system._runtime_modules_lock = threading.RLock()
+        system._runtime_supervisor_stop = threading.Event()
+        system.audio = SimpleNamespace(recovery_error="recovery_pcm_write_failed")
+        system._active_session_id = "recording-session"
+        system._worker_pids = lambda: {}
+        system._oldest_worker_heartbeat = lambda: 0
+        stops = []
+        system.controller = SimpleNamespace(
+            phase=RuntimePhase.RECORDING,
+            update_worker_health=lambda **_kwargs: None,
+            toggle_recording=lambda **kwargs: (stops.append(kwargs) or ActionResult(True)),
+        )
+        VoiceInputSystem._runtime_supervisor_tick(system)
+        VoiceInputSystem._runtime_supervisor_tick(system)
+        self.assertEqual(stops, [{"source": "recovery_error"}])
+
     def test_supervisor_continues_after_one_failed_health_tick(self):
         from main import VoiceInputSystem
 
@@ -597,7 +621,7 @@ class FinalTextSelectionTests(unittest.TestCase):
         preview_block = stream_block[preview_start:cache_start]
 
         self.assertIn("next_sample = 0", preview_block)
-        self.assertIn("self._audio_snapshot(next_sample, total_samples)", feed_block)
+        self.assertIn("self._audio_snapshot(next_sample, block_end)", feed_block)
         self.assertIn("preview.accept_pcm(", feed_block)
         self.assertIn("next_sample += len(new_audio)", feed_block)
         self.assertIn("next_sample = self._feed_preview_audio(", preview_block)

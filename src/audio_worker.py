@@ -16,8 +16,20 @@ import yaml
 
 def _audio_worker_main(commands, events, heartbeat, config_path):
     from worker_lifecycle import watch_parent_exit
-    watch_parent_exit()
+
+    capture = None
+    journal = None
+    published_samples = 0
+
+    def close_recovery():
+        if journal is not None:
+            if capture is not None and capture.is_recording:
+                capture.freeze_recording()
+            journal.close_interrupted()
+
+    watch_parent_exit(close_recovery)
     from audio_capture import AudioCapture
+    from recovery_session import RecoverySessionStore
 
     stop_heartbeat = threading.Event()
     memories = {}
@@ -25,13 +37,25 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
     def pulse():
         while not stop_heartbeat.wait(0.25):
             heartbeat.value = time.monotonic()
+            if journal is not None and journal.writer_error:
+                if capture is not None and capture.is_recording:
+                    capture.freeze_recording()
+                try:
+                    events.put_nowait({"kind": "recovery_error", "error": journal.writer_error})
+                except queue.Full:
+                    pass
 
     def publish_pcm(block):
+        nonlocal published_samples
+        samples = np.asarray(block, dtype=np.int16).reshape(-1)
+        start_sample = published_samples
+        published_samples += len(samples)
         try:
             events.put_nowait(
                 {
                     "kind": "pcm",
-                    "payload": np.asarray(block, dtype=np.int16).reshape(-1).tobytes(),
+                    "payload": samples.tobytes(),
+                    "start_sample": start_sample,
                 }
             )
         except queue.Full:
@@ -49,17 +73,19 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
         name="voiceflow-audio-heartbeat",
         daemon=True,
     ).start()
-    capture = None
     try:
         capture = AudioCapture(config_path)
         capture.set_pcm_callback(publish_pcm)
         capture.set_level_callback(publish_level)
+        enumerate_devices = getattr(capture, "list_devices", None)
+        microphones = enumerate_devices() if enumerate_devices is not None else []
         events.put(
             {
                 "kind": "ready",
                 "sample_rate": capture.sample_rate,
                 "channels": capture.channels,
                 "dtype": capture.dtype,
+                "microphones": [(device["name"], device["index"]) for device in microphones[:128]],
             }
         )
         while True:
@@ -67,14 +93,38 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
             kind = command.get("kind")
             request_id = command.get("request_id")
             if kind == "shutdown":
+                close_recovery()
                 if capture.is_recording:
                     capture.cancel_recording()
                 return
             try:
                 if kind == "start":
+                    close_recovery()
+                    journal = None
+                    published_samples = 0
+                    recovery = command.get("recovery")
+                    if recovery:
+                        store = RecoverySessionStore(
+                            recovery["root"],
+                            max_storage_bytes=recovery.get("max_storage_bytes", RecoverySessionStore.DEFAULT_MAX_STORAGE_BYTES),
+                            min_free_bytes=recovery.get("min_free_bytes", RecoverySessionStore.DEFAULT_MIN_FREE_BYTES),
+                        )
+                        journal = store.start_session(
+                            session_id=recovery["session_id"],
+                            sample_rate=capture.sample_rate,
+                            channels=capture.channels,
+                            dtype=capture.dtype,
+                            model=recovery["model"],
+                        )
+                        capture.set_recovery_sink(journal)
+                    else:
+                        capture.set_recovery_sink(None)
                     capture.start_recording()
+                    if journal is not None:
+                        journal.mark_state("recording")
                     events.put(
-                        {"kind": "response", "request_id": request_id, "ok": True}
+                        {"kind": "response", "request_id": request_id, "ok": True,
+                         "recovery": journal.status() if journal is not None else None}
                     )
                 elif kind == "freeze":
                     samples = capture.freeze_recording()
@@ -88,6 +138,11 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
                     )
                 elif kind == "stop":
                     audio = capture.stop_recording()
+                    close_recovery()
+                    recovery_status = journal.status() if journal is not None else None
+                    if recovery_status is not None and recovery_status["closed"]:
+                        capture.set_recovery_sink(None)
+                        journal = None
                     memory = shared_memory.SharedMemory(create=True, size=max(2, audio.nbytes))
                     if len(audio):
                         np.ndarray(audio.shape, dtype=np.int16, buffer=memory.buf)[:] = audio
@@ -99,12 +154,17 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
                             "ok": True,
                             "shm_name": memory.name,
                             "samples": len(audio),
+                            "recovery": recovery_status,
                         }
                     )
                 elif kind == "cancel":
                     capture.cancel_recording()
+                    if journal is not None:
+                        journal.close_without_recovery()
+                    journal = None
                     events.put(
-                        {"kind": "response", "request_id": request_id, "ok": True}
+                        {"kind": "response", "request_id": request_id, "ok": True,
+                         "reusable": capture.wait_for_stream_teardown()}
                     )
                 elif kind == "ack":
                     target = command.get("target_request_id")
@@ -116,8 +176,22 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
                         except FileNotFoundError:
                             pass
                     events.put(
-                        {"kind": "response", "request_id": request_id, "ok": True}
+                        {"kind": "response", "request_id": request_id, "ok": True,
+                         "reusable": capture.wait_for_stream_teardown()}
                     )
+                elif kind == "recovery_state":
+                    if journal is not None and journal.session_id != command["session_id"]:
+                        raise RuntimeError("recovery session changed")
+                    if journal is not None:
+                        journal.mark_state(command["state"], preview_text=command.get("preview_text"))
+                    events.put({"kind": "response", "request_id": request_id, "ok": True,
+                                "recovery": journal.status() if journal is not None else None})
+                elif kind == "recovery_close":
+                    if journal is not None and journal.session_id != command["session_id"]:
+                        raise RuntimeError("recovery session changed")
+                    close_recovery()
+                    events.put({"kind": "response", "request_id": request_id, "ok": True,
+                                "recovery": journal.status() if journal is not None else None})
             except Exception as error:
                 events.put(
                     {
@@ -131,12 +205,61 @@ def _audio_worker_main(commands, events, heartbeat, config_path):
         events.put({"kind": "startup_error", "error": str(error)})
     finally:
         stop_heartbeat.set()
+        close_recovery()
         for memory in memories.values():
             memory.close()
             try:
                 memory.unlink()
             except FileNotFoundError:
                 pass
+
+
+class _WorkerRecoveryJournal:
+    """Host-side handle; PCM is accepted and journaled only in the audio worker."""
+
+    def __init__(self, capture, store, descriptor):
+        self._capture = capture
+        self._store = store
+        self.session_id = descriptor["session_id"]
+
+    @property
+    def writer_error(self):
+        return self._capture.recovery_error
+
+    def mark_state(self, state, *, preview_text=None):
+        try:
+            response = self._capture._request("recovery_state", session_id=self.session_id,
+                                             state=state, preview_text=preview_text)
+            self._capture._raise_if_failed(response, "录音保存状态无法更新")
+            self._capture._update_recovery_status(response)
+        except RuntimeError:
+            self._capture._recovery_error = "recovery_worker_unavailable"
+
+    def close_interrupted(self):
+        if self._capture._recovery_closed_session == self.session_id:
+            return True
+        try:
+            response = self._capture._request("recovery_close", session_id=self.session_id)
+            self._capture._update_recovery_status(response)
+        except RuntimeError:
+            self._capture._recovery_error = "recovery_worker_unavailable"
+        return self._capture._recovery_closed_session == self.session_id
+
+    def mark_delivered(self, _text_sha256):
+        if self.close_interrupted():
+            deleted = self._store.delete(self.session_id)
+            self._capture._recovery_descriptor = None
+            return deleted
+        return False
+
+    def close_without_recovery(self):
+        # An explicit cancel command already closes/deletes the worker journal.
+        # On failure, retain files until the worker is proven stopped.
+        if self._capture._process is None or self.close_interrupted():
+            deleted = self._store.delete(self.session_id)
+            self._capture._recovery_descriptor = None
+            return deleted
+        return False
 
 
 class SupervisedAudioCapture:
@@ -174,6 +297,7 @@ class SupervisedAudioCapture:
         self._waiters = {}
         self._waiters_lock = threading.Lock()
         self._lock = threading.RLock()
+        self._pcm_closed = False
         self._audio_buffer = []
         self._audio_buffer_ends = []
         self._total_samples = 0
@@ -183,9 +307,13 @@ class SupervisedAudioCapture:
         self._is_recording = False
         self._is_frozen = False
         self._on_level_callback = None
-        self._recovery_sink = None
+        self._recovery_descriptor = None
+        self._recovery_closed_session = None
+        self._recovery_error = None
         self._recovery_drop_count = 0
+        self._preview_pcm_gap = False
         self._callback_status_count = 0
+        self._microphones = []
 
     @property
     def worker_pid(self):
@@ -244,11 +372,44 @@ class SupervisedAudioCapture:
     def recovery_drop_count(self):
         return self._recovery_drop_count
 
+    @property
+    def recovery_error(self):
+        return self._recovery_error
+
+    @property
+    def preview_pcm_gap(self):
+        return self._preview_pcm_gap
+
+    @property
+    def microphones(self):
+        return list(self._microphones)
+
     def set_level_callback(self, callback):
         self._on_level_callback = callback
 
     def set_recovery_sink(self, sink):
-        self._recovery_sink = sink
+        if sink is not None:
+            raise ValueError("recovery PCM belongs to the audio worker")
+
+    def create_recovery_journal(self, store, *, session_id, model):
+        descriptor = {"root": str(store.root), "session_id": str(session_id),
+                      "sample_rate": self.sample_rate, "channels": self.channels,
+                      "dtype": self.dtype, "model": str(model),
+                      "max_storage_bytes": store.max_storage_bytes,
+                      "min_free_bytes": store.min_free_bytes}
+        self._recovery_descriptor = descriptor
+        self._recovery_closed_session = None
+        self._recovery_error = None
+        return _WorkerRecoveryJournal(self, store, descriptor)
+
+    def _update_recovery_status(self, response):
+        status = response.get("recovery")
+        if not status:
+            return
+        if status.get("writer_error"):
+            self._recovery_error = str(status["writer_error"])
+        if status.get("closed") and self._recovery_descriptor:
+            self._recovery_closed_session = self._recovery_descriptor["session_id"]
 
     def prepare(self):
         """Start the disposable device process before the first hotkey tap."""
@@ -264,6 +425,7 @@ class SupervisedAudioCapture:
     def start_recording(self):
         self._ensure_worker()
         with self._lock:
+            self._pcm_closed = False
             self._audio_buffer = []
             self._audio_buffer_ends = []
             self._total_samples = 0
@@ -271,8 +433,10 @@ class SupervisedAudioCapture:
             self._last_total_samples = 0
             self._last_buffer_start_sample = 0
             self._recovery_drop_count = 0
-        response = self._request("start")
+            self._preview_pcm_gap = False
+        response = self._request("start", recovery=self._recovery_descriptor)
         self._raise_if_failed(response, "麦克风打开失败")
+        self._update_recovery_status(response)
         self._is_recording = True
         self._is_frozen = False
 
@@ -297,9 +461,11 @@ class SupervisedAudioCapture:
         if self._is_recording:
             self.freeze_recording()
         request_id = uuid.uuid4().hex
+        reusable = False
         try:
             response = self._request("stop", request_id=request_id)
             self._raise_if_failed(response, "麦克风停止失败")
+            self._update_recovery_status(response)
             samples = int(response.get("samples", 0))
             memory = shared_memory.SharedMemory(name=response["shm_name"])
             try:
@@ -311,34 +477,45 @@ class SupervisedAudioCapture:
             finally:
                 memory.close()
             try:
-                self._request(
+                acknowledgement = self._request(
                     "ack",
                     target_request_id=request_id,
                     timeout=min(0.5, self.command_timeout),
                 )
+                reusable = bool(acknowledgement.get("ok") and acknowledgement.get("reusable"))
             except RuntimeError:
                 pass
         except RuntimeError:
             audio = self.snapshot_audio()
         finally:
-            self._terminate_worker()
+            if not reusable:
+                self._terminate_worker()
+            self._release_pcm()
             self._is_recording = False
             self._is_frozen = False
         return audio
 
+    def _release_pcm(self):
+        # The caller owns a detached final copy; reject any late preview PCM.
+        with self._lock:
+            self._pcm_closed = True
+            self._audio_buffer = []
+            self._audio_buffer_ends = []
+            self._total_samples = 0
+            self._buffer_start_sample = 0
+
     def cancel_recording(self):
+        reusable = False
         try:
             if self._process is not None:
-                self._request("cancel")
+                response = self._request("cancel")
+                reusable = bool(response.get("ok") and response.get("reusable"))
         except RuntimeError:
             pass
         finally:
-            self._terminate_worker()
-            with self._lock:
-                self._audio_buffer = []
-                self._audio_buffer_ends = []
-                self._total_samples = 0
-                self._buffer_start_sample = 0
+            if not reusable:
+                self._terminate_worker()
+            self._release_pcm()
             self._is_recording = False
             self._is_frozen = False
 
@@ -446,12 +623,15 @@ class SupervisedAudioCapture:
                 self.sample_rate = int(event.get("sample_rate", self.sample_rate))
                 self.channels = int(event.get("channels", self.channels))
                 self.dtype = str(event.get("dtype", self.dtype))
+                self._microphones = list(event.get("microphones") or [])[:128]
                 self._ready_event.set()
             elif kind == "startup_error":
                 self._startup_error = str(event.get("error", "未知错误"))
                 self._ready_event.set()
             elif kind == "pcm":
-                self._accept_pcm(event.get("payload", b""))
+                self._accept_pcm(event.get("payload", b""), start_sample=event.get("start_sample"))
+            elif kind == "recovery_error":
+                self._recovery_error = str(event.get("error", "recovery_write_failed"))
             elif kind == "level":
                 callback = self._on_level_callback
                 if callback is not None:
@@ -469,17 +649,21 @@ class SupervisedAudioCapture:
                     except queue.Full:
                         pass
 
-    def _accept_pcm(self, payload):
+    def _accept_pcm(self, payload, *, start_sample=None):
         block = np.frombuffer(payload, dtype=np.int16).copy()
         if not len(block):
             return
         with self._lock:
+            if self._pcm_closed:
+                return
+            if self._preview_pcm_gap or (
+                start_sample is not None and int(start_sample) != self._total_samples
+            ):
+                self._preview_pcm_gap = True
+                return
             self._audio_buffer.append(block)
             self._total_samples += len(block)
             self._audio_buffer_ends.append(self._total_samples)
-        recovery_sink = self._recovery_sink
-        if recovery_sink is not None and not recovery_sink.append_pcm(block):
-            self._recovery_drop_count += 1
 
     def _terminate_worker(self):
         process = self._process
@@ -488,7 +672,10 @@ class SupervisedAudioCapture:
                 self._commands.put_nowait({"kind": "shutdown"})
             except (queue.Full, OSError, ValueError):
                 pass
-            process.join(timeout=0.25)
+            active_journal = self._recovery_descriptor is not None and (
+                self._recovery_closed_session != self._recovery_descriptor["session_id"]
+            )
+            process.join(timeout=2.0 if active_journal else 0.25)
             if process.is_alive():
                 process.terminate()
                 process.join(timeout=1.0)

@@ -24,7 +24,7 @@ def test_runtime_logger_emits_allowlisted_operational_fields_only(tmp_path):
         "action completed",
         extra={
             "event": "action_finished",
-            "action": "trial_toggle",
+            "action": "record_toggle",
             "duration_ms": 12.5,
             "secret_transcript": "绝不能进入日志",
         },
@@ -32,6 +32,6 @@ def test_runtime_logger_emits_allowlisted_operational_fields_only(tmp_path):
 
     payload = json.loads(log_path.read_text(encoding="utf-8").splitlines()[-1])
     assert payload["event"] == "action_finished"
-    assert payload["action"] == "trial_toggle"
+    assert payload["action"] == "record_toggle"
     assert payload["duration_ms"] == 12.5
     assert "secret_transcript" not in payload

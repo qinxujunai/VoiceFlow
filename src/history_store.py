@@ -25,7 +25,10 @@ class HistoryStore:
         content = "\n".join(lines)
         if content:
             content += "\n"
-        temporary.write_text(content, encoding="utf-8")
+        with temporary.open("w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(temporary, self.path)
 
     def append(
@@ -64,6 +67,7 @@ class HistoryStore:
         session_id=None,
         clipboard_verified=None,
         paste_dispatched=None,
+        landed_confirmed=None,
         recovery_saved=None,
         safe_text_reasons=None,
         delivery_reason="",
@@ -148,6 +152,8 @@ class HistoryStore:
             entry["clipboard_verified"] = bool(clipboard_verified)
         if paste_dispatched is not None:
             entry["paste_dispatched"] = bool(paste_dispatched)
+        if landed_confirmed is not None:
+            entry["landed_confirmed"] = bool(landed_confirmed)
         if recovery_saved is not None:
             entry["recovery_saved"] = bool(recovery_saved)
         if safe_text_reasons is not None:
@@ -159,38 +165,88 @@ class HistoryStore:
         with self._lock:
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
         return entry
 
+    def _iter_lines_reverse(self):
+        try:
+            stream = self.path.open("rb")
+        except FileNotFoundError:
+            return
+        with stream:
+            stream.seek(0, os.SEEK_END)
+            position = stream.tell()
+            tail = []
+            while position:
+                size = min(position, 64 * 1024)
+                position -= size
+                stream.seek(position)
+                parts = stream.read(size).split(b"\n")
+                tail.append(parts[-1])
+                if len(parts) > 1:
+                    yield b"".join(reversed(tail)).rstrip(b"\r")
+                    for part in reversed(parts[1:-1]):
+                        yield part.rstrip(b"\r")
+                    tail = [parts[0]]
+            if tail:
+                yield b"".join(reversed(tail)).rstrip(b"\r")
+
+    @staticmethod
+    def _parse_line(line):
+        try:
+            text = line.decode("utf-8")
+            record = json.loads(text)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        return (text, record) if isinstance(record, dict) else None
+
     def read_recent(self, limit=80):
-        if not self.path.exists():
+        limit = max(0, int(limit))
+        if not limit:
             return []
-        with self._lock:
-            lines = [
-                line
-                for line in self.path.read_text(encoding="utf-8").splitlines()
-                if line
-            ][-max(0, int(limit)):]
         rows = []
-        for line in reversed(lines):
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(record, dict):
-                continue
-            record["_entry_id"] = self._entry_id(line)
-            rows.append(record)
+        seen = 0
+        with self._lock:
+            for line in self._iter_lines_reverse():
+                if not line:
+                    continue
+                seen += 1
+                parsed = self._parse_line(line)
+                if parsed is not None:
+                    text, record = parsed
+                    record["_entry_id"] = self._entry_id(text)
+                    rows.append(record)
+                if seen >= limit:
+                    break
         return rows
 
     def delete_entry(self, entry_id):
         return bool(self.delete_entry_with_undo(entry_id))
+
+    def find_entry(self, entry_id):
+        expected = str(entry_id or "")
+        if not expected:
+            return None
+        with self._lock:
+            for line in self._iter_lines_reverse():
+                parsed = self._parse_line(line)
+                if parsed is not None and self._entry_id(parsed[0]) == expected:
+                    return parsed[1]
+        return None
+
+    def _read_lines(self):
+        lines = self.path.read_text(encoding="utf-8").split("\n")
+        if lines and not lines[-1]:
+            lines.pop()
+        return lines
 
     def delete_entry_with_undo(self, entry_id):
         expected = str(entry_id or "")
         if not expected or not self.path.exists():
             return None
         with self._lock:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
+            lines = self._read_lines()
             for index in range(len(lines) - 1, -1, -1):
                 if self._entry_id(lines[index]) != expected:
                     continue
@@ -212,7 +268,7 @@ class HistoryStore:
             return False
         with self._lock:
             lines = (
-                self.path.read_text(encoding="utf-8").splitlines()
+                self._read_lines()
                 if self.path.exists()
                 else []
             )
@@ -228,28 +284,25 @@ class HistoryStore:
         with self._lock:
             lines = [
                 line
-                for line in self.path.read_text(encoding="utf-8").splitlines()
+                for line in self._read_lines()
                 if line
             ]
             self._write_lines_atomic([])
         return len(lines)
 
     def last(self):
-        if not self.path.exists():
-            return None
-        lines = [line for line in self.path.read_text(encoding="utf-8").splitlines() if line]
-        if not lines:
-            return None
-        return json.loads(lines[-1])
+        with self._lock:
+            for line in self._iter_lines_reverse():
+                parsed = self._parse_line(line)
+                if parsed is not None:
+                    return parsed[1]
+        return None
 
     def has_session_id(self, session_id):
         expected = str(session_id)
-        if not self.path.exists():
-            return False
-        for line in self.path.read_text(encoding="utf-8").splitlines():
-            try:
-                if str(json.loads(line).get("session_id", "")) == expected:
+        with self._lock:
+            for line in self._iter_lines_reverse():
+                parsed = self._parse_line(line)
+                if parsed is not None and str(parsed[1].get("session_id", "")) == expected:
                     return True
-            except (json.JSONDecodeError, AttributeError):
-                continue
         return False

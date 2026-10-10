@@ -64,7 +64,7 @@ def test_recovery_journal_success_removes_audio_only_after_delivery(tmp_path):
     assert store.list_recoverable() == []
 
 
-def test_recovery_store_purges_sessions_older_than_retention(tmp_path):
+def test_recovery_store_never_purges_undelivered_sessions_after_retention(tmp_path):
     from recovery_session import RecoverySessionStore
 
     root = tmp_path / "recovery"
@@ -83,8 +83,10 @@ def test_recovery_store_purges_sessions_older_than_retention(tmp_path):
 
     removed = store.purge_expired(now=time.time())
 
-    assert removed == ("expired",)
-    assert not journal.session_dir.exists()
+    assert removed == ()
+    assert journal.session_dir.exists()
+    assert store.read_pcm("expired").tolist() == [1, 1, 1, 1]
+    assert store.overdue_session_ids(now=time.time()) == ("expired",)
 
 
 def test_recovery_store_reads_and_deletes_only_exact_session(tmp_path):
@@ -621,7 +623,7 @@ def test_uia_focus_rejects_read_only_text_selection(monkeypatch):
 
     assert target is not None
     assert target.editable is False
-    assert target.rejection_reason == "no_writable_evidence"
+    assert target.rejection_reason == "read_only"
 
 
 def test_uia_focus_accepts_focused_legacy_text_control(monkeypatch):
@@ -851,7 +853,7 @@ def test_uia_native_edit_class_without_verified_writable_handle_is_rejected(
 
     assert target is not None
     assert target.editable is False
-    assert target.rejection_reason == "no_writable_evidence"
+    assert target.rejection_reason == "read_only"
 
 
 def test_safe_text_boundary_removes_protocol_tokens_and_controls_without_rewriting_words():
@@ -884,13 +886,15 @@ def test_main_connects_recovery_safe_text_and_truthful_delivery_in_order():
     source = (SRC / "main.py").read_text(encoding="utf-8")
 
     assert "RecoverySessionStore" in source
-    assert "self.audio.set_recovery_sink(self._recovery_journal)" in source
+    assert "self.audio.create_recovery_journal(" in source
+    assert "self.audio.set_recovery_sink(self._recovery_journal)" not in source
     assert "self._safe_text.sanitize(raw_text)" in source
     assert "self._recording_state.mark_delivering()" in source
     assert "self.output_handler.deliver(" in source
     assert "self.overlay.show_authoritative_final(" in source
     assert "self.overlay.show_delivery_state(" in source
-    assert source.index("self._safe_text.sanitize(raw_text)") < source.index(
+    stop = source.split("def _on_record_stop", 1)[1].split("def ", 1)[0]
+    assert stop.index("self._prepare_final_text(raw_text, final_options)") < stop.index(
         "self.output_handler.deliver("
     )
 

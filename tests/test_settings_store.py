@@ -1,9 +1,66 @@
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 
 import yaml
+
+
+def test_concurrent_first_use_and_runtime_save_preserve_both_changes(tmp_path, monkeypatch):
+    from settings_store import set_onboarding_completed, update_runtime_settings
+
+    config = tmp_path / "config.yaml"
+    config.write_text('engine:\n  active: "sensevoice"\n  sensevoice:\n    language: "auto"\n'
+                      'audio:\n  device_index: null\nui:\n  onboarding_completed: false\n',
+                      encoding="utf-8")
+    original_read = Path.read_text
+    entered = threading.Event()
+    release = threading.Event()
+    second_finished = threading.Event()
+    failures = []
+    reads = []
+
+    def observed_read(path, *args, **kwargs):
+        text = original_read(path, *args, **kwargs)
+        if path == config:
+            reads.append(threading.get_ident())
+            if len(reads) == 1:
+                entered.set()
+                assert release.wait(2)
+        return text
+
+    def save_settings():
+        try:
+            update_runtime_settings(config, engine="sensevoice", language="en", device_index=3)
+        except Exception as error:
+            failures.append(error)
+
+    def save_first_use():
+        try:
+            set_onboarding_completed(config)
+        except Exception as error:
+            failures.append(error)
+        finally:
+            second_finished.set()
+
+    monkeypatch.setattr(Path, "read_text", observed_read)
+    settings_thread = threading.Thread(target=save_settings)
+    first_use_thread = threading.Thread(target=save_first_use)
+    settings_thread.start()
+    try:
+        assert entered.wait(1)
+        first_use_thread.start()
+        second_finished.wait(.1)
+    finally:
+        release.set()
+        settings_thread.join(2)
+        first_use_thread.join(2)
+    assert not failures
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    assert payload["engine"]["sensevoice"]["language"] == "en"
+    assert payload["audio"]["device_index"] == 3
+    assert payload["ui"]["onboarding_completed"] is True
 
 
 ROOT = Path(__file__).resolve().parents[1]

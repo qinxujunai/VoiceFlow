@@ -37,7 +37,7 @@ def test_delivery_state_uses_minimal_truthful_copy():
 
     assert "function showDeliveryState(" in html
     assert "clipboard_verified_only: '已复制到剪贴板'" in html
-    assert "if (status === 'clipboard_verified_paste_dispatched')" in html
+    assert "if (status === 'landed_confirmed')" in html
     assert "pill.className = 'pill final_text delivery_dismissed';" in html
     assert ".pill.delivery_dismissed" in html
     assert "clipboard_verified_paste_dispatched: '已完成'" not in html
@@ -218,20 +218,31 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert 'for label in ("状态", "听写", "词典", "历史")' in overlay
-    assert 'self.sidebar.setAccessibleName("设置导航")' in overlay
+    assert 'for label in ("听写", "词典", "历史")' in overlay
+    assert 'self.sidebar.setAccessibleName("主要导航")' in overlay
     assert 'self.search_box.setAccessibleName("搜索历史转录")' in overlay
     assert 'self.language_combo.setAccessibleName("识别语言")' in overlay
     assert 'self.microphone_combo.setAccessibleName("麦克风")' in overlay
     assert 'self.doctor_list.setAccessibleName("诊断结果")' in overlay
-    assert 'self.practice_box.setAccessibleName("VoiceFlow 试说输入框")' in overlay
+    assert "practice_box" not in overlay
+    assert "set_trial_result" not in overlay
+    assert "trial_result_requested" not in overlay
+
+
+def test_recording_capsule_preserves_black_surface_light_text_and_three_red_bars():
+    capsule = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "--bg: rgba(24, 24, 26, 0.88)" in capsule
+    assert "--text: #f5f5f7" in capsule
+    assert "--red: #ff453a" in capsule
+    assert "<span></span><span></span><span></span>" in capsule
 
 
 def test_settings_do_not_expose_model_choice_or_download_controls():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    status_start = overlay.index("def _status_page(self):")
-    status_block = overlay[status_start:overlay.index("def _dictionary_page(self):", status_start)]
+    status_start = overlay.index("def _home_page(self):")
+    status_block = overlay[status_start:overlay.index("def _recent_page(self):", status_start)]
 
     assert "model_combo" not in status_block
     assert "model_download_button" not in status_block
@@ -244,7 +255,8 @@ def test_settings_do_not_expose_model_choice_or_download_controls():
 def test_history_does_not_expose_internal_output_status_codes():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
 
-    assert '"clipboard_verified_paste_dispatched": "已完成"' in overlay
+    assert '"clipboard_verified_paste_dispatched": "已复制，输入未确认"' in overlay
+    assert '"landed_confirmed": "已输入"' in overlay
     assert '"clipboard_verified_only": "已复制"' in overlay
     assert 'status = self._output_status_label' in overlay
 
@@ -344,7 +356,9 @@ def test_recording_start_cancels_pending_hide_timer():
     recording_block = overlay[recording_idx:streaming_idx]
 
     assert "self._hide_timer = None" in init_block
-    assert "self._cancel_pending_hide()" in recording_block
+    assert "self._cancel_pending_hide()" in overlay[
+        overlay.index("def _expect_recording_paint"):overlay.index("def _recording_painted")
+    ]
 
 
 def test_app_launch_only_opens_onboarding_before_background_model_load():
@@ -373,7 +387,7 @@ def test_settings_window_has_recent_history_copy_controls():
     assert "self._history_card(text, meta, entry_id)" in settings_block
     assert "self.search_box.setPlaceholderText(\"搜索最近转录\")" in settings_block
     assert "QPushButton(\"复制\")" in settings_block
-    assert "QPushButton(\"再次粘贴\")" in settings_block
+    assert "QPushButton(\"再次粘贴\")" not in settings_block
     assert "QPushButton(\"复制全部\")" in settings_block
     assert "copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))" in settings_block
     assert "meta_parts.append(f\"尾部 {tail}\")" in settings_block
@@ -382,7 +396,7 @@ def test_settings_window_has_recent_history_copy_controls():
     assert "label = self._output_status_label(status)" in settings_block
     assert "pyperclip.copy(text)" not in settings_block
     assert "self._copy_text(\"\\n\\n\".join(texts))" in settings_block
-    assert "self._run_history_action(text, self._on_repaste_text" in settings_block
+    assert "self._run_history_action(text, self._on_repaste_text" not in settings_block
     assert "self._set_status_badge(\"无可复制\")" in settings_block
 
 
@@ -396,19 +410,20 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
     assert "self.sidebar = QListWidget()" in settings_block
     assert "self.stack = QStackedWidget()" in settings_block
     assert "self.sidebar.currentRowChanged.connect(self._show_primary_page)" in settings_block
-    assert "page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}" in settings_block
+    assert 'for label in ("听写", "词典", "历史")' in settings_block
+    assert "page_by_row = {0: 0, 1: 2, 2: 1}" in settings_block
     assert "QTabWidget" not in overlay
     assert "QLabel#sectionTitle" in settings_block
 
 
-def test_settings_status_page_exposes_language_without_model_setup_actions():
+def test_settings_dictation_page_exposes_language_without_model_setup_actions():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
 
     assert "self.language_combo = QComboBox()" in settings_block
-    assert '("语言", self.language_combo)' in settings_block
+    assert '("识别语言", self.language_combo)' in settings_block
     assert "self.model_combo = QComboBox()" not in settings_block
     assert "def _save_settings(self):" in settings_block
     assert "for profile in user_model_profiles()" not in settings_block
@@ -581,12 +596,12 @@ def test_hide_path_hides_window_before_resetting_dom():
     assert hide_block.index("resetHiddenInstant()") < hide_block.index("self._hide()")
 
 
-def test_js_then_hide_allows_reset_to_paint_before_hiding():
+def test_legacy_hide_resets_only_after_hiding_the_window():
     overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
     hide_idx = overlay.index("def _run_js_then_hide")
     hide_block = overlay[hide_idx:]
 
-    assert "QTimer.singleShot(50, self.hide_requested.emit)" in hide_block
+    assert hide_block.index("self.hide_requested.emit()") < hide_block.index("runJavaScript(code)")
 
 
 def test_streaming_updates_are_session_guarded():
@@ -718,7 +733,9 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## 为什么是 VoiceFlow" in readme
     assert "## 下载" in readme
     assert "## 使用" in readme
-    assert "docs/voiceflow-demo.svg" in readme
+    assert "docs/voiceflow-demo.svg" not in readme
+    assert "省略最后一个句号" in readme
+    assert "Ctrl+V" in readme
     assert "面试" not in readme
     assert "Codex" not in readme
     assert "GitHub 右侧的语言统计" not in readme
@@ -727,7 +744,8 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "## Why VoiceFlow" in english
     assert "## Download" in english
     assert "## Controls" in english
-    assert "docs/voiceflow-demo.svg" in english
+    assert "docs/voiceflow-demo.svg" not in english
+    assert "Ctrl+V" in english
 
 
 def test_tray_menu_can_toggle_dictation_without_a_global_hotkey():
@@ -782,7 +800,7 @@ def test_delivery_feedback_is_minimal_truthful_and_has_accessible_detail():
     delivery_end = html.index("function showResult(", delivery_start)
     delivery = html[delivery_start:delivery_end]
 
-    assert "if (status === 'clipboard_verified_paste_dispatched')" in delivery
+    assert "if (status === 'landed_confirmed')" in delivery
     assert "pill.className = 'pill final_text delivery_dismissed';" in delivery
     assert "clipboard_verified_paste_dispatched: '已完成'" not in delivery
     assert "clipboard_verified_only: '已复制到剪贴板'" in delivery
@@ -830,16 +848,18 @@ def test_success_dismisses_quietly_while_fallback_states_remain_visible():
     hold_start = main.index("def _delivery_hold_ms")
     hold_end = main.index("def _active_engine_name", hold_start)
     hold = main[hold_start:hold_end]
-    assert 'if output_status == "clipboard_verified_paste_dispatched"' in hold
+    assert 'if output_status == "landed_confirmed"' in hold
     assert "return self.SUCCESS_DISMISS_MS" in hold
 
 
-def test_empty_capture_is_a_neutral_cancel_not_a_red_audio_error():
+def test_empty_capture_preserves_recovery_and_does_not_claim_user_cancel():
     source = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     empty_capture = source.split("if len(data) == 0:", 1)[1].split(
         "cache_handoff_started", 1
     )[0]
 
-    assert "self.overlay.show_canceled()" in empty_capture
+    assert "self._recovery_journal.close_interrupted()" in empty_capture
+    assert "close_without_recovery" not in empty_capture
+    assert "self.overlay.show_canceled()" not in empty_capture
+    assert "self.overlay.show_error(" in empty_capture
     assert 'self.overlay.show_error("无音频")' not in empty_capture
-    assert "self.overlay.hide_after(650)" in empty_capture

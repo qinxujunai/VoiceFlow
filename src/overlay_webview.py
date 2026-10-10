@@ -2,7 +2,6 @@
 VoiceFlow 悬浮窗。Qt 主线程 + 信号桥接，所有跨线程 UI 操作线程安全。
 """
 
-import hashlib
 import json
 import logging
 import os
@@ -15,11 +14,11 @@ from pathlib import Path
 from qt_compat import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QSystemTrayIcon, QMenu, QLabel, QPushButton,
-    QPlainTextEdit, QGridLayout, QHBoxLayout, QListWidget,
+    QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
-    QCheckBox, QComboBox, QMessageBox,
-    QWebChannel, QWebEngineView, Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
-    QAction, QLocalServer, QLocalSocket,
+    QCheckBox, QComboBox, QMessageBox, QScrollArea,
+    Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
+    QAction, QLocalServer, QLocalSocket, QEvent,
 )
 
 from tray_icon import (
@@ -30,6 +29,7 @@ from tray_icon import (
     build_tray_icon,
 )
 from ui_state import UiState, display_for_state
+from history_store import HistoryStore
 from settings_store import (
     is_autostart_enabled,
     onboarding_completed,
@@ -53,13 +53,52 @@ from platform_utils import (
     platform_label,
     trigger_instruction,
     trigger_summary,
+    system_high_contrast_enabled,
 )
 from recovery_session import RecoverySessionStore
 from runtime_monitor import UiStallDetector
+from capsule_native import NativeCapsuleBridge, NativeCapsuleView
+from punctuation import SENTENCE_END_CHOICES, apply_sentence_end
+from dictation_preferences import application_preserves_format, normalize_app_id, PreferencesChangedError
 
 
 SINGLE_INSTANCE_NAME = "VoiceFlow.LocalFirstDictation"
 logger = logging.getLogger("voiceflow.ui")
+
+
+class _QuitCoordinator(QObject):
+    finished = Signal(object)
+
+    def __init__(self, cleanup, complete):
+        super().__init__()
+        self._cleanup = cleanup
+        self._complete = complete
+        self._running = False
+        self._completed = False
+        self.finished.connect(self._finish)
+
+    def start(self):
+        if self._running or self._completed:
+            return False
+        self._running = True
+        threading.Thread(target=self._run, name="voiceflow-quit", daemon=False).start()
+        return True
+
+    def _run(self):
+        error = None
+        try:
+            if self._cleanup:
+                self._cleanup()
+        except Exception as failure:
+            logger.exception("runtime cleanup failed")
+            error = failure
+        self.finished.emit(error)
+
+    @Slot(object)
+    def _finish(self, error):
+        self._running = False
+        self._completed = error is None
+        self._complete(error)
 
 
 class _LatestPreviewMailbox:
@@ -115,6 +154,8 @@ class _SettingsWindow(QMainWindow):
     history_action_finished = Signal(object)
     history_mutation_finished = Signal(object)
     update_finished = Signal(object)
+    dictation_preferences_finished = Signal(object)
+    onboarding_finished = Signal(object)
 
     def __init__(
         self,
@@ -163,6 +204,10 @@ class _SettingsWindow(QMainWindow):
         self._history_action_in_progress = False
         self._doctor_in_progress = False
         self._recovery_action_in_progress = False
+        self._dictation_save_in_progress = False
+        self._onboarding_save_in_progress = False
+        self._onboarding_confirmed = False
+        self._dictation_preferences_snapshot = {}
         self._history_render_generation = 0
         self.setWindowTitle("VoiceFlow")
         self.setMinimumSize(980, 660)
@@ -207,10 +252,10 @@ class _SettingsWindow(QMainWindow):
 
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
-        for label in ("状态", "听写", "词典", "历史"):
+        for label in ("听写", "词典", "历史"):
             self.sidebar.addItem(QListWidgetItem(label))
         self.sidebar.setCurrentRow(0)
-        self.sidebar.setAccessibleName("设置导航")
+        self.sidebar.setAccessibleName("主要导航")
         sidebar_layout.addWidget(self.sidebar, 1)
 
         self.status_badge = QLabel("准备中")
@@ -219,9 +264,9 @@ class _SettingsWindow(QMainWindow):
         sidebar_layout.addWidget(self.status_badge)
         help_menu = QMenu(self)
         self.diagnostics_action = help_menu.addAction("运行检查")
-        self.diagnostics_action.triggered.connect(lambda: self._show_aux_page(4))
+        self.diagnostics_action.triggered.connect(lambda: self._show_aux_page(3))
         about_action = help_menu.addAction("关于 VoiceFlow")
-        about_action.triggered.connect(lambda: self._show_aux_page(5))
+        about_action.triggered.connect(lambda: self._show_aux_page(4))
         self.help_button = QPushButton("帮助")
         self.help_button.setMenu(help_menu)
         self.help_button.setAccessibleName("帮助、诊断与关于")
@@ -236,7 +281,6 @@ class _SettingsWindow(QMainWindow):
         self.stack.setObjectName("contentStack")
         self.stack.addWidget(self._home_page())
         self.stack.addWidget(self._recent_page())
-        self.stack.addWidget(self._status_page())
         self.stack.addWidget(self._dictionary_page())
         self.stack.addWidget(self._diagnostics_page())
         self.stack.addWidget(self._about_page())
@@ -246,8 +290,9 @@ class _SettingsWindow(QMainWindow):
         body.addWidget(self.stack, 1)
         root.addLayout(body, 1)
         self.setCentralWidget(shell)
-        if not self._high_contrast_enabled():
-            self.setStyleSheet(self._style())
+        self._system_style_ready = True
+        self._high_contrast_active = None
+        self._refresh_system_style()
         self.doctor_finished.connect(self._finish_doctor)
         self.model_switch_finished.connect(self._finish_model_switch)
         self.recovery_finished.connect(self._finish_recovery)
@@ -256,6 +301,16 @@ class _SettingsWindow(QMainWindow):
         self.history_action_finished.connect(self._finish_history_action)
         self.history_mutation_finished.connect(self._finish_history_mutation)
         self.update_finished.connect(self._finish_update_check)
+        self.dictation_preferences_finished.connect(self._finish_dictation_preferences)
+        self.onboarding_finished.connect(self._finish_onboarding)
+        self._last_runtime_phase = None
+        self._runtime_status_timer = QTimer(self)
+        self._runtime_status_timer.setInterval(500)
+        self._runtime_status_timer.timeout.connect(
+            lambda: self._sync_runtime_status() if self.isVisible() else None
+        )
+        if callable(getattr(self.controller, "runtime_snapshot", None)):
+            self._runtime_status_timer.start()
 
     def set_history_actions(
         self,
@@ -271,24 +326,15 @@ class _SettingsWindow(QMainWindow):
         self._on_clear_local_data = clear_local_data
         self._on_restore_history = restore
 
-    def set_trial_result(self, text):
-        self.practice_box.setPlainText(text)
-        self.practice_box.moveCursor(self.practice_box.textCursor().MoveOperation.End)
-        self.practice_box.setFocus()
-        self._set_status_badge(
-            "可以使用" if text else "没有识别到文字，请再试一次",
-            attention=not bool(text),
-        )
-
     def _show_primary_page(self, row):
-        page_by_row = {0: 0, 1: 2, 2: 3, 3: 1}
+        page_by_row = {0: 0, 1: 2, 2: 1}
         if row in page_by_row:
             self.stack.setCurrentIndex(page_by_row[row])
 
     def _show_aux_page(self, index):
         self.sidebar.clearSelection()
         self.stack.setCurrentIndex(index)
-        if index == 4:
+        if index == 3:
             self._run_doctor()
 
     def _section_header(self, title, subtitle):
@@ -306,33 +352,15 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(44, 34, 44, 30)
-        layout.setSpacing(22)
-
-        system_status = QWidget()
-        system_status.setObjectName("systemStatusPanel")
-        status_layout = QHBoxLayout(system_status)
-        status_layout.setContentsMargins(16, 11, 16, 11)
-        status_layout.setSpacing(14)
-        self.home_microphone = QLabel("麦克风 · 正在检查")
-        self.home_microphone.setObjectName("systemStatusItem")
-        self.home_model = QLabel("本地处理")
-        self.home_model.setObjectName("systemStatusItem")
-        self.home_hotkeys = QLabel(trigger_summary())
-        self.home_hotkeys.setObjectName("systemStatusItem")
-        status_layout.addWidget(self.home_microphone)
-        status_layout.addStretch(1)
-        status_layout.addWidget(self.home_model)
-        status_layout.addStretch(1)
-        status_layout.addWidget(self.home_hotkeys)
-        layout.addWidget(system_status)
+        layout.setContentsMargins(40, 32, 40, 32)
+        layout.setSpacing(20)
 
         intro = QVBoxLayout()
-        intro.setSpacing(7)
-        self.home_ready_title = QLabel("VoiceFlow 已就绪")
+        intro.setSpacing(8)
+        self.home_ready_title = QLabel("开口，文字就位。")
         self.home_ready_title.setObjectName("commandTitle")
         self.home_ready_subtitle = QLabel(
-            "完全离线。按快捷键开始说话，再按一次停止。"
+            f"按 {trigger_summary()} 开始说话，再按一次停止。录音与识别在本机完成。"
         )
         self.home_ready_subtitle.setObjectName("commandSubtitle")
         self.home_ready_subtitle.setWordWrap(True)
@@ -340,63 +368,137 @@ class _SettingsWindow(QMainWindow):
         intro.addWidget(self.home_ready_subtitle)
         layout.addLayout(intro)
 
-        shortcut_panel = QWidget()
-        shortcut_panel.setObjectName("shortcutPanel")
-        shortcut_layout = QHBoxLayout(shortcut_panel)
-        shortcut_layout.setContentsMargins(18, 13, 18, 13)
-        shortcut_layout.setSpacing(12)
-        shortcut_name = QLabel("默认快捷键")
-        shortcut_name.setObjectName("panelLabel")
-        shortcut_value = QLabel(f"{trigger_summary()}　　Esc 取消")
-        shortcut_value.setObjectName("shortcutValue")
-        shortcut_layout.addWidget(shortcut_name)
-        shortcut_layout.addStretch(1)
-        shortcut_layout.addWidget(shortcut_value)
-        layout.addWidget(shortcut_panel)
+        self.onboarding_panel = QWidget()
+        onboarding_layout = QVBoxLayout(self.onboarding_panel)
+        onboarding_layout.setContentsMargins(0, 0, 0, 0)
+        onboarding_help = QLabel(
+            "首次使用：把光标放到其他应用的输入位置，按快捷键说一句话，再按一次停止。"
+            "检查文字是否正确出现；没有出现时，可在目标位置按 Ctrl+V。"
+        )
+        onboarding_help.setWordWrap(True)
+        onboarding_layout.addWidget(onboarding_help)
+        self.onboarding_confirm_check = QCheckBox("我已在目标应用看到正确的文字")
+        onboarding_layout.addWidget(self.onboarding_confirm_check)
+        self.confirm_onboarding_button = QPushButton("完成首次使用")
+        self.confirm_onboarding_button.setEnabled(False)
+        self.confirm_onboarding_button.clicked.connect(lambda: self.complete_onboarding(manual=True))
+        self.onboarding_confirm_check.toggled.connect(
+            lambda checked: self.confirm_onboarding_button.setEnabled(
+                checked and not self._onboarding_save_in_progress)
+        )
+        onboarding_layout.addWidget(self.confirm_onboarding_button)
+        self.onboarding_panel.setVisible(False)
+        layout.addWidget(self.onboarding_panel)
 
-        practice_panel = QWidget()
-        practice_panel.setObjectName("practicePanel")
-        practice_layout = QVBoxLayout(practice_panel)
-        practice_layout.setContentsMargins(18, 16, 18, 16)
-        practice_layout.setSpacing(12)
-        practice_header = QHBoxLayout()
-        practice_copy = QVBoxLayout()
-        practice_copy.setSpacing(3)
-        practice_label = QLabel("试说一句")
-        practice_label.setObjectName("subsectionTitle")
-        practice_note = QLabel("把光标放在下方，然后开始听写。")
-        practice_note.setObjectName("sectionSubtitle")
-        practice_copy.addWidget(practice_label)
-        practice_copy.addWidget(practice_note)
-        practice_header.addLayout(practice_copy)
-        practice_header.addStretch(1)
-        self.practice_box = QPlainTextEdit()
-        self.practice_box.setObjectName("practiceBox")
-        self.practice_box.setAccessibleName("VoiceFlow 试说输入框")
-        self.practice_box.setPlaceholderText("识别结果会出现在这里")
-        self.practice_box.setFixedHeight(92)
-        practice_layout.addLayout(practice_header)
-        practice_layout.addWidget(self.practice_box)
-        layout.addWidget(practice_panel)
+        settings_panel = QWidget()
+        settings_panel.setObjectName("dictationSettingsPanel")
+        settings_layout = QVBoxLayout(settings_panel)
+        settings_layout.setContentsMargins(20, 18, 20, 18)
+        settings_layout.setSpacing(14)
+        settings_title = QLabel("听写设置")
+        settings_title.setObjectName("subsectionTitle")
+        settings_layout.addWidget(settings_title)
 
-        recent_header = QHBoxLayout()
-        recent_title = QLabel("最近听写")
-        recent_title.setObjectName("subsectionTitle")
-        view_all = QPushButton("查看全部")
-        view_all.setObjectName("textButton")
-        view_all.clicked.connect(lambda: self.sidebar.setCurrentRow(3))
-        recent_header.addWidget(recent_title)
-        recent_header.addStretch(1)
-        recent_header.addWidget(view_all)
-        layout.addLayout(recent_header)
-        self.home_recent_labels = []
-        label = QLabel()
-        label.setObjectName("recentLine")
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.home_recent_labels.append(label)
-        layout.addWidget(label)
+        fields = QGridLayout()
+        fields.setHorizontalSpacing(16)
+        fields.setVerticalSpacing(12)
+        self.language_combo = QComboBox()
+        self.language_combo.setAccessibleName("识别语言")
+        self.microphone_combo = QComboBox()
+        self.microphone_combo.setAccessibleName("麦克风")
+        self.language_combo.setObjectName("fieldValue")
+        self.microphone_combo.setObjectName("fieldValue")
+        for row, (name, value) in enumerate((
+            ("识别语言", self.language_combo),
+            ("麦克风", self.microphone_combo),
+        )):
+            label = QLabel(name)
+            label.setObjectName("fieldName")
+            fields.addWidget(label, row, 0)
+            fields.addWidget(value, row, 1)
+        fields.setColumnStretch(1, 1)
+        settings_layout.addLayout(fields)
+
+        self.dictation_scope_combo = QComboBox()
+        self.dictation_scope_combo.setAccessibleName("句末策略适用范围")
+        self.dictation_scope_combo.addItem("所有应用的默认值", None)
+        self.sentence_end_combo = QComboBox()
+        self.sentence_end_combo.setAccessibleName("句末标点")
+        for value, label in SENTENCE_END_CHOICES:
+            self.sentence_end_combo.addItem(label, value)
+        fields.addWidget(QLabel("适用范围"), 2, 0)
+        fields.addWidget(self.dictation_scope_combo, 2, 1)
+        fields.addWidget(QLabel("句末标点"), 3, 0)
+        fields.addWidget(self.sentence_end_combo, 3, 1)
+        self.preserve_format_check = QCheckBox("保留格式，不调整空格、换行和标点")
+        self.preserve_format_check.setAccessibleName("保留输入格式")
+        settings_layout.addWidget(self.preserve_format_check)
+        self.sentence_end_sample = QLabel()
+        self.sentence_end_sample.setObjectName("sectionSubtitle")
+        self.sentence_end_sample.setWordWrap(True)
+        self.dictation_scope_note = QLabel("应用设置优先；代码编辑器和终端默认保留格式。")
+        self.dictation_scope_note.setObjectName("sectionSubtitle")
+        self.dictation_scope_note.setWordWrap(True)
+        settings_layout.addWidget(self.sentence_end_sample)
+        settings_layout.addWidget(self.dictation_scope_note)
+        sentence_actions = QHBoxLayout()
+        self.save_dictation_preferences_button = QPushButton("保存标点与格式")
+        self.save_dictation_preferences_button.clicked.connect(self._save_dictation_preferences)
+        sentence_actions.addWidget(self.save_dictation_preferences_button)
+        self.follow_default_button = QPushButton("跟随默认值")
+        self.follow_default_button.setAccessibleName("移除此应用的标点与格式设置，跟随默认值")
+        self.follow_default_button.setEnabled(False)
+        self.follow_default_button.clicked.connect(lambda: self._save_dictation_preferences(follow_default=True))
+        sentence_actions.addWidget(self.follow_default_button)
+        sentence_actions.addWidget(QLabel("下一次听写生效"))
+        sentence_actions.addStretch(1)
+        settings_layout.addLayout(sentence_actions)
+        self.dictation_scope_combo.currentIndexChanged.connect(self._change_dictation_scope)
+        self.sentence_end_combo.currentIndexChanged.connect(self._update_sentence_end_sample)
+        self.preserve_format_check.toggled.connect(self._update_sentence_end_sample)
+        self._update_sentence_end_sample()
+
+        self.autostart_check = QCheckBox(
+            "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
+        )
+        self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
+        settings_layout.addWidget(self.autostart_check)
+
+        actions = QHBoxLayout()
+        self.save_settings_button = QPushButton("保存设置")
+        self.save_settings_button.setObjectName("primaryButton")
+        self.save_settings_button.setAccessibleName("保存听写设置")
+        self.save_settings_button.clicked.connect(self._save_settings)
+        actions.addWidget(self.save_settings_button)
+        save_note = QLabel("语言和麦克风更改需重启")
+        save_note.setObjectName("sectionSubtitle")
+        actions.addWidget(save_note)
+        actions.addStretch(1)
+        settings_layout.addLayout(actions)
+        layout.addWidget(settings_panel)
+
+        status_row = QHBoxLayout()
+        self.home_microphone = QLabel("麦克风 · 正在检查")
+        self.home_microphone.setObjectName("systemStatusItem")
+        self.home_model = QLabel("本地识别 · 正在检查")
+        self.home_model.setObjectName("systemStatusItem")
+        status_row.addWidget(self.home_microphone)
+        status_row.addStretch(1)
+        status_row.addWidget(self.home_model)
+        layout.addLayout(status_row)
+
+        shortcut_hint = QLabel("文字会粘贴到当前光标；不能粘贴时，仍可从剪贴板取用。Esc 取消听写。")
+        shortcut_hint.setWordWrap(True)
+        shortcut_hint.setObjectName("sectionSubtitle")
+        layout.addWidget(shortcut_hint)
         layout.addStretch(1)
-        return page
+        self.dictation_scroll = QScrollArea()
+        self.dictation_scroll.setObjectName("dictationScroll")
+        self.dictation_scroll.setAccessibleName("听写设置")
+        self.dictation_scroll.setWidgetResizable(True)
+        self.dictation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.dictation_scroll.setWidget(page)
+        return self.dictation_scroll
 
     def _recent_page(self):
         page = QWidget()
@@ -404,7 +506,7 @@ class _SettingsWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
-        layout.addLayout(self._section_header("历史", "查看、复制或再次粘贴最近结果"))
+        layout.addLayout(self._section_header("历史", "查看和复制最近结果。复制后，在需要的位置按 Ctrl+V。"))
 
         self.recovery_panel = QWidget()
         self.recovery_panel.setObjectName("recoveryPanel")
@@ -413,7 +515,7 @@ class _SettingsWindow(QMainWindow):
         recovery_layout.setSpacing(8)
         self.recovery_summary = QLabel("")
         self.recovery_summary.setObjectName("recoveryTitle")
-        self.recovery_detail = QLabel("录音只保留 24 小时。恢复成功并写入历史后会立即删除。")
+        self.recovery_detail = QLabel("尚未交付的录音不会自动删除。恢复并复制成功后删除；不再需要时可手动删除。")
         self.recovery_detail.setObjectName("sectionSubtitle")
         self.recovery_detail.setWordWrap(True)
         self.recovery_combo = QComboBox()
@@ -426,6 +528,7 @@ class _SettingsWindow(QMainWindow):
         copy_preview.clicked.connect(self._copy_recovery_preview)
         self.delete_recovery_button = QPushButton("删除录音")
         self.delete_recovery_button.clicked.connect(self._delete_recovery)
+        self.recovery_combo.currentIndexChanged.connect(self._update_recovery_selection)
         recovery_actions.addWidget(self.recover_button)
         recovery_actions.addWidget(copy_preview)
         recovery_actions.addWidget(self.delete_recovery_button)
@@ -473,86 +576,6 @@ class _SettingsWindow(QMainWindow):
         self.history_list.itemDoubleClicked.connect(lambda item: self._copy_text(item.data(Qt.ItemDataRole.UserRole)))
         layout.addWidget(self.history_list, 1)
 
-        return page
-
-    def _status_page(self):
-        page = QWidget()
-        page.setObjectName("contentPage")
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(18, 16, 18, 18)
-        layout.setSpacing(16)
-        layout.addLayout(
-            self._section_header(
-                "听写",
-                "选择语言、麦克风和启动方式。",
-            )
-        )
-
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(12)
-        self.language_combo = QComboBox()
-        self.language_combo.setAccessibleName("识别语言")
-        self.microphone_combo = QComboBox()
-        self.microphone_combo.setAccessibleName("麦克风")
-        self.autostart_check = QCheckBox(
-            "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
-        )
-        self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
-        rows = (
-            ("语言", self.language_combo),
-            ("麦克风", self.microphone_combo),
-        )
-        for row, (name, value) in enumerate(rows):
-            name_label = QLabel(name)
-            name_label.setObjectName("fieldName")
-            value.setObjectName("fieldValue")
-            grid.addWidget(name_label, row, 0)
-            grid.addWidget(value, row, 1)
-        layout.addLayout(grid)
-        layout.addWidget(self.autostart_check)
-
-        privacy_panel = QWidget()
-        privacy_panel.setObjectName("privacyPanel")
-        privacy_layout = QVBoxLayout(privacy_panel)
-        privacy_layout.setContentsMargins(14, 11, 14, 11)
-        privacy_layout.setSpacing(3)
-        privacy_title = QLabel("本地处理")
-        privacy_title.setObjectName("readinessName")
-        privacy_copy = QLabel("录音和文字不会上传")
-        privacy_copy.setObjectName("hotkeyValue")
-        privacy_layout.addWidget(privacy_title)
-        privacy_layout.addWidget(privacy_copy)
-        layout.addWidget(privacy_panel)
-
-        hotkey_panel = QWidget()
-        hotkey_panel.setObjectName("hotkeyPanel")
-        hotkey_layout = QHBoxLayout(hotkey_panel)
-        hotkey_layout.setContentsMargins(14, 11, 12, 11)
-        hotkey_layout.setSpacing(12)
-        hotkey_copy = QVBoxLayout()
-        hotkey_copy.setSpacing(2)
-        hotkey_title = QLabel("开始与停止")
-        hotkey_title.setObjectName("readinessName")
-        hotkey_value = QLabel(f"{trigger_summary()}　　Esc 取消")
-        hotkey_value.setObjectName("hotkeyValue")
-        hotkey_copy.addWidget(hotkey_title)
-        hotkey_copy.addWidget(hotkey_value)
-        hotkey_layout.addLayout(hotkey_copy, 1)
-        layout.addWidget(hotkey_panel)
-
-        actions = QHBoxLayout()
-        self.save_settings_button = QPushButton("保存设置")
-        self.save_settings_button.setObjectName("primaryButton")
-        self.save_settings_button.setAccessibleName("保存听写设置")
-        self.save_settings_button.clicked.connect(self._save_settings)
-        actions.addWidget(self.save_settings_button)
-        save_note = QLabel("保存后重新启动 VoiceFlow 生效")
-        save_note.setObjectName("sectionSubtitle")
-        actions.addWidget(save_note)
-        actions.addStretch(1)
-        layout.addLayout(actions)
-        layout.addStretch(1)
         return page
 
     def _dictionary_page(self):
@@ -806,6 +829,8 @@ class _SettingsWindow(QMainWindow):
                     "history_rows": self._read_history_rows(),
                     "dictionary_entries": self._read_dictionary_entries(),
                     "recovery_sessions": self.recovery_store.list_recoverable(),
+                    "dictation_preferences": (
+                        self.controller.query_dictation_preferences() if self.controller else {}),
                 }
             except Exception as error:
                 payload = {"ok": False, "error": str(error)}
@@ -831,25 +856,41 @@ class _SettingsWindow(QMainWindow):
         self._dictionary_entries = payload["dictionary_entries"]
         self._active_dictionary_filename = self.dictionary_section.currentData()
         self._refresh_settings_controls(config, payload["microphones"])
+        self._apply_dictation_preferences(payload.get("dictation_preferences", {}))
         self._refresh_home(config)
-        self._refresh_home_history()
         self._render_history()
         self._render_dictionary_section()
         self._apply_recovery_sessions(payload["recovery_sessions"])
-        self._set_status_badge("就绪" if payload["ready"] else "需要设置")
+        self._set_status_badge("就绪" if payload["ready"] and self._microphone_detected else "需要设置")
+        self._sync_runtime_status(force=True)
 
-    @staticmethod
-    def _query_microphones():
-        devices = []
-        try:
-            import sounddevice as sd
+    def _sync_runtime_status(self, *, force=False):
+        snapshot = getattr(self.controller, "runtime_snapshot", None)
+        if not callable(snapshot):
+            return
+        state = snapshot()
+        audio_pid = state.get("worker_pids", {}).get("audio", 0)
+        if audio_pid and audio_pid != getattr(self, "_microphone_worker_pid", 0):
+            self._microphone_worker_pid = audio_pid
+            self._microphone_refresh_pending = True
+        if getattr(self, "_microphone_refresh_pending", False) and not self._refresh_in_progress:
+            self._microphone_refresh_pending = False
+            self.refresh()
+        phase = state["phase"]
+        if not force and phase == self._last_runtime_phase:
+            return
+        self._last_runtime_phase = phase
+        labels = {"starting": "正在准备", "ready": "就绪", "recording": "聆听中",
+                  "finalizing": "正在完成", "delivering": "正在交付"}
+        self._set_status_badge(labels.get(phase, "需要处理"), attention=phase in {"degraded", "error"})
+        readiness = "正在准备" if phase == "starting" else (
+            "可用" if state["final_asr"] == "ready" and phase not in {"degraded", "error"} else "需要检查"
+        )
+        self.home_model.setText(f"本地识别 · {readiness}")
 
-            for index, device in enumerate(sd.query_devices()):
-                if int(device.get("max_input_channels", 0)) > 0:
-                    devices.append((str(device.get("name", index)), index))
-        except Exception:
-            pass
-        return devices
+    def _query_microphones(self):
+        query = getattr(self.controller, "query_microphones", None)
+        return query() if query is not None else []
 
     def _read_dictionary_entries(self):
         entries = {}
@@ -887,36 +928,57 @@ class _SettingsWindow(QMainWindow):
     def needs_onboarding(self):
         return not onboarding_completed(self.paths.config_file)
 
-    def complete_onboarding(self):
-        if self.needs_onboarding():
-            set_onboarding_completed(self.paths.config_file, True)
-        self.home_ready_title.setText("VoiceFlow 已就绪")
-        self.home_ready_subtitle.setText(
-            "刚才的文字已保存在剪贴板和本地历史中。以后直接按快捷键说话即可。"
-        )
-        self._set_status_badge("首次听写完成")
+    def complete_onboarding(self, *, manual=False):
+        if manual and not self.onboarding_confirm_check.isChecked():
+            return
+        if self._onboarding_save_in_progress:
+            return
+        self._onboarding_save_in_progress = True
+        self.confirm_onboarding_button.setEnabled(False)
+
+        def run():
+            try:
+                set_onboarding_completed(self.paths.config_file, True)
+                result = {"ok": True}
+            except Exception:
+                logger.warning("first use state persistence failed")
+                result = {"ok": False}
+            self.onboarding_finished.emit(result)
+
+        threading.Thread(target=run, name="voiceflow-first-use-save", daemon=True).start()
+
+    @Slot(object)
+    def _finish_onboarding(self, result):
+        self._onboarding_save_in_progress = False
+        if result.get("ok"):
+            self._onboarding_confirmed = True
+            self.onboarding_panel.hide()
+            self._set_status_badge("首次听写已确认")
+        else:
+            self.confirm_onboarding_button.setEnabled(self.onboarding_confirm_check.isChecked())
+            self._set_status_badge("首次使用状态未保存，请稍后重试", attention=True)
 
     def _refresh_home(self, config):
+        self.onboarding_panel.setVisible(
+            not self._onboarding_confirmed
+            and not bool(config.get("ui", {}).get("onboarding_completed", False))
+        )
         active = config.get("engine", {}).get("active", "sensevoice")
         model_ready = self._engine_ready(active, config)
-        microphone_name = self.microphone_combo.currentText() or "未检测到"
         microphone_ready = self._microphone_detected
         all_ready = model_ready and microphone_ready
-        self.home_ready_title.setText(
-            "VoiceFlow 已就绪" if all_ready else "还需要完成一项设置"
-        )
+        self.home_ready_title.setText("开口，文字就位。")
         self.home_ready_subtitle.setText(
-            "完全离线。按快捷键开始说话，再按一次停止。"
+            f"按 {trigger_summary()} 开始说话，再按一次停止。录音与识别在本机完成。"
             if all_ready
-            else "完成下方检查后，就可以在任意输入框使用语音输入。"
+            else "选择可用麦克风并确认本地识别可用后，即可开始听写。"
         )
         self.home_microphone.setText(
-            f"麦克风 · {microphone_name}" if microphone_ready else "麦克风 · 需要选择"
+            "麦克风 · 可用" if microphone_ready else "麦克风 · 需要选择"
         )
         self.home_model.setText(
-            "本地处理 · 可用" if model_ready else "本地处理 · 需要检查"
+            "本地识别 · 可用" if model_ready else "本地识别 · 需要检查"
         )
-        self.home_hotkeys.setText(f"快捷键 · {trigger_summary()}")
 
     def _dictionary_path(self, filename):
         return self.paths.knowledge_dir / filename
@@ -1081,6 +1143,119 @@ class _SettingsWindow(QMainWindow):
         except Exception:
             return {}
 
+    def _apply_dictation_preferences(self, snapshot, *, selected_app=None):
+        self._dictation_preferences_snapshot = snapshot or {}
+        current = selected_app if selected_app is not None else self.dictation_scope_combo.currentData()
+        self.dictation_scope_combo.blockSignals(True)
+        self.dictation_scope_combo.clear()
+        self.dictation_scope_combo.addItem("所有应用的默认值", None)
+        identities = set(self._dictation_preferences_snapshot.get("apps", {}))
+        last_app = self._dictation_preferences_snapshot.get("last_app", "")
+        if last_app:
+            identities.add(last_app)
+        for identity in sorted(identities):
+            try:
+                identity = normalize_app_id(identity)
+            except ValueError:
+                continue
+            label = f"{identity} · 上次听写应用" if identity == last_app else identity
+            self.dictation_scope_combo.addItem(label, identity)
+        self.dictation_scope_combo.setCurrentIndex(max(0, self.dictation_scope_combo.findData(current)))
+        self.dictation_scope_combo.blockSignals(False)
+        available = self.controller is not None and bool(snapshot)
+        self.save_dictation_preferences_button.setEnabled(available and not self._dictation_save_in_progress)
+        self._change_dictation_scope()
+
+    def _change_dictation_scope(self, *_args):
+        snapshot = self._dictation_preferences_snapshot
+        app_id = self.dictation_scope_combo.currentData()
+        self.follow_default_button.setVisible(bool(app_id))
+        self.follow_default_button.setEnabled(
+            bool(self.controller and app_id in snapshot.get("apps", {}))
+            and not self._dictation_save_in_progress)
+        options = snapshot.get("apps", {}).get(app_id)
+        if options is None:
+            options = dict(snapshot.get("global", {"sentence_end": "preserve", "preserve_format": False}))
+            if application_preserves_format(app_id):
+                options["preserve_format"] = True
+        self.sentence_end_combo.setCurrentIndex(max(0, self.sentence_end_combo.findData(options["sentence_end"])))
+        self.preserve_format_check.setChecked(bool(options["preserve_format"]))
+        if app_id in {"msedge.exe", "chrome.exe", "firefox.exe", "brave.exe"}:
+            note = "此设置适用于这个浏览器的所有网站，不按网页分别记忆。"
+        elif app_id:
+            note = "仅在这个应用中使用；保存后会记住，其他应用不受影响。"
+        else:
+            note = "应用设置优先；代码编辑器和终端默认保留格式。"
+        if snapshot.get("load_error"):
+            note = "上次设置未能读取，暂用保留原样；重新保存可修复。 " + note
+        self.dictation_scope_note.setText(note)
+        self._update_sentence_end_sample()
+
+    def _update_sentence_end_sample(self, *_args):
+        mode = self.sentence_end_combo.currentData() or "preserve"
+        preserve = self.preserve_format_check.isChecked()
+        source = "你好。" if mode != "complete_period" else "你好"
+        sample = apply_sentence_end(source, mode, preserve_format=preserve)
+        self.sentence_end_sample.setText(f"示例：{sample}　/　Hello!　/　真的吗？")
+        self.sentence_end_combo.setEnabled(not preserve)
+
+    def _save_dictation_preferences(self, _checked=False, *, follow_default=False):
+        if self._dictation_save_in_progress or self.controller is None:
+            return
+        self._dictation_save_in_progress = True
+        self.save_dictation_preferences_button.setEnabled(False)
+        self.follow_default_button.setEnabled(False)
+        self.dictation_scope_combo.setEnabled(False)
+        self.sentence_end_combo.setEnabled(False)
+        self.preserve_format_check.setEnabled(False)
+        app_id = self.dictation_scope_combo.currentData()
+        options = {"sentence_end": self.sentence_end_combo.currentData(),
+                   "preserve_format": self.preserve_format_check.isChecked(),
+                   "app_id": app_id,
+                   "expected": (self._dictation_preferences_snapshot.get("global") if app_id is None
+                                else self._dictation_preferences_snapshot.get("apps", {}).get(app_id))}
+        if follow_default:
+            options = {"app_id": app_id, "follow_default": True, "expected": options["expected"]}
+
+        def run():
+            try:
+                snapshot = self.controller.update_dictation_preferences(options)
+                if not snapshot:
+                    raise RuntimeError("settings unavailable")
+                result = {"ok": True, "snapshot": self.controller.query_dictation_preferences(),
+                          "app_id": app_id, "follow_default": follow_default}
+            except PreferencesChangedError:
+                try:
+                    result = {"ok": False, "changed": True,
+                              "snapshot": self.controller.query_dictation_preferences(), "app_id": app_id}
+                except Exception:
+                    result = {"ok": False}
+            except Exception:
+                result = {"ok": False}
+            self.dictation_preferences_finished.emit(result)
+
+        threading.Thread(target=run, name="voiceflow-dictation-settings", daemon=True).start()
+
+    @Slot(object)
+    def _finish_dictation_preferences(self, result):
+        self._dictation_save_in_progress = False
+        self.save_dictation_preferences_button.setEnabled(True)
+        self.dictation_scope_combo.setEnabled(True)
+        self.preserve_format_check.setEnabled(True)
+        self._update_sentence_end_sample()
+        if result.get("ok"):
+            self._apply_dictation_preferences(result["snapshot"], selected_app=result.get("app_id"))
+            self._set_status_badge("已跟随默认值，下一次听写生效" if result.get("follow_default")
+                                   else "标点与格式已保存，下一次听写生效")
+        elif result.get("changed"):
+            self._apply_dictation_preferences(result["snapshot"], selected_app=result.get("app_id"))
+            self._set_status_badge("设置已在其他位置更改，已刷新。请确认后重新保存。", attention=True)
+        else:
+            app_id = self.dictation_scope_combo.currentData()
+            self.follow_default_button.setEnabled(
+                bool(app_id in self._dictation_preferences_snapshot.get("apps", {})))
+            self._set_status_badge("标点与格式未保存，请重试或检查磁盘空间", attention=True)
+
     def _engine_ready(self, engine, config):
         return self.model_manager.status(engine, config).state is ModelState.READY
 
@@ -1162,13 +1337,14 @@ class _SettingsWindow(QMainWindow):
 
     def _output_status_label(self, status):
         return {
-            "clipboard_verified_paste_dispatched": "已完成",
+            "landed_confirmed": "已输入",
+            "clipboard_verified_paste_dispatched": "已复制，输入未确认",
             "clipboard_verified_only": "已复制",
             "recovery_saved_clipboard_unavailable": "已保存",
-            "clipboard_copied_paste_sent": "已完成",
+            "clipboard_copied_paste_sent": "已复制，输入未确认",
             "clipboard_copied_integrity_warning": "已复制",
             "fallback": "已复制",
-            "typed": "已输入",
+            "typed": "输入未确认",
             "error": "失败",
             "unknown": "未知",
         }.get(status, "未知")
@@ -1202,23 +1378,7 @@ class _SettingsWindow(QMainWindow):
     def _read_history_rows(self):
         if self._on_read_history:
             return list(self._on_read_history())
-        path = self.paths.history_file
-        if not path.exists():
-            return []
-        with path.open("r", encoding="utf-8") as f:
-            rows = [line for line in f.read().splitlines() if line][-80:]
-        parsed = []
-        for row in reversed(rows):
-            try:
-                record = json.loads(row)
-            except Exception:
-                continue
-            if isinstance(record, dict):
-                record["_entry_id"] = hashlib.sha256(
-                    row.encode("utf-8")
-                ).hexdigest()
-                parsed.append(record)
-        return parsed
+        return HistoryStore(self.paths.history_file).read_recent(80)
 
     @Slot(object)
     def _finish_history_refresh(self, payload):
@@ -1231,34 +1391,7 @@ class _SettingsWindow(QMainWindow):
             return
         self._history_rows = payload["rows"]
         self._render_history()
-        self._refresh_home_history()
         self._set_status_badge("历史已刷新")
-
-    def _refresh_home_history(self):
-        if not hasattr(self, "home_recent_labels"):
-            return
-        rows = []
-        for row in self._history_rows:
-            text = (
-                row.get("corrected_text")
-                or row.get("clean_text")
-                or row.get("error")
-                or ""
-            ).strip()
-            if text:
-                rows.append(text)
-            if len(rows) == len(self.home_recent_labels):
-                break
-        for index, label in enumerate(self.home_recent_labels):
-            if index < len(rows):
-                value = rows[index]
-                label.setText(value if len(value) <= 72 else f"{value[:72]}…")
-                label.show()
-            elif index == 0:
-                label.setText("完成第一次听写后，文字会出现在这里。")
-                label.show()
-            else:
-                label.hide()
 
     def _render_history(self):
         if not hasattr(self, "history_list"):
@@ -1335,12 +1468,6 @@ class _SettingsWindow(QMainWindow):
         copy.setObjectName("inlineCopyButton")
         copy.clicked.connect(lambda _=False, value=text: self._copy_text(value))
         row.addWidget(copy)
-        repaste = QPushButton("再次粘贴")
-        repaste.setObjectName("inlineRepasteButton")
-        repaste.clicked.connect(
-            lambda _=False, value=text: self._repaste_text(value)
-        )
-        row.addWidget(repaste)
         delete = QPushButton("删除")
         delete.setObjectName("inlineDeleteButton")
         delete.setEnabled(bool(entry_id))
@@ -1366,7 +1493,7 @@ class _SettingsWindow(QMainWindow):
         answer = QMessageBox.question(
             self,
             "清空全部历史",
-            f"将永久删除全部 {len(self._history_rows)} 条本地听写记录。继续吗？",
+            "将永久删除全部本地听写历史（包括未显示的记录）和待交付文字，保留可恢复录音。继续吗？",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
@@ -1380,7 +1507,8 @@ class _SettingsWindow(QMainWindow):
         answer = QMessageBox.question(
             self,
             "清除本机听写数据",
-            "将永久删除本地历史和未交付录音，不会删除配置、词典或模型。继续吗？",
+            "将永久删除本地历史、待交付文字和未交付录音，保留配置、词典和模型。"
+            "Windows 剪贴板及其历史、同步记录需自行清理。继续吗？",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
@@ -1417,6 +1545,7 @@ class _SettingsWindow(QMainWindow):
                     changed = int(
                         result.get("history_entries", 0)
                         + result.get("recovery_sessions", 0)
+                        + result.get("pending_deliveries", 0)
                     )
                 elif action == "restore":
                     changed = int(bool(self._on_restore_history(token)))
@@ -1509,13 +1638,7 @@ class _SettingsWindow(QMainWindow):
         self._repaste_text(text)
 
     def _repaste_text(self, text):
-        if not text:
-            self._set_status_badge("无可粘贴")
-            return
-        if not self._on_repaste_text:
-            self._set_status_badge("粘贴失败", attention=True)
-            return
-        self._run_history_action(text, self._on_repaste_text, "正在准备粘贴")
+        self._copy_text(text)
 
     def _run_history_action(self, text, callback, pending_label):
         if self._history_action_in_progress:
@@ -1556,7 +1679,7 @@ class _SettingsWindow(QMainWindow):
             minutes = session.sample_count / max(1, session.sample_rate) / 60
             created = datetime.fromtimestamp(session.created_at).strftime("%m月%d日 %H:%M")
             self.recovery_combo.addItem(
-                f"{created} · {minutes:.1f} 分钟 · {session.model}",
+                f"{created} · {minutes:.1f} 分钟" if session.can_recover else f"{created} · 信息损坏",
                 session.session_id,
             )
             index = self.recovery_combo.count() - 1
@@ -1565,13 +1688,29 @@ class _SettingsWindow(QMainWindow):
                 session.preview_text,
                 int(Qt.ItemDataRole.UserRole) + 1,
             )
-        self.recovery_summary.setText(f"有 {len(sessions)} 段录音可以恢复")
+            self.recovery_combo.setItemData(index, session, int(Qt.ItemDataRole.UserRole) + 2)
+        self.recovery_summary.setText(f"有 {len(sessions)} 段尚未交付的录音")
         self.recovery_panel.setVisible(bool(sessions))
+        self._update_recovery_selection()
+
+    def _update_recovery_selection(self, *_args):
+        session = self.recovery_combo.currentData(int(Qt.ItemDataRole.UserRole) + 2)
+        available = session is not None and session.can_recover
+        self.recover_button.setEnabled(available and not self._recovery_action_in_progress)
+        if session is not None and not session.can_recover:
+            detail = "录音信息损坏，原文件已保留。无法可靠识别，不再需要时可手动删除。"
+        elif session is not None and session.partial:
+            detail = "这段录音可能只保存了部分内容，末尾可能缺失。恢复后仍保留原录音，不再需要时可手动删除。"
+        else:
+            detail = "尚未交付的录音不会自动删除。恢复并复制成功后删除；不再需要时可手动删除。"
+        self.recovery_detail.setText(detail)
 
     def _recover_selected_session(self):
         session_id = self.recovery_combo.currentData()
+        session = self.recovery_combo.currentData(int(Qt.ItemDataRole.UserRole) + 2)
         if (
             not session_id
+            or session is None or not session.can_recover
             or not self._on_recover_session
             or self._recovery_action_in_progress
         ):
@@ -1597,6 +1736,7 @@ class _SettingsWindow(QMainWindow):
         self._recovery_action_in_progress = False
         self.recover_button.setEnabled(True)
         self.delete_recovery_button.setEnabled(True)
+        self._update_recovery_selection()
         if result.get("action") == "delete":
             if result.get("ok"):
                 self._set_status_badge("恢复录音已删除")
@@ -1605,7 +1745,10 @@ class _SettingsWindow(QMainWindow):
                 self._set_status_badge("没有找到这段恢复录音")
             return
         if result.get("ok"):
-            self._set_status_badge("恢复完成，文字已复制到剪贴板")
+            message = ("已恢复保存的部分，文字已复制。原录音仍保留" if result.get("partial") else
+                       "文字已复制到剪贴板，原录音仍保留" if result.get("recording_retained") else
+                       "恢复完成，文字已复制到剪贴板")
+            self._set_status_badge(message)
             self._refresh_history()
             self._refresh_recovery()
         else:
@@ -1794,38 +1937,34 @@ class _SettingsWindow(QMainWindow):
             return
         self._copy_text(format_diagnostics(self._last_diagnostics))
 
+    def event(self, event):
+        if (getattr(self, "_system_style_ready", False) and event.type() in {
+                QEvent.Type.ApplicationPaletteChange, QEvent.Type.PaletteChange,
+                QEvent.Type.ThemeChange}):
+            self._refresh_system_style()
+        return super().event(event)
+
+    def showEvent(self, event):
+        self._refresh_system_style()
+        super().showEvent(event)
+
+    def _refresh_system_style(self):
+        high_contrast = self._high_contrast_enabled()
+        if high_contrast != self._high_contrast_active:
+            self._high_contrast_active = high_contrast
+            self.setStyleSheet("" if high_contrast else self._style())
+
     def _high_contrast_enabled(self):
-        if os.name != "nt":
-            return False
-        try:
-            import ctypes
-
-            class HighContrast(ctypes.Structure):
-                _fields_ = [
-                    ("cbSize", ctypes.c_uint),
-                    ("dwFlags", ctypes.c_uint),
-                    ("lpszDefaultScheme", ctypes.c_wchar_p),
-                ]
-
-            value = HighContrast()
-            value.cbSize = ctypes.sizeof(value)
-            ok = ctypes.windll.user32.SystemParametersInfoW(
-                0x0042,
-                value.cbSize,
-                ctypes.byref(value),
-                0,
-            )
-            return bool(ok and value.dwFlags & 0x00000001)
-        except Exception:
-            return False
+        return system_high_contrast_enabled()
 
     def _style(self):
         return """
+        * {
+            font-size: 14px;
+        }
         QWidget#appShell {
             background: #f7f7f8;
             color: #1d1d1f;
-            font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei";
-            font-size: 14px;
         }
         QWidget#sidebarPanel {
             background: #f0f0f2;
@@ -1852,7 +1991,7 @@ class _SettingsWindow(QMainWindow):
         QLabel#statusBadge {
             padding: 7px 2px;
             background: transparent;
-            color: #24753d;
+            color: #6b6b70;
             border: none;
             font-weight: 600;
         }
@@ -1886,6 +2025,10 @@ class _SettingsWindow(QMainWindow):
             background: transparent;
             border: none;
         }
+        QScrollArea#dictationScroll {
+            border: none;
+            background: transparent;
+        }
         QLabel#sectionTitle {
             font-size: 22px;
             font-weight: 650;
@@ -1905,29 +2048,15 @@ class _SettingsWindow(QMainWindow):
             font-size: 14px;
             font-weight: 600;
         }
-        QWidget#systemStatusPanel {
-            background: #fafafa;
+        QWidget#dictationSettingsPanel {
+            background: #fbfbfc;
             border: 1px solid #e5e5e8;
-            border-radius: 10px;
+            border-radius: 16px;
         }
         QLabel#systemStatusItem {
             color: #4d4d50;
             font-size: 12px;
             font-weight: 550;
-        }
-        QWidget#shortcutPanel, QWidget#practicePanel {
-            background: #ffffff;
-            border: 1px solid #e4e4e7;
-            border-radius: 12px;
-        }
-        QLabel#panelLabel {
-            color: #6e6e73;
-            font-size: 13px;
-        }
-        QLabel#shortcutValue {
-            color: #1d1d1f;
-            font-size: 13px;
-            font-weight: 600;
         }
         QWidget#hotkeyPanel, QWidget#recoveryPanel,
         QWidget#aboutHero, QWidget#privacyPanel {
@@ -2005,18 +2134,19 @@ class _SettingsWindow(QMainWindow):
             color: #1d1d1f;
             font-weight: 500;
         }
-        QLineEdit, QPlainTextEdit, QComboBox,
+        QLineEdit, QComboBox,
         QListWidget#historyList, QListWidget#diagnosticList,
         QListWidget#dictionaryList {
             border: 1px solid #d5d5da;
             border-radius: 9px;
             background: #ffffff;
             padding: 9px 11px;
-            selection-background-color: #007aff;
+            selection-background-color: #343438;
             selection-color: #ffffff;
         }
         QComboBox {
-            min-height: 32px;
+            min-height: 18px;
+            padding: 6px 11px;
         }
         QComboBox::drop-down {
             width: 32px;
@@ -2067,19 +2197,19 @@ class _SettingsWindow(QMainWindow):
         QPushButton:hover {
             background: #f2f2f5;
         }
-        QPushButton:focus, QLineEdit:focus, QPlainTextEdit:focus,
+        QPushButton:focus, QLineEdit:focus,
         QComboBox:focus, QListWidget:focus {
-            border: 2px solid #007aff;
+            border: 2px solid #55555b;
         }
         QPushButton#primaryButton {
-            background: #0071e3;
+            background: #1d1d1f;
             color: white;
-            border: 1px solid #0071e3;
+            border: 1px solid #1d1d1f;
             font-weight: 600;
         }
         QPushButton#primaryButton:hover {
-            background: #006ee6;
-            border-color: #006ee6;
+            background: #353539;
+            border-color: #353539;
         }
         QPushButton#primaryButton:disabled {
             background: #c7c7cc;
@@ -2112,8 +2242,12 @@ class OverlayWindow:
         self.controller = controller
         self.window = None
         self.web_view = None
+        self._native_renderer = os.environ.get("VOICEFLOW_CAPSULE_RENDERER", "native") != "webengine"
         self._bridge = None
         self._tray = None
+        self._quit_coordinator = None
+        self._quit_action_states = []
+        self._quit_tooltip = ""
         self._tray_icons = {}
         self._on_record_toggle = (
             (lambda *_args: controller.toggle_recording(source="tray"))
@@ -2232,24 +2366,22 @@ class OverlayWindow:
         self.window.setFixedSize(QSize(self._window_width, self._window_height))
         self._center_window()
 
-        # ---- WebView ----
-        self.web_view = QWebEngineView()
-        self._preview_paint_reporter = _PreviewPaintReporter()
-        self._preview_paint_reporter.painted.connect(self._preview_painted)
-        self._web_channel = QWebChannel(self.web_view.page())
-        self._web_channel.registerObject(
-            "voiceflowBridge",
-            self._preview_paint_reporter,
-        )
-        self.web_view.page().setWebChannel(self._web_channel)
-        self.web_view.setUrl(QUrl.fromLocalFile(self._html_path))
-        self.web_view.setStyleSheet("background: transparent;")
-        self.web_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
-
-        self._bridge = _Bridge(
-            self.web_view,
-            before_show=self._expect_recording_paint,
-        )
+        if self._native_renderer:
+            self.web_view = NativeCapsuleView()
+            self.web_view.preview_painted.connect(self._preview_painted)
+            self._bridge = NativeCapsuleBridge(self.web_view, self._expect_recording_paint)
+        else:
+            from qt_compat import QWebChannel, QWebEngineView
+            self.web_view = QWebEngineView()
+            self._preview_paint_reporter = _PreviewPaintReporter()
+            self._preview_paint_reporter.painted.connect(self._preview_painted)
+            self._web_channel = QWebChannel(self.web_view.page())
+            self._web_channel.registerObject("voiceflowBridge", self._preview_paint_reporter)
+            self.web_view.page().setWebChannel(self._web_channel)
+            self.web_view.setUrl(QUrl.fromLocalFile(self._html_path))
+            self.web_view.setStyleSheet("background: transparent;")
+            self.web_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
+            self._bridge = _Bridge(self.web_view, before_show=self._expect_recording_paint)
         # 连接 show/hide 信号（线程安全）
         self._bridge.show_requested.connect(self._show)
         self._bridge.hide_requested.connect(self._hide)
@@ -2257,7 +2389,6 @@ class OverlayWindow:
         self._bridge.tray_state_requested.connect(self._set_tray_state)
         self._bridge.settings_requested.connect(self._show_settings)
         self._bridge.startup_requested.connect(self._show_startup)
-        self._bridge.trial_result_requested.connect(self._apply_trial_result)
         self._bridge.onboarding_completed_requested.connect(
             self._complete_onboarding
         )
@@ -2430,11 +2561,7 @@ class OverlayWindow:
         copy_last_act.triggered.connect(self._copy_last)
         self._tray_menu.addAction(copy_last_act)
         self._tray_actions.append(copy_last_act)
-
-        repaste_last_act = QAction("重新粘贴上一次结果", self._tray_menu)
-        repaste_last_act.triggered.connect(self._repaste_last)
-        self._tray_menu.addAction(repaste_last_act)
-        self._tray_actions.append(repaste_last_act)
+        self._setup_sentence_end_menu()
 
         dictionary_act = QAction("打开词库", self._tray_menu)
         dictionary_act.triggered.connect(self._open_dictionary)
@@ -2451,6 +2578,45 @@ class OverlayWindow:
         self._tray.setContextMenu(self._tray_menu)
         self._tray.activated.connect(self._on_tray_activated)
 
+    def _setup_sentence_end_menu(self):
+        self._sentence_end_menu = self._tray_menu.addMenu("句末标点 · 默认值")
+        self._tray_actions.append(self._sentence_end_menu.menuAction())
+        for mode, label in SENTENCE_END_CHOICES:
+            action = self._sentence_end_menu.addAction(label)
+            action.setCheckable(True)
+            action.setData(mode)
+            action.triggered.connect(lambda _checked=False, value=mode: self._save_tray_sentence_end(value))
+        self._sentence_end_menu.aboutToShow.connect(self._refresh_sentence_end_menu)
+
+    def _refresh_sentence_end_menu(self):
+        snapshot = self.controller.query_dictation_preferences() if self.controller else {}
+        current = snapshot.get("global", {}).get("sentence_end", "preserve")
+        for action in self._sentence_end_menu.actions():
+            action.setChecked(action.data() == current)
+            action.setEnabled(bool(snapshot) and not getattr(self, "_tray_sentence_save_in_progress", False))
+
+    def _save_tray_sentence_end(self, mode):
+        if self.controller is None or getattr(self, "_tray_sentence_save_in_progress", False):
+            return
+        self._tray_sentence_save_in_progress = True
+
+        def run():
+            try:
+                snapshot = self.controller.query_dictation_preferences()
+                result = self.controller.update_dictation_preferences({
+                    "sentence_end": mode,
+                    "preserve_format": snapshot.get("global", {}).get("preserve_format", False),
+                    "expected": snapshot.get("global"),
+                })
+                if not result:
+                    raise RuntimeError("settings unavailable")
+            except Exception:
+                self.show_error("标点设置未保存，请重试或检查磁盘空间")
+            finally:
+                self._tray_sentence_save_in_progress = False
+
+        threading.Thread(target=run, name="voiceflow-tray-punctuation", daemon=True).start()
+
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self._show_settings()
@@ -2461,6 +2627,7 @@ class OverlayWindow:
             self.window.show()
 
     def _expect_recording_paint(self):
+        self._cancel_pending_hide()
         if self.window:
             self.window.expect_first_paint()
 
@@ -2514,10 +2681,6 @@ class OverlayWindow:
         if window.needs_onboarding():
             self._show_settings()
 
-    def _apply_trial_result(self, text):
-        window = self._ensure_settings_window()
-        window.set_trial_result(text)
-
     def _complete_onboarding(self):
         if self._settings_window is not None:
             self._settings_window.complete_onboarding()
@@ -2542,6 +2705,8 @@ class OverlayWindow:
         self._hide_timer = None
         self._set_tray_state(TRAY_ICON_IDLE)
         if self._bridge:
+            if self._native("reset", hide=True):
+                return
             self._bridge.js_then_hide_requested.emit("resetHiddenInstant()")
             return
         self._hide()
@@ -2568,18 +2733,33 @@ class OverlayWindow:
             self._on_copy_last()
 
     def _repaste_last(self):
-        if self._on_repaste_last:
-            self._on_repaste_last()
+        self._copy_last()
 
     def _open_dictionary(self):
         if self._on_open_dictionary:
             self._on_open_dictionary()
 
     def quit(self):
+        if self._quit_coordinator is None:
+            self._quit_coordinator = _QuitCoordinator(self._on_quit, self._finish_quit)
+        if self._quit_coordinator.start():
+            self._quit_action_states = [(action, action.isEnabled()) for action in self._tray_actions]
+            for action, _enabled in self._quit_action_states:
+                action.setEnabled(False)
+            if self._tray:
+                self._quit_tooltip = self._tray.toolTip()
+                self._tray.setToolTip("VoiceFlow · 正在退出")
+
+    def _finish_quit(self, error):
+        if error is not None:
+            for action, enabled in self._quit_action_states:
+                action.setEnabled(enabled)
+            if self._tray:
+                self._tray.setToolTip(self._quit_tooltip)
+            self.show_error("退出未完成，请从托盘重试。")
+            return
         if self._tray:
             self._tray.setVisible(False)
-        if self._on_quit:
-            self._on_quit()
         app = QApplication.instance()
         if app:
             app.quit()
@@ -2592,12 +2772,21 @@ class OverlayWindow:
         if self._bridge:
             self._bridge.js_requested.emit(code)
 
+    def _native(self, command, *args, show=False, hide=False):
+        if not self._native_renderer:
+            return False
+        if self._bridge:
+            signal = (self._bridge.render_then_show_requested if show else
+                      self._bridge.render_then_hide_requested if hide else
+                      self._bridge.render_requested)
+            signal.emit(command, list(args))
+        return True
+
     def _tray_state(self, state):
         if self._bridge:
             self._bridge.tray_state_requested.emit(state)
 
     def show_recording(self, session_id, triggered_at=None):
-        self._cancel_pending_hide()
         self._tray_state(TRAY_ICON_RECORDING)
         if triggered_at is not None:
             with self._recording_feedback_lock:
@@ -2606,14 +2795,20 @@ class OverlayWindow:
                     float(triggered_at),
                 )
         if self._bridge:
+            if self._native("prepare_recording", int(session_id), show=True):
+                return
             self._bridge.js_then_show_requested.emit(f"prepareRecording({int(session_id)})")
 
     def append_streaming(self, delta, session_id):
+        if self._native("append_streaming", delta, int(session_id)):
+            return
         self._js(
             f"appendStreaming({json.dumps(delta, ensure_ascii=False)}, {int(session_id)})"
         )
 
     def update_transcript_state(self, state):
+        if self._native("transcript", state.authoritative_prefix, state.draft_tail, int(state.session_id)):
+            return
         self._js(
             "updateTranscriptState("
             f"{json.dumps(state.authoritative_prefix, ensure_ascii=False)}, "
@@ -2622,12 +2817,16 @@ class OverlayWindow:
         )
 
     def show_authoritative_final(self, text, session_id):
+        if self._native("final", text, int(session_id)):
+            return
         self._js(
             "showAuthoritativeFinal("
             f"{json.dumps(text, ensure_ascii=False)}, {int(session_id)})"
         )
 
     def update_audio_level(self, levels, session_id):
+        if self._native("levels", [max(0.0, min(float(level), 1.0)) for level in levels[:3]], int(session_id)):
+            return
         if self._bridge:
             safe_levels = [max(0.0, min(float(level), 1.0)) for level in levels[:3]]
             self._bridge.level_js_requested.emit(
@@ -2636,15 +2835,21 @@ class OverlayWindow:
 
     def show_processing(self):
         self._tray_state(TRAY_ICON_PROCESSING)
+        if self._native("processing"):
+            return
         self._js("showProcessing()")
 
     def show_settling(self, session_id):
         self._tray_state(TRAY_ICON_PROCESSING)
+        if self._native("settling", int(session_id)):
+            return
         self._js(f"showSettling({int(session_id)})")
 
 
     def show_delivery_state(self, status, session_id):
         self._tray_state(TRAY_ICON_IDLE)
+        if self._native("delivery", str(status), int(session_id)):
+            return
         self._js(
             "showDeliveryState("
             f"{json.dumps(str(status))}, "
@@ -2653,27 +2858,37 @@ class OverlayWindow:
 
 
     def show_result(self, text):
+        if self._native("label", "success", text):
+            self._tray_state(TRAY_ICON_IDLE)
+            return
         self._js(f"showResult({json.dumps(text, ensure_ascii=False)})")
         self._tray_state(TRAY_ICON_IDLE)
 
     def show_error(self, msg):
         self._tray_state(TRAY_ICON_ERROR)
+        if self._native("label", "error", msg):
+            return
         self._js(f"showState('error', {json.dumps(msg, ensure_ascii=False)})")
 
     def show_recovery_available(self, count):
         self._tray_state(TRAY_ICON_IDLE)
-        self._js(f"showRecoveryAvailable({int(count)})")
+        if not self._native("label", "recovery", "有未完成的听写"):
+            self._js(f"showRecoveryAvailable({int(count)})")
         self.show_window()
         self.hide_after(3600)
 
     def show_canceled(self):
         self._tray_state(TRAY_ICON_IDLE)
         display = display_for_state(UiState.CANCELED)
+        if self._native("label", display.css_class, display.label):
+            return
         self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
 
     def show_idle(self):
         self._tray_state(TRAY_ICON_IDLE)
         display = display_for_state(UiState.IDLE)
+        if self._native("reset"):
+            return
         self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
 
     def show_window(self):
@@ -2691,10 +2906,6 @@ class OverlayWindow:
     def complete_onboarding(self):
         if self._bridge:
             self._bridge.onboarding_completed_requested.emit()
-
-    def show_trial_result(self, text):
-        if self._bridge:
-            self._bridge.trial_result_requested.emit(str(text))
 
     def hide_after(self, ms=2000):
         if self._bridge:
@@ -2717,8 +2928,6 @@ class _Bridge(QObject):
     settings_requested = Signal()
     startup_requested = Signal()
     onboarding_completed_requested = Signal()
-    trial_result_requested = Signal(str)
-
     def __init__(self, web_view, before_show=None):
         super().__init__()
         self._web_view = web_view
@@ -2778,7 +2987,7 @@ class _Bridge(QObject):
 
     @Slot(str)
     def _run_js_then_hide(self, code):
+        self.hide_requested.emit()
         if not self._page_ready or not self._web_view or not self._web_view.page():
-            self.hide_requested.emit()
             return
-        self._web_view.page().runJavaScript(code, lambda _: QTimer.singleShot(50, self.hide_requested.emit))
+        self._web_view.page().runJavaScript(code)

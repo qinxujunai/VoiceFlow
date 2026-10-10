@@ -29,7 +29,8 @@ try {
     $runtimeRoot = Join-Path $smokeRoot "VoiceFlow"
     $runtimeState = Join-Path $runtimeRoot "runtime-state.json"
     $startupDeadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
-    while (-not (Test-Path -LiteralPath $runtimeState)) {
+    $state = $null
+    while ($null -eq $state) {
         $process.Refresh()
         if ($process.HasExited) {
             throw "Packaged VoiceFlow exited before readiness with code $($process.ExitCode)"
@@ -39,6 +40,21 @@ try {
                 "Packaged VoiceFlow readiness timed out after " +
                 "$StartupTimeoutSeconds seconds: $runtimeState"
             )
+        }
+        if (Test-Path -LiteralPath $runtimeState) {
+            try {
+                $candidate = Get-Content -Raw -LiteralPath $runtimeState | ConvertFrom-Json
+                if ($candidate.phase -eq "ready" -and $candidate.worker -eq "ready" -and $candidate.final_asr -eq "ready" -and $candidate.hotkeys -eq "ready") {
+                    $state = $candidate
+                    break
+                }
+                if ($candidate.phase -in @("degraded", "error")) {
+                    throw "Packaged VoiceFlow initialization failed: $($candidate.last_error_code)"
+                }
+            }
+            catch [System.ArgumentException] {
+                # Retry an incomplete read during atomic state replacement.
+            }
         }
         Start-Sleep -Milliseconds 250
     }
@@ -75,6 +91,11 @@ finally {
     }
     $env:LOCALAPPDATA = $previousLocalAppData
     if (Test-Path -LiteralPath $smokeRoot) {
+        $checkedRoot = [System.IO.Path]::GetFullPath($smokeRoot)
+        $checkedParent = [System.IO.Path]::GetFullPath($temporaryRoot).TrimEnd('\') + '\'
+        if (-not $checkedRoot.StartsWith($checkedParent, [System.StringComparison]::OrdinalIgnoreCase) -or (Split-Path $checkedRoot -Leaf) -notlike "VoiceFlow-frozen-smoke-*") {
+            throw "Refusing cleanup outside the exact temporary smoke directory"
+        }
         for ($attempt = 1; $attempt -le 5; $attempt++) {
             try {
                 Remove-Item -LiteralPath $smokeRoot -Recurse -Force

@@ -102,10 +102,13 @@ def main() -> int:
 
     def ready():
         overlay.set_actions(on_recording_painted=painted)
-        overlay.web_view.loadFinished.connect(
-            lambda ok: QTimer.singleShot(120, trigger) if ok else finish()
-        )
-        QTimer.singleShot(1500, trigger)
+        if overlay._native_renderer:
+            QTimer.singleShot(0, trigger)
+        else:
+            overlay.web_view.loadFinished.connect(
+                lambda ok: QTimer.singleShot(120, trigger) if ok else finish()
+            )
+            QTimer.singleShot(1500, trigger)
 
     overlay.start(on_ready=ready)
     return 0 if len(measurements) == args.samples else 1

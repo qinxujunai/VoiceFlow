@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "scope": "Exact packaged interpreter binary origin and original supplementary notices; full/stripped/source archives are distinct upstream assets. Not complete native redistribution approval.",
+  "license_review_complete": false,
+  "python_version": "3.12.13",
+  "archive": {
+    "name": "cpython-3.12.13+20260602-x86_64-pc-windows-msvc-pgo-full.tar.zst",
+    "size": 43414767,
+    "digest": "sha256:08415afccf363e8e1bb648dc09b104edeed007e83ec2088fbf265520aaf59f19",
+    "id": 436827038,
+    "updated_at": "2026-06-03T02:13:31Z",
+    "browser_download_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260602/cpython-3.12.13%2B20260602-x86_64-pc-windows-msvc-pgo-full.tar.zst"
+  },
+  "binary_archive": {
+    "name": "cpython-3.12.13+20260602-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+    "size": 21931406,
+    "digest": "sha256:dbada31f91a4fff934dae85e7998d91f1e926135bd88ffed4921a337d5680f48",
+    "id": 436827036,
+    "updated_at": "2026-06-03T02:13:30Z",
+    "browser_download_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260602/cpython-3.12.13%2B20260602-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+  },
+  "upstream_metadata_sha256": "d72a83c2fb7d403f4ec9a86b7a470e36354f55dcafb4ed8edb83e50d72aa8be8",
+  "binary_comparisons": [
+    {
+      "path": "VCRUNTIME140.dll",
+      "member": "python/vcruntime140.dll",
+      "bytes": 124544,
+      "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066"
+    },
+    {
+      "path": "VCRUNTIME140_1.dll",
+      "member": "python/vcruntime140_1.dll",
+      "bytes": 49792,
+      "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f"
+    },
+    {
+      "path": "_asyncio.pyd",
+      "member": "python/DLLs/_asyncio.pyd",
+      "bytes": 59392,
+      "sha256": "9b1d1d993cf87c31f12a615406282063516420eb7d90bcafeb1c0323f4c6d714"
+    },
+    {
+      "path": "_bz2.pyd",
+      "member": "python/DLLs/_bz2.pyd",
+      "bytes": 73216,
+      "sha256": "40f8f5d88dfc07b37bae07dd2883d78651fb8211302f13cfea113f77f32b35d5"
+    },
+    {
+      "path": "_ctypes.pyd",
+      "member": "python/DLLs/_ctypes.pyd",
+      "bytes": 116224,
+      "sha256": "661cd62635f55533157edadb513a4e6697ee85e29d40ba1e5f8ada2b9bac2c0f"
+    },
+    {
+      "path": "_decimal.pyd",
+      "member": "python/DLLs/_decimal.pyd",
+      "bytes": 247296,
+      "sha256": "c16fb740d39add7e8138e80e7c6ef73d6e56f022accb16359b56dc52ed3cd65e"
+    },
+    {
+      "path": "_hashlib.pyd",
+      "member": "python/DLLs/_hashlib.pyd",
+      "bytes": 54784,
+      "sha256": "3a1ccf4f64d49fab0ad92c3eddc5011ce2653e5fe8b966a9946e41024d4899e1"
+    },
+    {
+      "path": "_lzma.pyd",
+      "member": "python/DLLs/_lzma.pyd",
+      "bytes": 152576,
+      "sha256": "84f84ef29785ac0eaff13f6326a68cf0d9b2ff2839960ef12168aa3e4a0aca46"
+    },
+    {
+      "path": "_multiprocessing.pyd",
+      "member": "python/DLLs/_multiprocessing.pyd",
+      "bytes": 24064,
+      "sha256": "84c6413a510e50f10970c720e02fc406b2d2bea8591de8cbc4b434431f4f9665"
+    },
+    {
+      "path": "_overlapped.pyd",
+      "member": "python/DLLs/_overlapped.pyd",
+      "bytes": 44032,
+      "sha256": "cfbc4f1daa5393742a095d5d96aaeca1028c75cfe0929aa1695b666f7884a12f"
+    },
+    {
+      "path": "_queue.pyd",
+      "member": "python/DLLs/_queue.pyd",
+      "bytes": 20480,
+      "sha256": "49a2cfa032abcfb623bea7b1b1778e10cc3bf375fb567b2a4cf35a3ee9684c8e"
+    },
+    {
+      "path": "_socket.pyd",
+      "member": "python/DLLs/_socket.pyd",
+      "bytes": 71680,
+      "sha256": "cba89d089c5180dff479b4c62c05d3f3690a4d00775bcbdd357bcf0329bb7294"
+    },
+    {
+      "path": "_ssl.pyd",
+      "member": "python/DLLs/_ssl.pyd",
+      "bytes": 164864,
+      "sha256": "9f57488475a6a49bdf56abc00e66238e40a3066522363a360daf5c9c0c59cb96"
+    },
+    {
+      "path": "_uuid.pyd",
+      "member": "python/DLLs/_uuid.pyd",
+      "bytes": 13824,
+      "sha256": "4447fefe2e9e83dcc0ac69cd812480fd9166681e3ecafadacb5b5804209369bf"
+    },
+    {
+      "path": "_wmi.pyd",
+      "member": "python/DLLs/_wmi.pyd",
+      "bytes": 25600,
+      "sha256": "49aafc2040f21000a78553f3874543f2a68f1ff0d3af658f426a340191cdbaf9"
+    },
+    {
+      "path": "libcrypto-3-x64.dll",
+      "member": "python/DLLs/libcrypto-3-x64.dll",
+      "bytes": 7977984,
+      "sha256": "da8ef63d8ecf777d0fafd5b1e33530112656be628666965abc788c678578eaf1"
+    },
+    {
+      "path": "libffi-8.dll",
+      "member": "python/DLLs/libffi-8.dll",
+      "bytes": 28160,
+      "sha256": "184036de1240e40b05549824548f36cd033ed76fd7b647329f26ba66c24642f0"
+    },
+    {
+      "path": "libssl-3-x64.dll",
+      "member": "python/DLLs/libssl-3-x64.dll",
+      "bytes": 1579520,
+      "sha256": "8ce17eae9567faf45425d8a357b2127c9ef50708a9407cf7610d8683a954ce9c"
+    },
+    {
+      "path": "pyexpat.pyd",
+      "member": "python/DLLs/pyexpat.pyd",
+      "bytes": 204288,
+      "sha256": "cdeaa89f2643b923aa0b5be04e210ecf4be7bd202aab9abbbdfd1eacebded0c6"
+    },
+    {
+      "path": "python3.dll",
+      "member": "python/python3.dll",
+      "bytes": 56320,
+      "sha256": "c88982dc8e7988075b5c01a35f613ae1ddf1e30f760d186324ab44340add3910"
+    },
+    {
+      "path": "python312.dll",
+      "member": "python/python312.dll",
+      "bytes": 6972416,
+      "sha256": "d79000e15009fb66473768a0e7afbc0b12e800527d4f44737bf15103818ebe33"
+    },
+    {
+      "path": "select.pyd",
+      "member": "python/DLLs/select.pyd",
+      "bytes": 18944,
+      "sha256": "737057d9c233707e3b80de09f335048b71b1aea22938b1f349d7eb0ba2cd1506"
+    },
+    {
+      "path": "unicodedata.pyd",
+      "member": "python/DLLs/unicodedata.pyd",
+      "bytes": 1126400,
+      "sha256": "5995bc0185ecc048f76cb214723f662915ce7dd86d142c109ef9c97053fd0a46"
+    }
+  ],
+  "original_sources": [
+    {
+      "path": "LICENSE.bzip2.txt",
+      "member": "python/licenses/LICENSE.bzip2.txt",
+      "bytes": 1780,
+      "sha256": "bd5628cc76fb0ebf9c657d1dd4d1a240a1a7b216c31663e7bbf1131c0b70a910"
+    },
+    {
+      "path": "LICENSE.expat.txt",
+      "member": "python/licenses/LICENSE.expat.txt",
+      "bytes": 1165,
+      "sha256": "8a9cfe4b5924f4b25881aa0c9f5e4561c5f31065d0c4a13cdcdbcf917edf39aa"
+    },
+    {
+      "path": "LICENSE.libffi.txt",
+      "member": "python/licenses/LICENSE.libffi.txt",
+      "bytes": 1153,
+      "sha256": "9afb8970cd29fc1031fa647278e4bef613399e2e3468a1e3a397f4d158c6101c"
+    },
+    {
+      "path": "LICENSE.liblzma.txt",
+      "member": "python/licenses/LICENSE.liblzma.txt",
+      "bytes": 673,
+      "sha256": "d87d218dd908b3243ec4cbc72af400e5b7437513ea9d9229291d0812b8464fec"
+    },
+    {
+      "path": "LICENSE.mpdecimal.txt",
+      "member": "python/licenses/LICENSE.mpdecimal.txt",
+      "bytes": 1308,
+      "sha256": "f094277cd46e1f6e4d87916cc4b51e22f613d45eb81f48231c3cb7caf8fc8a6a"
+    },
+    {
+      "path": "LICENSE.openssl-3.txt",
+      "member": "python/licenses/LICENSE.openssl-3.txt",
+      "bytes": 10352,
+      "sha256": "ed72ce2b51ee58f117e5a021e2e04af158857f40269fbc03491f0b2a99dbcc96"
+    },
+    {
+      "path": "LICENSE.zlib.txt",
+      "member": "python/licenses/LICENSE.zlib.txt",
+      "bytes": 1016,
+      "sha256": "365e36720db366054863235aea5d6f440142ab968834bfaf81fa9d187c99b9b8"
+    },
+    {
+      "path": "CPython-expat-COPYING",
+      "member": "Python-3.12.13/Modules/expat/COPYING",
+      "bytes": 1144,
+      "sha256": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+      "source_archive": "https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tar.xz"
+    },
+    {
+      "path": "CPython-mpdecimal.h",
+      "member": "Python-3.12.13/Modules/_decimal/libmpdec/mpdecimal.h",
+      "bytes": 41684,
+      "sha256": "ea0b9c6b296c13aed6ecaa50b463e39a9c1bdc059b84f50507fd8247b2e660f9",
+      "source_archive": "https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tar.xz"
+    }
+  ],
+  "notices_absent_from_dev12": [
+    "LICENSE.expat.txt",
+    "LICENSE.libffi.txt",
+    "LICENSE.mpdecimal.txt",
+    "LICENSE.zlib.txt"
+  ],
+  "metadata_limits": [
+    "The full and install-only-stripped archives are distinct official assets in the same immutable release. Full-archive python312.dll equality failed; only the stripped archive is the exact packaged binary source.",
+    "Upstream _decimal/pyexpat metadata omits license annotations despite its linked object inventory; corresponding original notices are retained.",
+    "Windows _uuid links system rpcrt4; the generic upstream libuuid annotation does not prove a shipped libuuid implementation.",
+    "MSVC redistribution entitlement and complete corresponding-source review remain separate.",
+    "PBS LICENSE.expat.txt predates the Expat 2.7.4 version string in the actual binary. The CPython 3.12.13 source COPYING is additionally retained; generic PBS license metadata alone is insufficient."
+  ],
+  "source_archive": {
+    "url": "https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tar.xz",
+    "bytes": 20801708,
+    "sha256": "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"
+  }
+}

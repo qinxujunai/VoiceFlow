@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; delivery confirmation tightened on 2026-10-06
 
 ## Date
 
@@ -22,18 +22,27 @@ also require visible feedback.
 
 ## Decision
 
-- After verified clipboard delivery and one dispatched paste, keep the
+- Only after reliable verification of the actual inserted final text, keep the
   authoritative text in place and fade the capsule out over 120 ms. Do not
   render a check or a success label.
-- Keep the complete accessible announcement that the clipboard was verified
-  and the paste command was dispatched.
+- Announce confirmed insertion as `文字已输入`. A clipboard readback or accepted
+  input events alone do not establish insertion.
+- When one paste was dispatched but insertion is unverified, show
+  `已复制到剪贴板` and announce manual Ctrl+V if the text has not appeared.
+  Never retry automatically or mark onboarding complete from dispatch alone.
 - When paste is not dispatched but clipboard delivery is verified, show
   `已复制到剪贴板` long enough to be read.
 - When only durable local recovery succeeds, show `已保存`. Real failures keep
   their concise recovery-oriented state.
-- Mouse position remains irrelevant. Delivery continues to use the ordinary
-  foreground target observed at stop time and falls back only on positive
-  blocked-target evidence.
+- Mouse position remains irrelevant. Bind delivery to the ordinary foreground
+  target observed at stop time; revalidate before dispatch. A changed target,
+  changed clipboard, held modifier, or positive blocked-target evidence requires
+  recoverable delivery without automatic paste. Transient unknown UIA nodes
+  alone remain insufficient to classify an ordinary target as blocked.
+
+Historical dispatch-only statuses remain unverified; no migration may turn
+them into confirmed insertion. The current development runtime has not yet
+implemented a general insertion verifier, so dispatch remains unverified.
 
 This supersedes only the explicit completion-feedback decision in ADR-002. Its
 single recording color, fixed bundled model, and settings decisions remain in

@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_active_docs_match_021_preview_and_release_contract():
+def test_active_docs_match_native_preview_and_release_contract():
     model_strategy = (ROOT / "docs" / "model-strategy.md").read_text(
         encoding="utf-8"
     )
@@ -15,7 +15,9 @@ def test_active_docs_match_021_preview_and_release_contract():
         encoding="utf-8"
     )
 
-    assert "fixed 48 ms cadence" in model_strategy
+    assert "48 ms cadence" in model_strategy
+    assert "at least 17 ms" in model_strategy
+    assert "coalesces after 600 ms" in model_strategy
     assert "160 authorized" in evaluation
     assert "VoiceFlow-<version>-Windows-x64.exe" in release
     assert "release\\v<version>" in release

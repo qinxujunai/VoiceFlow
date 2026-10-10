@@ -1,0 +1,15 @@
+diff --git a/sherpa-onnx/python/csrc/sherpa-onnx.cc b/sherpa-onnx/python/csrc/sherpa-onnx.cc
+index 6e711e6..7b91843 100644
+--- a/sherpa-onnx/python/csrc/sherpa-onnx.cc
++++ b/sherpa-onnx/python/csrc/sherpa-onnx.cc
+@@ -86,8 +86,10 @@ PYBIND11_MODULE(_sherpa_onnx, m) {
+   PybindSentencePieceTokenizer(&m);
+ #else
+   /* Define "empty" TTS symbols */
++  m.attr("GenerationConfig") = py::none();
+   m.attr("OfflineTtsKittenModelConfig") = py::none();
+   m.attr("OfflineTtsPocketModelConfig") = py::none();
++  m.attr("OfflineTtsSupertonicModelConfig") = py::none();
+   m.attr("OfflineTtsKokoroModelConfig") = py::none();
+   m.attr("OfflineTtsMatchaModelConfig") = py::none();
+   m.attr("OfflineTtsModelConfig") = py::none();

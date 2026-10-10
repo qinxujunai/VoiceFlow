@@ -69,7 +69,8 @@ a reason. The current closure matrix is
   localized copy;
 - overlay motion communicates state and never fabricates recognition progress;
 - final work completing within 350 ms never flashes a spinner or text label;
-- verified paste dispatch fades out without redundant success copy;
+- reliably confirmed text insertion fades out without redundant success copy;
+  dispatched but unverified paste retains truthful manual-paste guidance;
   clipboard-only and durable-recovery states use `已复制到剪贴板` and `已保存`;
 - recording text uses one color and the meter remains red throughout recording;
 - ordinary settings expose no model download, repair, selection, or switching;
