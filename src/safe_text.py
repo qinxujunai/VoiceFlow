@@ -20,7 +20,7 @@ class SafeTextBoundary:
     REPEATED_CHAR = re.compile(r"(.)\1{31,}", re.DOTALL)
     REPEATED_PHRASE = re.compile(r"(.{2,24})\1{7,}", re.DOTALL)
 
-    def sanitize(self, raw_text: str) -> SafeTextResult:
+    def sanitize(self, raw_text: str, *, preserve_format=False) -> SafeTextResult:
         original = str(raw_text or "")
         reasons: list[str] = []
         text, token_count = self.MODEL_TOKEN.subn("", original)
@@ -30,12 +30,15 @@ class SafeTextBoundary:
         cleaned: list[str] = []
         saw_control = False
         saw_private = False
+        permitted = {"\n", "\t", "\u200c", "\u200d"}
+        if preserve_format:
+            permitted.add("\r")
         for char in text:
             category = unicodedata.category(char)
             if category == "Co":
                 saw_private = True
                 continue
-            if category in {"Cc", "Cf", "Cs"} and char not in {"\n", "\t"}:
+            if category in {"Cc", "Cf", "Cs"} and char not in permitted:
                 saw_control = True
                 continue
             cleaned.append(char)
@@ -45,8 +48,9 @@ class SafeTextBoundary:
             reasons.append("private_use")
 
         text = "".join(cleaned)
-        text = re.sub(r"[ \t]+", " ", text)
-        text = re.sub(r" *\n *", "\n", text).strip()
+        if not preserve_format:
+            text = re.sub(r"[ \t]+", " ", text)
+            text = re.sub(r" *\n *", "\n", text).strip()
         if self.REPEATED_CHAR.search(text) or self.REPEATED_PHRASE.search(text):
             reasons.append("pathological_repetition")
             return SafeTextResult("", True, True, tuple(reasons))

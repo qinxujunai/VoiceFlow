@@ -18,6 +18,9 @@ from delivery import (
     TargetSnapshot,
     VerifiedClipboard,
     inspect_current_target,
+    inspect_foreground_target,
+    PasteDispatchResult,
+    dispatch_windows_paste,
 )
 from platform_utils import paste_modifier
 
@@ -64,10 +67,17 @@ class OutputHandler:
             inspect_target=lambda: self._focus_monitor.observe().snapshot,
             dispatch_paste=self._dispatch_paste,
             ledger_dir=self.base_dir / "delivery-pending",
+            dispatch_checked_paste=self._dispatch_checked_paste,
+            verify_insertion=self._verify_insertion,
         )
 
-    def capture_target(self) -> TargetSnapshot:
-        return self._focus_monitor.start_tracking().snapshot
+    def capture_target(self, *, wait: bool = True) -> TargetSnapshot:
+        if wait:
+            return self._focus_monitor.start_tracking().snapshot
+        return self._focus_monitor.start_tracking(wait=False).snapshot
+
+    def capture_stop_target(self) -> TargetSnapshot:
+        return inspect_foreground_target()
 
     def deliver(
         self,
@@ -76,6 +86,7 @@ class OutputHandler:
         start_target: TargetSnapshot | None,
         session_id: str,
         allow_paste: bool = True,
+        stop_target: TargetSnapshot | None = None,
     ) -> DeliveryResult:
         prepared = self._prepare_text(text)
         self.last_text = prepared
@@ -85,6 +96,7 @@ class OutputHandler:
                 start_target=start_target,
                 session_id=session_id,
                 allow_paste=allow_paste,
+                stop_target=stop_target,
             )
             self._log_focus_trace(session_id)
             return result
@@ -152,25 +164,23 @@ class OutputHandler:
     def acknowledge_delivery(self, session_id):
         return self._coordinator.acknowledge(str(session_id))
 
+    def clear_pending(self, *, session_ids=None, text=None):
+        return self._coordinator.clear_pending(session_ids=session_ids, text=text)
+
     def recover_pending(self):
         return self._coordinator.recover_pending_to_clipboard()
 
     def repeat_last(self):
         if not self.last_text:
             return "empty"
-        return self.output(self.last_text)
+        return self.copy_only(self.last_text)
 
     def _prepare_text(self, text):
-        prepared = str(text).strip()
-        if (
-            self.auto_period
-            and prepared
-            and prepared[-1] not in "。！？.!?,，；;：:"
-        ):
-            prepared += "。"
-        return prepared
+        return str(text)
 
     def _dispatch_paste(self) -> bool:
+        if os.name == "nt":
+            raise RuntimeError("Windows paste requires the checked delivery path")
         # Import only when delivery needs it. PyAutoGUI changes process DPI
         # awareness at import time, which otherwise races Qt's per-monitor setup.
         import pyautogui
@@ -179,6 +189,25 @@ class OutputHandler:
         pyautogui.FAILSAFE = False
         pyautogui.hotkey(paste_modifier(), "v")
         return True
+
+    def _dispatch_checked_paste(self, target, text) -> PasteDispatchResult:
+        if os.name != "nt":
+            return PasteDispatchResult(self._dispatch_paste(), "paste_dispatched")
+        terminal_class = target.foreground_class.casefold()
+        terminal = terminal_class in {"cascadia_hosting_window_class", "consolewindowclass"}
+        if terminal and any(character in text for character in "\r\n\u2028\u2029"):
+            return PasteDispatchResult(False, "terminal_multiline")
+        return dispatch_windows_paste(
+            terminal=terminal_class == "cascadia_hosting_window_class",
+            guard=lambda: (
+                inspect_foreground_target().same_input_context(target)
+                and self._coordinator.clipboard.still_contains(text)
+            ),
+        )
+
+    def _verify_insertion(self, target, text) -> bool:
+        verify = getattr(self._focus_monitor, "verify_insertion", None)
+        return verify(target, text) if verify is not None else False
 
     def _paste(self, text):
         """Compatibility wrapper; status still means dispatched, never landed."""

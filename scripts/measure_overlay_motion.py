@@ -1,4 +1,4 @@
-"""Measure the real WebEngine capsule append cadence without recording audio."""
+"""Measure the shipped native capsule; --legacy compares the retired renderer."""
 
 from __future__ import annotations
 
@@ -8,9 +8,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
-from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWidgets import QApplication
-from PySide6.QtWebEngineWidgets import QWebEngineView
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,7 +98,9 @@ def _measure_language_fill(app, page, text, session_id):
     return _capsule_metrics(app, page)
 
 
-def main():
+def measure_legacy():
+    from PySide6.QtWebChannel import QWebChannel
+    from PySide6.QtWebEngineWidgets import QWebEngineView
     app = QApplication.instance() or QApplication([])
     view = QWebEngineView()
     reporter = _PaintReporter()
@@ -236,6 +236,70 @@ def main():
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["passed"] else 1
+
+
+def main():
+    if "--legacy" in sys.argv:
+        return measure_legacy()
+    sys.path.insert(0, str(ROOT / "src"))
+    from capsule_native import NativeCapsuleView, split_graphemes
+    from qt_compat import QFontMetricsF, Qt
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    view.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+    view.resize(380, 48)
+    view.show()
+    app.processEvents()
+    painted = []
+    view.preview_painted.connect(lambda generation: painted.append(
+        {"session_id": generation, "elapsed_ms": round((time.perf_counter() - started) * 1000, 3)}
+    ))
+    view.present("prepare_recording", [1])
+    started = time.perf_counter()
+    view.present("append_streaming", [SAMPLE, 1])
+    frames = []
+    previous = -1
+    while time.perf_counter() - started < 3:
+        app.processEvents()
+        length = len(view.state.text)
+        if length != previous:
+            frames.append({"elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+                           "length": length, "width": view._target_width, "horizontal_offset": 0})
+            previous = length
+        if not view.state.pending:
+            break
+        time.sleep(0.003)
+    before = view.state.text
+    before_width = view._target_width
+    view.present("append_streaming", [FOLLOW_UP, 1])
+    _wait(app, lambda: not view.state.pending)
+    after = view.state.text
+    fill = {}
+    for generation, (name, text) in enumerate((("chinese", WIDTH_CHINESE), ("english", WIDTH_ENGLISH)), 2):
+        view.present("prepare_recording", [generation])
+        view.present("append_streaming", [text, generation])
+        _wait(app, lambda: not view.state.pending and not view.frame_timer.isActive())
+        metrics = QFontMetricsF(view.font())
+        chars = split_graphemes(view.state.text)
+        available = view._width - 50
+        while chars and metrics.horizontalAdvance("".join(chars)) > available:
+            chars.pop(0)
+        fill[name] = {"fillRatio": metrics.horizontalAdvance("".join(chars)) / available,
+                      "pillWidth": view._width}
+    intervals = [b["elapsed_ms"] - a["elapsed_ms"] for a, b in zip(frames, frames[1:])]
+    passed = (bool(painted) and painted[0]["session_id"] == 1 and painted[0]["elapsed_ms"] <= 100
+              and [f["length"] for f in frames] == list(range(1, len(SAMPLE) + 1))
+              and bool(intervals) and max(intervals) <= 110 and frames[-1]["elapsed_ms"] <= 650
+              and before == SAMPLE and after == SAMPLE + FOLLOW_UP
+              and view.MAX_WIDTH >= before_width
+              and all(0.72 <= value["fillRatio"] <= 1.02 for value in fill.values()))
+    result = {"renderer": "native-qt", "passed": passed, "frames": frames,
+              "first_paint_ack_ms": painted[0]["elapsed_ms"] if painted else None,
+              "intervals_ms": intervals, "language_fill": fill}
+    view.close()
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

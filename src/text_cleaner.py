@@ -200,9 +200,11 @@ class TextCleaner:
     # 主清理流程
     # ================================================================
 
-    def clean(self, text: str) -> str:
+    def clean(self, text: str, *, preserve_format=False) -> str:
         """清理 ASR 输出文本。返回清理后的文本。"""
         if not text or not text.strip():
+            return text
+        if preserve_format:
             return text
 
         text = text.strip()
@@ -218,8 +220,6 @@ class TextCleaner:
 
         # 清理多余空格和标点
         text = re.sub(r" {2,}", " ", text)
-        text = re.sub(r"，{2,}", "，", text)
-        text = re.sub(r"。{2,}", "。", text)
         # 去除非打印字符
         text = self._ctrl_re.sub("", text)
 

@@ -6,13 +6,11 @@
   <meta name="description" content="VoiceFlow 是 Windows 上的离线语音输入工具。按下 F2 说话，文字回到当前光标；不需要账户，也不上传录音。">
   <meta name="theme-color" content="#ffffff">
   <meta property="og:title" content="VoiceFlow — 离线语音输入">
-  <meta property="og:description" content="开口，文字就位。离线识别，说完，接着写。，剪贴板与本地恢复兜底。">
+  <meta property="og:description" content="在电脑上离线听写。按 F2 开始，再按一下完成；句末标点由你选择，听写内容可在本地历史中找回。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://qinxujunai.github.io/VoiceFlow/">
-  <meta property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-demo.svg">
   <title>VoiceFlow — 离线语音输入</title>
   <link rel="icon" href="assets/voiceflow.ico">
-  <link rel="preload" href="assets/voiceflow-demo.svg" as="image" fetchpriority="high">
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
   {
@@ -65,12 +63,21 @@
           </a>
         </div>
         <p class="compatibility" data-i18n="compatibility">Windows 10 / 11 · x64 · v__VOICEFLOW_VERSION__</p>
-        <p class="release-status" data-i18n="releaseStatus">离线使用 · 无需登录</p>
+        <p class="release-status" data-i18n="releaseStatus">离线使用 · 无需登录 · 句末标点可设置</p>
       </div>
 
-      <figure class="product-stage">
-        <img src="assets/voiceflow-demo.svg" alt="VoiceFlow 听写时显示文字，完成后收起" data-i18n-alt="demoAlt" data-i18n-src="demoSrc">
-      </figure>
+      <aside class="product-stage" aria-label="使用方法" data-i18n-aria="usageAria">
+        <div class="usage-card">
+          <h2 data-i18n="usageTitle">三步，接着写。</h2>
+          <ol>
+            <li data-i18n="usageFirst">把光标放进输入框，按 F2。</li>
+            <li data-i18n="usageSecond">自然说话，再按 F2 完成。</li>
+            <li data-i18n="usageThird">检查文字；没有插入时，按 Ctrl+V 手动粘贴。</li>
+          </ol>
+          <p data-i18n="usagePunctuation">日常聊天不想带句号？在设置的「听写」中选择「省略最后一个句号」。问号、感叹号和内部标点仍会保留。</p>
+          <p data-i18n="usageRecovery">听写内容保存在本地历史。无法完成的录音可从恢复页重试。</p>
+        </div>
+      </aside>
     </section>
 
     <section class="values" id="values" aria-label="VoiceFlow 核心价值" data-i18n-aria="valuesAria">
@@ -98,7 +105,7 @@
       </div>
       <div class="privacy-detail">
         <p data-i18n="privacyBody">
-          录音时，小胶囊显示正在识别的文字。完成后自动收起，让你继续眼前的事。
+          录音时，小胶囊显示识别进度。完成后尝试在当前输入位置粘贴；未确认插入时，提示文字已复制，方便你手动粘贴。
         </p>
         <a class="privacy-link" href="https://github.com/qinxujunai/VoiceFlow/blob/master/README.md#隐私与联网" data-i18n="privacyLink" data-i18n-href="privacyHref">
           了解隐私与联网

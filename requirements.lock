@@ -1,3 +1,4 @@
+--find-links ./vendor/windows
 altgraph==0.17.5
 annotated-doc==0.0.4
 anyio==4.14.1
@@ -43,7 +44,7 @@ pywin32-ctypes==0.2.3
 PyYAML==6.0.3
 rich==15.0.0
 sherpa-onnx-core==1.13.3
-sherpa_onnx==1.13.3
+sherpa_onnx==1.13.3+voiceflow.5
 shiboken6==6.11.1
 shellingham==1.5.4
 six==1.17.0

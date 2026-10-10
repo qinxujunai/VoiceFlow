@@ -529,3 +529,29 @@ footer > div {
     transition-duration: 0.01ms !important;
   }
 }
+
+.usage-card {
+  padding: clamp(28px, 5vw, 56px);
+  text-align: left;
+}
+
+.usage-card h2 {
+  margin: 0 0 24px;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.25;
+}
+
+.usage-card ol {
+  padding-left: 24px;
+  line-height: 1.8;
+}
+
+.usage-card li {
+  margin-bottom: 12px;
+}
+
+.usage-card p {
+  margin: 24px 0 0;
+  line-height: 1.7;
+  color: #515154;
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "scope": "Exact official wheel native origin and original vendored Windows libffi notices; source setup.py selects this vendor directory on MSVC x86/x64. Not a reproduced wheel build or complete native redistribution review.",
+  "license_review_complete": false,
+  "version": "2.0.0",
+  "source_archive": {
+    "filename": "cffi-2.0.0.tar.gz",
+    "size": 523588,
+    "url": "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz",
+    "digests": {
+      "blake2b_256": "eb56b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846",
+      "md5": "5e897f6251e614f6bd128a73e81801a4",
+      "sha256": "44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529"
+    }
+  },
+  "wheel_source": "https://files.pythonhosted.org/packages/f8/ed/13bd4418627013bec4ed6e54283b1959cf6db888048c7cf4b4c3b5b36002/cffi-2.0.0-cp312-cp312-win_amd64.whl",
+  "wheel_sha256": "da68248800ad6320861f129cd9c1bf96ca849a2771a59e0344e88681905916f5",
+  "native_sha256": "53de34afc3939d81bf2498b77425c52e2c3f3164f8cfe2543d3acc8f24134488",
+  "native_bytes": 181248,
+  "original_sources": [
+    {
+      "path": "LICENSE",
+      "member": "cffi-2.0.0/LICENSE",
+      "bytes": 1123,
+      "sha256": "5ba24ddc57067f9249add644c3afc41a5d6dc37e23433ef759d95df370b0af63"
+    },
+    {
+      "path": "libffi_x86_x64/ffi.c",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/ffi.c",
+      "bytes": 12509,
+      "sha256": "1abda6df884d78f33be1ee8abf99c6dc1c8b60b6f72ac41ac27b42a98329334a"
+    },
+    {
+      "path": "libffi_x86_x64/ffi.h",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/ffi.h",
+      "bytes": 9298,
+      "sha256": "96cc1f0392c280471c86164b31a5d5fbbce3141376c352ddc187d531cc740d0f"
+    },
+    {
+      "path": "libffi_x86_x64/ffi_common.h",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/ffi_common.h",
+      "bytes": 2114,
+      "sha256": "70fc6e9f815ba8c6320c0b8a00d6c06ed763a58847708eb694123c687ddd5a65"
+    },
+    {
+      "path": "libffi_x86_x64/fficonfig.h",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/fficonfig.h",
+      "bytes": 2973,
+      "sha256": "742907d362beb3b3308719541c8c94c3b7539a6cb9eb77fe202be45303bae6da"
+    },
+    {
+      "path": "libffi_x86_x64/ffitarget.h",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/ffitarget.h",
+      "bytes": 2699,
+      "sha256": "f4fb7eaffbe13a11035174284eba68934f3cf41eb16d044f157d8bdd966b14da"
+    },
+    {
+      "path": "libffi_x86_x64/prep_cif.c",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/prep_cif.c",
+      "bytes": 5720,
+      "sha256": "e04a2106e3f14333d5f79515d65fbb7b177de59b520b6860e95d5869202bf6af"
+    },
+    {
+      "path": "libffi_x86_x64/types.c",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/types.c",
+      "bytes": 3556,
+      "sha256": "f398aad1c87cb8168d29f9ad1222e6e250b83847272b3caad21db3319a5ec2a5"
+    },
+    {
+      "path": "libffi_x86_x64/win32.c",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/win32.c",
+      "bytes": 4712,
+      "sha256": "b893d4254903d843c4fa889640e7124a98d39a3eb65b2b916bad7359e6a193c6"
+    },
+    {
+      "path": "libffi_x86_x64/win64.asm",
+      "member": "cffi-2.0.0/src/c/libffi_x86_x64/win64.asm",
+      "bytes": 3096,
+      "sha256": "020ed36b231fadd51fcd93c1a92648c1346df9ec6a536ae892b807aed20cc1ad"
+    },
+    {
+      "path": "setup.py",
+      "member": "cffi-2.0.0/setup.py",
+      "bytes": 8178,
+      "sha256": "98e17ed0dfdd396897865985398278bd32def28424f9f90f05921a19b7c0ca2a"
+    }
+  ],
+  "limitations": [
+    "The vendor text bundle includes win32.c, although upstream x64 setup excludes it. No claim that this source file contributes to the shipped x64 extension.",
+    "The upstream x64 build consumes a prebuilt win64.obj. Its assembly origin is retained but recompilation has not been reproduced.",
+    "Top-level CFFI MIT No Attribution does not erase the distinct libffi per-file MIT copyright notices."
+  ]
+}

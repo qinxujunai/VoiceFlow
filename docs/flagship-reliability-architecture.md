@@ -76,8 +76,14 @@ assembly snapshots the cache; no new cache segment may start after stop.
 At startup, recoverable sessions produce a quiet amber notification. History
 lists each local recording with duration and model. The user can re-recognize
 and copy it, copy an existing confirmed preview, or explicitly delete it.
-Successful recovery writes history before deleting PCM. Unhandled recovery
-assets expire after 24 hours.
+Successful recovery verifies the clipboard and writes history before deleting
+PCM. Undelivered recordings never expire silently. The retention interval marks
+sessions for a recovery or explicit-delete reminder, not automatic deletion.
+The audio worker owns the journal before optional preview IPC. Its writer drains
+accepted blocks on normal stop; parent death has a bounded flush window. Storage
+errors stop recording and expose where the final text can be found. A storage
+budget refuses new PCM without deleting undelivered sessions. See ADR-004's
+2026-10-06 amendment and the current execution evidence for verified scope.
 
 ## Release blockers
 

@@ -1,0 +1,13 @@
+# Preserve reviewed upstream bytes and their pinned hashes on Windows checkouts.
+licenses/qt-6.11.1/** -text
+licenses/native-asr/** -text
+licenses/cpython-3.12.13/** -text
+licenses/cffi-2.0.0/** -text
+licenses/numpy-2.5.0-supplements/** -text
+vendor/windows/*.patch -text
+licenses/LLVM-3.6.2-* -text
+licenses/Mesa-llvmpipe-NOTICES.txt -text
+licenses/ONNXRuntime-1.24.4-* -text
+licenses/OpenSSL-3.5.6-LICENSE.txt -text
+licenses/PortAudio-LICENSE.txt -text
+licenses/Silero-MIT.txt -text

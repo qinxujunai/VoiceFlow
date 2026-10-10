@@ -1,14 +1,16 @@
 #define MyAppName "VoiceFlow"
-#define MyAppVersion "0.3.6"
-#define MyAppBuildId "261001.4"
+#include "version.iss"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
+#ifndef APP_SOURCE_DIR
+#define APP_SOURCE_DIR "..\dist\VoiceFlow"
+#endif
 
 [Setup]
 AppId={{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-VersionInfoVersion=0.3.6.1
+VersionInfoVersion={#MyAppFileVersion}
 VersionInfoTextVersion={#MyAppVersion}+{#MyAppBuildId}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\VoiceFlow
@@ -25,9 +27,13 @@ LicenseFile=..\LICENSE
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-CloseApplications=yes
+CloseApplications=no
 RestartApplications=no
 Uninstallable=yes
+; Older logs contain an image-wide process kill and recursive {app} deletion.
+; Do not append those destructive instructions to the safe current uninstaller.
+; Only the current installed inventory is removed; retired untracked files stay.
+UninstallLogMode=overwrite
 
 #ifdef SIGNTOOL
 SignTool={#SIGNTOOL}
@@ -44,7 +50,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "快捷方式"
 
 [Files]
-Source: "..\dist\VoiceFlow\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#APP_SOURCE_DIR}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; The offline default model is only included in an internal build after its
 ; distribution license review is recorded. CI sets INCLUDE_SENSEVOICE for that build.
 #ifdef INCLUDE_SENSEVOICE
@@ -65,20 +71,6 @@ Name: "{autodesktop}\VoiceFlow"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 VoiceFlow"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
-[InstallDelete]
-Type: files; Name: "{app}\knowledge-base\ai-terms.txt"
-Type: files; Name: "{app}\knowledge-base\company-terms.txt"
-Type: files; Name: "{app}\knowledge-base\user-custom.txt"
-#ifndef INCLUDE_STREAMING_PREVIEW
-; Public builds omit experimental preview weights. Remove a copy left by an
-; earlier internal build so the quiet-capsule fallback is deterministic.
-Type: filesandordirs; Name: "{app}\models\streaming-preview"
-#endif
-
-[UninstallRun]
-Filename: "{cmd}"; Parameters: "/c taskkill /IM VoiceFlow.exe /F"; Flags: runhidden; RunOnceId: "StopVoiceFlow"
-
-[UninstallDelete]
-; User-owned config, history, vocabulary, logs, and downloaded models live
-; under {localappdata}\VoiceFlow and are intentionally retained.
-Type: filesandordirs; Name: "{app}"
+; Inno's uninstall log owns installed files. Untracked files and legacy
+; vocabulary must survive; the runtime migrates vocabulary before retiring it.
+#include "runtime_guard.iss"

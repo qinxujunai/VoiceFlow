@@ -75,9 +75,9 @@ def _fake_audio_worker(commands, events, heartbeat, _config_path):
                 if memory is not None:
                     memory.close()
                     memory.unlink()
-                events.put({"kind": "response", "request_id": request_id, "ok": True})
+                events.put({"kind": "response", "request_id": request_id, "ok": True, "reusable": True})
             elif kind == "cancel":
-                events.put({"kind": "response", "request_id": request_id, "ok": True})
+                events.put({"kind": "response", "request_id": request_id, "ok": True, "reusable": True})
     finally:
         stop.set()
         for memory in memories.values():
@@ -159,9 +159,45 @@ def test_audio_device_lives_in_a_worker_and_returns_authoritative_pcm(tmp_path):
         assert frozen == 1600
         assert audio.tolist() == list(range(1600))
         assert capture.is_recording is False
-        assert capture.worker_pid is None
+        assert capture.is_ready
+        assert capture.last_total_samples == 1600
+        assert capture.sample_count == 0
+        assert capture._audio_buffer == []
+        assert capture._audio_buffer_ends == []
+        capture._accept_pcm(np.arange(1600, dtype=np.int16).tobytes())
+        assert capture.sample_count == 0
     finally:
         capture.shutdown()
+
+
+def test_successful_stop_and_cancel_reuse_worker_without_replaying_old_pcm(tmp_path):
+    capture = SupervisedAudioCapture(
+        _config(tmp_path),
+        worker_target=_fake_audio_worker,
+        startup_timeout=3.0,
+        command_timeout=1.0,
+    )
+    try:
+        capture.prepare()
+        original_pid = capture.worker_pid
+        for canceled in (False, True, False):
+            capture.start_recording()
+            deadline = time.monotonic() + 1.0
+            while capture.sample_count < 1600 and time.monotonic() < deadline:
+                time.sleep(0.005)
+            if canceled:
+                capture.cancel_recording()
+                assert capture.sample_count == 0
+                capture._accept_pcm(np.arange(1600, dtype=np.int16).tobytes())
+                assert capture.sample_count == 0
+            else:
+                capture.freeze_recording()
+                assert capture.stop_recording().tolist() == list(range(1600))
+            assert capture.worker_pid == original_pid
+            assert capture.is_healthy
+    finally:
+        capture.shutdown()
+    assert capture.worker_pid is None
 
 
 def test_blocked_driver_is_killed_and_mirrored_pcm_returns_without_freezing_ui(tmp_path):
@@ -185,5 +221,8 @@ def test_blocked_driver_is_killed_and_mirrored_pcm_returns_without_freezing_ui(t
         assert elapsed < 0.8
         assert audio.tolist() == list(range(800))
         assert capture.worker_pid is None
+        assert capture.last_total_samples == 800
+        assert capture.sample_count == 0
+        assert capture._audio_buffer == []
     finally:
         capture.shutdown()

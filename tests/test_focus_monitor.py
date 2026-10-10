@@ -1,6 +1,7 @@
 import sys
 import threading
 import random
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -8,6 +9,35 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
+
+
+def test_start_target_tracking_can_be_nonblocking_when_uia_is_slow():
+    from delivery import FocusMonitor, TargetSnapshot
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    @contextmanager
+    def context(*_):
+        yield
+
+    def inspect():
+        entered.set()
+        assert release.wait(2.0)
+        return TargetSnapshot(101, 202, "editor", True, True, True)
+
+    monitor = FocusMonitor(inspector=inspect, initializer=context, subscriber=context)
+    try:
+        started = time.perf_counter()
+        observation = monitor.start_tracking(wait=False)
+        assert time.perf_counter() - started < 0.15
+        assert observation.snapshot.window_handle is None
+        assert entered.wait(1.0)
+        release.set()
+        assert monitor.observe(timeout=0.5).snapshot.window_handle == 101
+    finally:
+        release.set()
+        monitor.shutdown()
 
 
 def test_target_observation_preserves_privacy_safe_focus_evidence():
@@ -166,6 +196,33 @@ def test_focus_monitor_coalesces_focus_event_bursts():
     assert monitor._requests.qsize() == 1
 
 
+def test_stalled_focus_provider_does_not_accumulate_unbounded_requests():
+    from delivery import FocusMonitor, TargetSnapshot
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    @contextmanager
+    def context(*_):
+        yield
+
+    def inspect():
+        entered.set()
+        release.wait(2.0)
+        return TargetSnapshot(101, 202, "edit", True, True, True)
+
+    monitor = FocusMonitor(inspector=inspect, initializer=context, subscriber=context)
+    try:
+        monitor.observe(timeout=0.01)
+        assert entered.wait(0.5)
+        for _ in range(1000):
+            monitor.observe(timeout=0)
+        assert monitor._requests.qsize() <= 8
+    finally:
+        release.set()
+        monitor.shutdown()
+
+
 def test_output_handler_tracks_focus_on_start_and_stops_after_delivery(tmp_path):
     from delivery import TargetObservation, TargetSnapshot
     from output_handler import OutputHandler
@@ -201,6 +258,7 @@ def test_output_handler_tracks_focus_on_start_and_stops_after_delivery(tmp_path)
     handler._coordinator.clipboard._copy = lambda _text: None
     handler._coordinator.clipboard._paste = lambda: "焦点线程交付"
     handler._coordinator.dispatch_paste = lambda: True
+    handler._coordinator.dispatch_checked_paste = lambda _target, _text: True
 
     start = handler.capture_target()
     result = handler.deliver(
@@ -211,7 +269,7 @@ def test_output_handler_tracks_focus_on_start_and_stops_after_delivery(tmp_path)
 
     assert result.paste_dispatched is True
     assert monitor.started == 1
-    assert monitor.observed == 1
+    assert monitor.observed == 2
     assert monitor.stopped == 1
 
 

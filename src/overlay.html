@@ -650,19 +650,23 @@ function showDeliveryState(status, sessionId) {
     if (sessionId < activeSession) return;
     activeSession = sessionId;
     const accessible = {
-        clipboard_verified_paste_dispatched: '文字已复制，粘贴指令已发送',
+        landed_confirmed: '文字已输入',
+        clipboard_verified_paste_dispatched: '文字已复制；如果未出现，请在目标位置按 Ctrl+V',
         clipboard_verified_only: '文字已复制到剪贴板',
-        recovery_saved_clipboard_unavailable: '文字已安全保存，剪贴板暂不可用'
+        recovery_saved_clipboard_unavailable: '文字已安全保存，剪贴板暂不可用',
+        delivery_failed: '复制和保存未完成，请查看可恢复的录音'
     };
-    if (status === 'clipboard_verified_paste_dispatched') {
+    if (status === 'landed_confirmed') {
         resetTextMotion();
         pill.className = 'pill final_text delivery_dismissed';
         pill.setAttribute('aria-label', accessible[status]);
         return;
     }
     const labels = {
+        clipboard_verified_paste_dispatched: '已复制到剪贴板',
         clipboard_verified_only: '已复制到剪贴板',
-        recovery_saved_clipboard_unavailable: '已保存'
+        recovery_saved_clipboard_unavailable: '已保存',
+        delivery_failed: '复制和保存未完成'
     };
     resetTextMotion();
     const saved = status === 'recovery_saved_clipboard_unavailable';

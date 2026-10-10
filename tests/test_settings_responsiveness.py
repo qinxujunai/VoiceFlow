@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,7 +21,7 @@ if str(SRC) not in sys.path:
 
 from overlay_webview import _SettingsWindow  # noqa: E402
 from overlay_webview import OverlayWindow  # noqa: E402
-from qt_compat import QApplication, QMessageBox, QPushButton  # noqa: E402
+from qt_compat import QAction, QApplication, QMessageBox, QPushButton  # noqa: E402
 from runtime_paths import AppPaths, RuntimeMode  # noqa: E402
 
 
@@ -56,10 +57,118 @@ def _pump_until(app, predicate, timeout=2.0):
     return False
 
 
-def test_refresh_does_not_block_the_ui_or_duplicate_slow_device_queries(
+def test_settings_readiness_follows_workers_instead_of_model_file_presence(app, paths):
+    from app_controller import AppController
+
+    controller = AppController()
+    window = _SettingsWindow(paths=paths, controller=controller)
+    try:
+        window._sync_runtime_status(force=True)
+        assert window.status_badge.text() == "正在准备"
+        assert window.home_model.text() == "本地识别 · 正在准备"
+        controller.mark_ready()
+        window._sync_runtime_status()
+        assert window.status_badge.text() == "就绪"
+        controller.mark_degraded("fixture failure")
+        window._sync_runtime_status()
+        assert window.status_badge.text() == "需要处理"
+        assert window.home_model.text() == "本地识别 · 需要检查"
+    finally:
+        window.close()
+
+
+def test_tray_quit_keeps_qt_responsive_and_waits_for_cleanup_once(app, paths, monkeypatch):
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+    completed = []
+    ui_thread = threading.get_ident()
+
+    def cleanup():
+        calls.append(threading.get_ident())
+        entered.set()
+        release.wait(1)
+
+    monkeypatch.setattr(app, "quit", lambda: completed.append(threading.get_ident()))
+    overlay = OverlayWindow(paths)
+    overlay._on_quit = cleanup
+    began = time.perf_counter()
+    try:
+        overlay.quit()
+        elapsed = time.perf_counter() - began
+        assert elapsed < .05
+        assert entered.wait(.5)
+        overlay.quit()
+        app.processEvents()
+        assert completed == []
+        assert len(calls) == 1 and calls[0] != ui_thread
+    finally:
+        release.set()
+        _pump_until(app, lambda: bool(completed))
+    assert completed == [ui_thread]
+
+
+def test_failed_quit_keeps_tray_available_and_reports_failure(app, paths, monkeypatch):
+    completed, errors, visible = [], [], []
+    monkeypatch.setattr(app, "quit", lambda: completed.append(True))
+    overlay = OverlayWindow(paths)
+    overlay._tray = SimpleNamespace(
+        setVisible=lambda value: visible.append(value),
+        toolTip=lambda: "VoiceFlow", setToolTip=lambda _value: None,
+    )
+    overlay.show_error = errors.append
+
+    def fail():
+        raise OSError("fixture cleanup failure")
+
+    overlay._on_quit = fail
+    escaped = None
+    try:
+        overlay.quit()
+    except Exception as error:
+        escaped = error
+
+    assert escaped is None
+    assert _pump_until(app, lambda: bool(errors))
+    assert completed == []
+    assert False not in visible
+
+
+def test_pending_quit_disables_tray_actions_and_failure_restores_previous_state(app, paths):
+    release = threading.Event()
+    errors = []
+    tooltip = {"text": "VoiceFlow · 就绪"}
+    overlay = OverlayWindow(paths)
+    first, unavailable = QAction("退出"), QAction("不可用的动作")
+    unavailable.setEnabled(False)
+    overlay._tray_actions = [first, unavailable]
+    overlay._tray = SimpleNamespace(
+        toolTip=lambda: tooltip["text"],
+        setToolTip=lambda value: tooltip.update(text=value),
+        setVisible=lambda _value: None,
+    )
+    overlay.show_error = errors.append
+
+    def fail_after_wait():
+        release.wait(1)
+        raise OSError("fixture failure")
+
+    overlay._on_quit = fail_after_wait
+    try:
+        overlay.quit()
+        assert not first.isEnabled() and not unavailable.isEnabled()
+        assert "正在退出" in tooltip["text"]
+    finally:
+        release.set()
+        _pump_until(app, lambda: bool(errors))
+    assert first.isEnabled() and not unavailable.isEnabled()
+    assert tooltip["text"] == "VoiceFlow · 就绪"
+
+
+def test_refresh_does_not_block_the_ui_or_duplicate_slow_cached_device_queries(
     app, paths, monkeypatch
 ):
     import sounddevice
+    from app_controller import AppController
 
     started = threading.Event()
     release = threading.Event()
@@ -74,8 +183,12 @@ def test_refresh_does_not_block_the_ui_or_duplicate_slow_device_queries(
         release.wait(timeout=1.0)
         return []
 
-    monkeypatch.setattr(sounddevice, "query_devices", slow_query_devices)
-    window = _SettingsWindow(paths=paths)
+    def forbidden_native_query():
+        raise AssertionError("settings must not enumerate native audio devices")
+
+    monkeypatch.setattr(sounddevice, "query_devices", forbidden_native_query)
+    controller = AppController(on_query_microphones=slow_query_devices)
+    window = _SettingsWindow(paths=paths, controller=controller)
     try:
         began = time.perf_counter()
         for _ in range(25):
@@ -116,7 +229,7 @@ def test_diagnostics_is_single_flight_even_when_repeated_from_help(
         window._run_doctor()
         assert started.wait(timeout=1.0)
         for _ in range(100):
-            window._show_aux_page(4)
+            window._show_aux_page(3)
         with calls_lock:
             assert calls == 1
     finally:
@@ -127,7 +240,7 @@ def test_diagnostics_is_single_flight_even_when_repeated_from_help(
 
 @pytest.mark.parametrize(
     ("method_name", "callback_name"),
-    (("_copy_text", "on_copy_text"), ("_repaste_text", "on_repaste_text")),
+    (("_copy_text", "on_copy_text"), ("_repaste_text", "on_copy_text")),
 )
 def test_history_delivery_actions_never_wait_on_the_ui_thread(
     app, paths, method_name, callback_name
@@ -325,6 +438,26 @@ def test_settings_exposes_no_competing_trial_button(app, paths):
         assert "试说" not in labels
         assert "停止并查看" not in labels
         assert not hasattr(window, "trial_button")
+        assert not hasattr(window, "practice_box")
+    finally:
+        window.close()
+
+
+def test_settings_primary_navigation_and_font_are_consistent(app, paths):
+    window = _SettingsWindow(paths=paths)
+    try:
+        assert [
+            window.sidebar.item(index).text()
+            for index in range(window.sidebar.count())
+        ] == ["听写", "词典", "历史"]
+        assert window.font().family() == app.font().family()
+        assert window.language_combo.font().family() == app.font().family()
+        assert window.microphone_combo.font().family() == app.font().family()
+
+        for row, stack_index in ((0, 0), (1, 2), (2, 1)):
+            window.sidebar.setCurrentRow(row)
+            app.processEvents()
+            assert window.stack.currentIndex() == stack_index
     finally:
         window.close()
 
@@ -339,7 +472,7 @@ def test_settings_navigation_survives_one_thousand_actions(
         app.processEvents()
         started = time.perf_counter()
         for index in range(1000):
-            window.sidebar.setCurrentRow(index % 4)
+            window.sidebar.setCurrentRow(index % 3)
             app.processEvents()
         elapsed = time.perf_counter() - started
 

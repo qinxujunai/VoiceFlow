@@ -6,7 +6,14 @@
       "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
       "size": 643854,
       "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
-      "license": "MIT"
+      "license": "MIT",
+      "license_file": "licenses/Silero-MIT.txt",
+      "license_sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b",
+      "license_source": "https://raw.githubusercontent.com/snakers4/silero-vad/915dd3d639b8333a52e001af095f87c5b7f1e0ac/LICENSE",
+      "source_asset_id": 271935959,
+      "source_asset_updated_at": "2025-07-11T07:04:32Z",
+      "exporter_reference": "https://github.com/k2-fsa/sherpa-onnx/tree/330609dab49be6ee8b30702918ca7abbbad1286a/scripts/silero_vad/v4",
+      "provenance_scope": "Byte-identical to the official k2-fsa release asset; exporter reference is supporting documentation, not a reproduced export"
     }
   },
   "models": {

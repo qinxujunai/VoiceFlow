@@ -34,16 +34,17 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart("v")
-          $inno = Get-Content -Raw installer\VoiceFlow.iss
-          if ($inno -notmatch "#define MyAppVersion `"$([regex]::Escape($version))`"") {
-            throw "Tag $env:GITHUB_REF_NAME does not match installer version"
-          }
+          python scripts/sync_version.py --tag $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { throw "Tag and source version validation failed" }
           $notes = "release\$env:GITHUB_REF_NAME\RELEASE_NOTES.md"
           if (-not (Test-Path -LiteralPath $notes)) {
             throw "Release notes missing: $notes"
           }
       - name: Install pinned dependencies
-        run: python -m pip install -r requirements.lock
+        run: |
+          python scripts/asr_runtime_assets.py --hash-only
+          python -m pip install -r requirements.lock
+          python scripts/asr_runtime_assets.py
       - name: Import required signing certificate
         if: env.SIGNING_AVAILABLE == 'true'
         shell: pwsh
@@ -98,6 +99,10 @@ jobs:
           python test_integration.py
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
+      - name: Verify native Qt package boundary
+        run: |
+          python scripts/check_frozen_qt.py dist/VoiceFlow
+          python scripts/asr_runtime_assets.py --package-dir dist/VoiceFlow
       - name: Sign application
         if: env.SIGNING_AVAILABLE == 'true'
         shell: pwsh
@@ -117,7 +122,7 @@ jobs:
       - name: Build full offline installer
         shell: pwsh
         run: |
-          choco install innosetup --no-progress -y
+          $innoCompiler = ./scripts/prepare_inno_compiler.ps1 -ToolchainRoot (Join-Path $env:RUNNER_TEMP "VoiceFlow-build-tools")
           $arguments = @(
             "/DINCLUDE_SENSEVOICE=1",
             "/DINCLUDE_STREAMING_PREVIEW=1"
@@ -131,7 +136,7 @@ jobs:
             $arguments += "/Svoiceflowsign=$signCommand"
             $arguments += "/DSIGNTOOL=voiceflowsign"
           }
-          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' `
+          & $innoCompiler `
             @arguments installer\VoiceFlow.iss
           if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
@@ -203,7 +208,10 @@ jobs:
           python scripts/generate_release_assets.py `
             --installer "dist\installer\VoiceFlow-$version-Windows-x64.exe" `
             --output-dir "release\$env:GITHUB_REF_NAME" `
-            --version $version
+            --version $version `
+            --package-dir dist\VoiceFlow `
+            --analysis-toc build\VoiceFlow\Analysis-00.toc
+          if ($LASTEXITCODE -ne 0) { throw "Artifact-based release metadata failed" }
       - name: Preserve compliance bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -212,7 +220,13 @@ jobs:
             release/${{ github.ref_name }}/SHA256SUMS.txt
             release/${{ github.ref_name }}/SBOM.cdx.json
             release/${{ github.ref_name }}/THIRD_PARTY_NOTICES.md
+            release/${{ github.ref_name }}/BUILD_PROVENANCE.json
           if-no-files-found: error
+      - name: Require complete artifact compliance before publication
+        shell: pwsh
+        run: |
+          python scripts/check_release_compliance.py "release\$env:GITHUB_REF_NAME"
+          if ($LASTEXITCODE -ne 0) { throw "Release compliance review is incomplete" }
       - name: Attest installer provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
@@ -228,6 +242,7 @@ jobs:
             "release\$env:GITHUB_REF_NAME\SHA256SUMS.txt" `
             "release\$env:GITHUB_REF_NAME\SBOM.cdx.json" `
             "release\$env:GITHUB_REF_NAME\THIRD_PARTY_NOTICES.md" `
+            "release\$env:GITHUB_REF_NAME\BUILD_PROVENANCE.json" `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --title "VoiceFlow $version — Windows 离线语音输入" `

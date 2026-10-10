@@ -188,6 +188,10 @@ class AppPaths:
         return self.data_dir / "delivery-pending"
 
     @property
+    def dictation_preferences_file(self) -> Path:
+        return self.data_dir / "dictation-preferences.json"
+
+    @property
     def model_switch_dir(self) -> Path:
         return self.data_dir / "model-switch"
 

@@ -12,13 +12,18 @@ import logging
 import threading
 import multiprocessing
 import uuid
+
+sys.path.insert(0, os.path.dirname(__file__))
+from runtime_bootstrap import configure_native_thread_pools
+configure_native_thread_pools()
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
 import yaml
 import numpy as np
 from dataclasses import dataclass
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from audio_capture import AudioCapture
 from transcriber import Transcriber
 from hotkey_manager import HotkeyManager
 from output_handler import OutputHandler
@@ -29,13 +34,13 @@ from recording_session import RecordingSession
 from recording_state import RecordingState, RecordingStateMachine
 from runtime_logging import configure_runtime_logging
 from audio_activity import (
-    SileroSpeechDetector,
     find_speech_onset,
     has_lexical_content,
     has_speech_activity,
 )
 from runtime_paths import AppPaths, prepare_runtime_layout
-from punctuation import FinalPunctuationRestorer
+from punctuation import FinalPunctuationRestorer, apply_sentence_end, contains_technical_text
+from dictation_preferences import DictationOptions, DictationPreferencesStore
 from platform_utils import open_path
 from recovery_session import RecoverySessionStore
 from safe_text import SafeTextBoundary
@@ -76,15 +81,20 @@ class _InitWorker(threading.Thread):
         self.on_error = on_error
 
     def run(self):
+        if self.system._runtime_stopping():
+            return
         try:
             self.system._init_modules()
-            self.on_done()
+            if not self.system._runtime_stopping():
+                self.on_done()
         except Exception as e:
-            self.on_error(e)
+            if not self.system._runtime_stopping():
+                self.on_error(e)
 
 
 class VoiceInputSystem:
     STREAM_PREVIEW_POLL_SECONDS = 0.04
+    STREAM_PREVIEW_BLOCK_SECONDS = 0.1
     FINAL_SEGMENT_SECONDS = 18.0
     FINAL_SEGMENT_OVERLAP_SECONDS = 1.0
     FINAL_SEGMENT_HOLD_SECONDS = 0.32
@@ -96,7 +106,8 @@ class VoiceInputSystem:
     CLIPBOARD_ONLY_HOLD_MS = 1040
     RECOVERY_SAVED_HOLD_MS = 1740
 
-    def __init__(self, config_path=None, *, paths=None):
+    def __init__(self, config_path=None, *, paths=None, register_hotkeys=True):
+        self._register_hotkeys = register_hotkeys
         self.paths = paths or AppPaths.discover(config_path=config_path)
         self.migration = prepare_runtime_layout(self.paths)
         self.base_dir = str(self.paths.data_dir)
@@ -111,6 +122,7 @@ class VoiceInputSystem:
         self._runtime_supervisor_stop = threading.Event()
         self._runtime_supervisor_thread = None
         self._runtime_supervisor_lock = threading.Lock()
+        self._runtime_modules_lock = threading.RLock()
         self._streaming = False
         self._stream_stop_event = None
         self._stream_generation = 0
@@ -147,7 +159,6 @@ class VoiceInputSystem:
             self.paths.recovery_dir,
             retention_hours=float(recovery_config.get("retention_hours", 24)),
         )
-        self._recovery_store.purge_expired()
         self._recovery_journal = None
         self._active_session_id = None
         self._target_snapshot = None
@@ -156,26 +167,13 @@ class VoiceInputSystem:
         self._speech_gate_enabled = bool(vad_config.get("enabled", True))
         self._speech_rms_threshold = float(vad_config.get("asr_energy_floor", 0.002))
         self._speech_min_active_ms = int(vad_config.get("min_speech_ms", 90))
-        self._speech_detector = None
-        if self._speech_gate_enabled:
-            vad_model = self.paths.resolve_asset(
-                vad_config.get("model_path", "assets/silero_vad.onnx"),
-            )
-            try:
-                self._speech_detector = SileroSpeechDetector(
-                    vad_model,
-                    threshold=float(vad_config.get("speech_probability_threshold", 0.5)),
-                    min_speech_ms=self._speech_min_active_ms,
-                    sample_rate=int(self.config.get("audio", {}).get("sample_rate", 16000)),
-                )
-            except Exception:
-                logger.exception("Silero VAD unavailable; using the energy safety gate")
         self.history = HistoryStore(self.paths.history_file)
         self.punctuation = FinalPunctuationRestorer()
-        self._trial_session = False
+        self.dictation_preferences = DictationPreferencesStore(
+            self.paths.dictation_preferences_file, legacy_output=self.config.get("output", {}))
+        self._last_dictation_app = ""
         self.controller = AppController(
             on_record_toggle=self._on_record_toggle,
-            on_trial_toggle=self._on_trial_toggle,
             on_cancel=self._on_record_cancel,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
@@ -188,10 +186,13 @@ class VoiceInputSystem:
             on_recover_session=self._recover_session,
             on_delete_recovery=self._delete_recovery_session,
             on_read_history=self.history.read_recent,
-            on_delete_history=self.history.delete_entry_with_undo,
-            on_clear_history=self.history.clear,
+            on_query_microphones=self._query_microphones,
+            on_query_dictation_preferences=self._query_dictation_preferences,
+            on_update_dictation_preferences=self._update_dictation_preferences,
+            on_delete_history=self._delete_history_entry,
+            on_clear_history=self._clear_history,
             on_clear_local_data=self._clear_local_dictation_data,
-            on_restore_history=self.history.restore_entry,
+            on_restore_history=self._restore_history_entry,
             build_id=BUILD_ID,
             runtime_state_path=self.paths.schema_file,
         )
@@ -199,27 +200,89 @@ class VoiceInputSystem:
         self.controller.set_status_sink(self._show_controller_status)
 
     def _clear_local_dictation_data(self):
+        self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
                 raise RuntimeError("请先结束当前听写或恢复操作，再清除本机数据")
+            pending_count = self.output_handler.clear_pending()
             history_count = int(self.history.clear())
             recovery_count = len(self._recovery_store.clear_all())
+            self._forget_retained_text()
             return {
                 "history_entries": history_count,
                 "recovery_sessions": recovery_count,
+                "pending_deliveries": pending_count,
             }
 
+    def _require_data_ready(self):
+        if self.controller.phase is RuntimePhase.STARTING or not hasattr(self, "output_handler"):
+            raise RuntimeError("正在准备，请稍后再操作听写数据")
+
+    def _forget_retained_text(self):
+        self.output_handler.last_text = ""
+        self._latest_text = ""
+        with self._final_cache_lock:
+            self._final_segments = []
+
+    def _clear_history(self):
+        self._require_data_ready()
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                raise RuntimeError("请先结束当前听写或数据操作")
+            self.output_handler.clear_pending()
+            count = self.history.clear()
+            self._forget_retained_text()
+            return count
+
+    def _delete_history_entry(self, entry_id):
+        self._require_data_ready()
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                raise RuntimeError("请先结束当前听写或数据操作")
+            entry = self.history.find_entry(entry_id)
+            if entry is None:
+                return None
+            text = entry.get("corrected_text") or entry.get("clean_text", "")
+            session_id = str(entry.get("session_id") or "")
+            if session_id:
+                # Equal text can belong to another interrupted recording.
+                self.output_handler.clear_pending(
+                    session_ids=(session_id, f"recovered-{session_id}"))
+            token = self.history.delete_entry_with_undo(entry_id)
+            if token and self.output_handler.last_text == text:
+                self.output_handler.last_text = ""
+            return token
+
+    def _restore_history_entry(self, token):
+        self._require_data_ready()
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                raise RuntimeError("请先结束当前听写或数据操作")
+            return self.history.restore_entry(token)
+
     def _delete_recovery_session(self, session_id):
+        self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
                 raise RuntimeError("请先结束当前听写或恢复操作，再删除录音")
             return self._recovery_store.delete(session_id)
 
     def _init_modules(self):
+        with self._runtime_modules_lock:
+            if not self._runtime_stopping():
+                self._init_modules_locked()
+
+    def _runtime_stopping(self):
+        return (self._recording_state.current is RecordingState.SHUTDOWN
+                or self._runtime_supervisor_stop.is_set())
+
+    def _init_modules_locked(self):
         print("[启动] 音频...", flush=True)
         self.audio = SupervisedAudioCapture(self.config_path)
         self.audio.set_level_callback(self._on_audio_levels)
         self.audio.prepare()
+        if self._runtime_stopping():
+            return
         self.session = RecordingSession(self.audio)
 
         print("[启动] ASR...", flush=True)
@@ -237,6 +300,8 @@ class VoiceInputSystem:
         try:
             self.transcriber.load_engine(engine)
         except Exception as candidate_error:
+            if self._runtime_stopping():
+                return
             if not pending_switch or pending_switch.get("candidate_engine") != engine:
                 raise
             previous = switch.rollback(str(candidate_error))
@@ -253,8 +318,12 @@ class VoiceInputSystem:
             )
             self.transcriber.load_engine(engine)
         else:
+            if self._runtime_stopping():
+                return
             if pending_switch and pending_switch.get("candidate_engine") == engine:
                 switch.commit(engine)
+        if self._runtime_stopping():
+            return
         print(f"[启动] {engine}", flush=True)
 
         try:
@@ -266,16 +335,23 @@ class VoiceInputSystem:
             self.preview_transcriber.load()
             print("[启动] 实时预览", flush=True)
         except Exception as exc:
+            if self._runtime_stopping():
+                return
             self.preview_transcriber = None
             logger.warning(
                 "real-time preview unavailable; keeping the quiet recording capsule: %s",
                 exc,
             )
 
+        if self._runtime_stopping():
+            return
+
         self.output_handler = OutputHandler(
             self.config_path, base_dir=self.base_dir, overlay=self.overlay
         )
         for pending in self.output_handler.recover_pending():
+            if self._runtime_stopping():
+                return
             session_id = pending["session_id"]
             if not self.history.has_session_id(session_id):
                 self.history.append(
@@ -305,6 +381,41 @@ class VoiceInputSystem:
             return
         self.overlay.update_audio_level(levels, self._stream_generation)
 
+    def _query_microphones(self):
+        audio = getattr(self, "audio", None)
+        return audio.microphones if audio is not None else []
+
+    def _query_dictation_preferences(self):
+        snapshot = self.dictation_preferences.snapshot()
+        snapshot["last_app"] = self._last_dictation_app
+        snapshot["load_error"] = self.dictation_preferences.load_error
+        return snapshot
+
+    def _update_dictation_preferences(self, options):
+        return self.dictation_preferences.update(**options)
+
+    def _final_text_options(self, target=None):
+        preferences = getattr(self, "dictation_preferences", None)
+        if preferences is None:
+            return DictationOptions()
+        app_id = getattr(target, "executable_name", "")
+        terminal = getattr(target, "foreground_class", "").casefold() in {
+            "cascadia_hosting_window_class", "consolewindowclass"}
+        return preferences.options_for(app_id, terminal=terminal)
+
+    def _prepare_final_text(self, raw_text, options):
+        if options.preserve_format:
+            safe = self._safe_text.sanitize(raw_text, preserve_format=True)
+            text = self.cleaner.clean(safe.text, preserve_format=True) if safe.text else ""
+            text = self.punctuation.restore(text, preserve_format=True)
+        else:
+            safe = self._safe_text.sanitize(raw_text)
+            text = (safe.text if contains_technical_text(safe.text) else
+                    self.cleaner.clean(safe.text) if safe.text else "")
+            text = self.punctuation.restore(text)
+        return apply_sentence_end(text, options.sentence_end,
+                                  preserve_format=options.preserve_format), safe
+
     def _on_recording_painted(self, generation, elapsed_ms):
         if generation != self._stream_generation:
             return
@@ -333,14 +444,6 @@ class VoiceInputSystem:
         elif state is RecordingState.IDLE:
             self._on_record_start(triggered_at)
 
-    def _on_trial_toggle(self):
-        state = self._recording_state.current
-        if state is RecordingState.IDLE:
-            self._trial_session = True
-            self._on_record_start()
-        elif state is RecordingState.RECORDING and self._trial_session:
-            self._on_record_stop()
-
     def _can_record_toggle(self):
         return self._recording_state.current in {
             RecordingState.IDLE,
@@ -354,18 +457,16 @@ class VoiceInputSystem:
             self._stream_generation += 1
             generation = self._stream_generation
             self._active_session_id = uuid.uuid4().hex
-            self._target_snapshot = self.output_handler.capture_target()
-            if self._recovery_enabled:
-                self._recovery_journal = self._recovery_store.start_session(
-                    session_id=self._active_session_id,
-                    sample_rate=self.audio.sample_rate,
-                    channels=getattr(self.audio, "channels", 1),
-                    dtype=getattr(self.audio, "dtype", "int16"),
-                    model=self._active_engine_name(),
-                )
-                self.audio.set_recovery_sink(self._recovery_journal)
+            self._recovery_fault_handled_session = None
             self._last_trigger_to_feedback_ms = None
             self.overlay.show_recording(generation, triggered_at)
+            self._target_snapshot = self.output_handler.capture_target(wait=False)
+            if self._recovery_enabled:
+                self._recovery_journal = self.audio.create_recovery_journal(
+                    self._recovery_store,
+                    session_id=self._active_session_id,
+                    model=self._active_engine_name(),
+                )
             self.session.start()
             self._recording_state.mark_recording()
             self.controller.mark_recording()
@@ -396,16 +497,12 @@ class VoiceInputSystem:
                 self._recovery_journal.close_interrupted()
                 self._recovery_journal = None
             self._recording_state.abort_start()
-            if self._trial_session:
-                self._trial_session = False
-                self.overlay.show_trial_result("")
             self.overlay.show_error(str(e))
             logger.exception("recording start failed")
             print(f"[错误] {e}", flush=True)
 
     def _on_record_stop(self, triggered_at=None):
         stop_started = triggered_at if triggered_at is not None else time.perf_counter()
-        trial_session = self._trial_session
         finalizing_done = threading.Event()
         finalizing_timer = None
         if not self._recording_state.claim_stop():
@@ -413,6 +510,9 @@ class VoiceInputSystem:
         self.controller.mark_finalizing()
 
         try:
+            stop_target = self.output_handler.capture_stop_target()
+            self._last_dictation_app = getattr(stop_target, "executable_name", "")
+            final_options = self._final_text_options(stop_target)
             freeze_started = time.perf_counter()
             self.session.freeze()
             audio_frozen_ms = (time.perf_counter() - freeze_started) * 1000
@@ -444,13 +544,16 @@ class VoiceInputSystem:
                 audio_teardown_ms = (time.perf_counter() - teardown_started) * 1000
             data = result.audio_data
             if len(data) == 0:
+                retained = self._recovery_journal is not None
                 if self._recovery_journal is not None:
-                    self._recovery_journal.close_without_recovery()
+                    self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
-                self.overlay.show_canceled()
-                self.overlay.hide_after(650)
-                if trial_session:
-                    self.overlay.show_trial_result("")
+                self._recording_state.mark_recoverable()
+                self._recording_state.acknowledge_recovery()
+                self.overlay.show_error(
+                    "未能读取录音。请打开设置查看可恢复录音，并检查麦克风。" if retained
+                    else "没有收到声音，请检查麦克风后重试。"
+                )
                 return
 
             cache_handoff_started = time.perf_counter()
@@ -470,17 +573,14 @@ class VoiceInputSystem:
             transcription_ms = (time.perf_counter() - transcription_started) * 1000
             raw_text = final_result.text
             safe_text_started = time.perf_counter()
-            safe_result = self._safe_text.sanitize(raw_text)
-            text = self.cleaner.clean(safe_result.text) if safe_result.text else ""
-            text = self.punctuation.restore(text)
+            text, safe_result = self._prepare_final_text(raw_text, final_options)
             if text and not has_lexical_content(text):
                 text = ""
             safe_text_ms = (time.perf_counter() - safe_text_started) * 1000
 
             # Safety: if final transcription empty but streaming had text, use streaming text
             if not text and self._latest_text:
-                preview_safe = self._safe_text.sanitize(self._latest_text)
-                preview_text = self.cleaner.clean(preview_safe.text)
+                preview_text, preview_safe = self._prepare_final_text(self._latest_text, final_options)
                 text = preview_text if has_lexical_content(preview_text) else ""
                 if text:
                     safe_result = preview_safe
@@ -494,7 +594,8 @@ class VoiceInputSystem:
 
             if text:
                 finalizing_done.set()
-                print(f"[转写] {text} ({duration:.1f}s)", flush=True)
+                logger.info("final transcription ready duration_s=%.1f characters=%s",
+                            duration, len(text))
                 self.overlay.show_authoritative_final(text, final_generation)
                 self._recording_state.mark_delivering()
                 self.controller.mark_delivering()
@@ -503,7 +604,9 @@ class VoiceInputSystem:
                     text,
                     start_target=self._target_snapshot,
                     session_id=self._active_session_id or uuid.uuid4().hex,
-                    allow_paste=final_result.coverage_ok and not trial_session,
+                    allow_paste=(final_result.coverage_ok
+                                 and self._recording_state.current is not RecordingState.SHUTDOWN),
+                    stop_target=stop_target,
                 )
                 delivery_ms = (time.perf_counter() - delivery_started) * 1000
                 timeline = FinalizationTimeline(
@@ -517,11 +620,13 @@ class VoiceInputSystem:
                 output_status = delivery.output_status
                 stop_to_paste_ms = (time.perf_counter() - stop_started) * 1000
                 segment_count = len(self._snapshot_final_cache()[0])
-                self.history.append(
+                history_saved = self._persist_final_history(
                     raw_text=raw_text,
                     clean_text=text,
                     corrected_text=text,
-                    output_status=output_status,
+                    output_status=(output_status if delivery.clipboard_verified
+                                   else "recovery_saved_clipboard_unavailable"),
+                    error=getattr(self.audio, "recovery_error", None) or "",
                     duration=duration,
                     model=self._active_engine_name(),
                     segment_count=segment_count,
@@ -553,17 +658,27 @@ class VoiceInputSystem:
                     session_id=self._active_session_id,
                     clipboard_verified=delivery.clipboard_verified,
                     paste_dispatched=delivery.paste_dispatched,
-                    recovery_saved=delivery.recovery_saved,
+                    landed_confirmed=delivery.landed_confirmed,
+                    recovery_saved=delivery.recovery_saved or not delivery.clipboard_verified,
                     safe_text_reasons=safe_result.reasons,
                     delivery_reason=delivery.reason,
                     target_evidence=delivery.target_evidence,
                 )
-                self.output_handler.acknowledge_delivery(self._active_session_id)
-                self.overlay.complete_onboarding()
+                if history_saved:
+                    if not delivery.clipboard_verified:
+                        output_status = "recovery_saved_clipboard_unavailable"
+                    if delivery.reason != "pending_write_failed":
+                        try:
+                            self.output_handler.acknowledge_delivery(self._active_session_id)
+                        except OSError:
+                            logger.warning("pending delivery acknowledgement failed")
+                if delivery.landed_confirmed:
+                    self.overlay.complete_onboarding()
                 delivered_completely = (
                     final_result.coverage_ok
                     and delivery.clipboard_verified
                     and not delivery.recovery_saved
+                    and history_saved
                 )
                 if delivered_completely and self._recovery_journal is not None:
                     self._recovery_journal.mark_delivered(delivery.text_sha256)
@@ -571,13 +686,31 @@ class VoiceInputSystem:
                 elif self._recovery_journal is not None:
                     self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
-                if trial_session:
-                    self.overlay.show_trial_result(text)
-                    self.overlay.hide_after(0)
-                else:
-                    self.overlay.show_delivery_state(output_status, final_generation)
-                    self.overlay.hide_after(
-                        self._delivery_hold_ms(output_status, duration)
+                self.overlay.show_delivery_state(output_status, final_generation)
+                self.overlay.hide_after(
+                    self._delivery_hold_ms(output_status, duration)
+                )
+                if not history_saved:
+                    destination = (
+                        "文字已复制到剪贴板。" if delivery.clipboard_verified else
+                        "文字已另行保存，下次启动可恢复。" if delivery.reason != "pending_write_failed" else
+                        "复制和保存均未完成，请查看可恢复录音。"
+                    )
+                    self.overlay.show_error("历史未保存。" + destination)
+                elif getattr(self.audio, "recovery_error", None):
+                    destination = (
+                        "文字已复制，也保存在历史中。" if delivery.clipboard_verified
+                        else "文字保存在历史中，可打开历史复制。"
+                    )
+                    self.overlay.show_error("录音保存中断。" + destination)
+                elif not final_result.coverage_ok:
+                    destination = (
+                        "已复制到剪贴板。" if delivery.clipboard_verified else
+                        "保存在历史中。"
+                    )
+                    self.overlay.show_error(
+                        "只找回部分文字，" + destination
+                        + "请打开设置查看可恢复录音。"
                     )
                 if delivered_completely:
                     self._recording_state.mark_complete()
@@ -586,14 +719,16 @@ class VoiceInputSystem:
                     self._recording_state.acknowledge_recovery()
             else:
                 finalizing_done.set()
+                retained = self._recovery_journal is not None
                 if self._recovery_journal is not None:
                     self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
                 self._recording_state.mark_recoverable()
                 self._recording_state.acknowledge_recovery()
-                if trial_session:
-                    self.overlay.show_trial_result("")
-                self.overlay.hide_after(0)
+                self.overlay.show_error(
+                    "没有识别到文字。请打开设置查看可恢复录音，或检查麦克风后重试。" if retained
+                    else "没有识别到文字，请检查麦克风后重试。"
+                )
 
         except Exception as e:
             finalizing_done.set()
@@ -605,9 +740,7 @@ class VoiceInputSystem:
             self._recording_state.mark_recoverable()
             self._recording_state.acknowledge_recovery()
             self.overlay.show_error(str(e))
-            if trial_session:
-                self.overlay.show_trial_result("")
-            self.history.append(output_status="error", error=str(e))
+            self._persist_final_history(output_status="error", error="finalization_failed")
             logger.exception("recording finalization failed")
             import traceback
             traceback.print_exc()
@@ -620,16 +753,23 @@ class VoiceInputSystem:
             self._recording_state.complete_processing()
             self._active_session_id = None
             self._target_snapshot = None
-            self._trial_session = False
-            if self.controller.phase.value not in {"degraded", "error"}:
-                try:
-                    self.audio.prepare()
-                except Exception as error:
+            if (self._recording_state.current is not RecordingState.SHUTDOWN
+                    and self.controller.phase.value not in {"degraded", "error"}):
+                self._restore_audio_ready()
+
+    def _restore_audio_ready(self):
+        with self._runtime_modules_lock:
+            if self._runtime_stopping():
+                return
+            try:
+                self.audio.prepare()
+            except Exception as error:
+                if not self._runtime_stopping():
                     self.controller.mark_degraded(
-                        str(error),
-                        error_code="audio_worker_restart_failed",
+                        str(error), error_code="audio_worker_restart_failed",
                     )
-                else:
+            else:
+                if not self._runtime_stopping():
                     self.controller.mark_ready(
                         preview_ready=self.preview_transcriber is not None,
                         worker_pid=getattr(self.transcriber, "worker_pid", None),
@@ -706,7 +846,11 @@ class VoiceInputSystem:
         total_samples = self._audio_sample_count()
         if total_samples <= next_sample:
             return next_sample
-        new_audio = self._audio_snapshot(next_sample, total_samples)
+        block_end = min(
+            total_samples,
+            next_sample + max(1, int(self.audio.sample_rate * self.STREAM_PREVIEW_BLOCK_SECONDS)),
+        )
+        new_audio = self._audio_snapshot(next_sample, block_end)
         if not len(new_audio):
             return next_sample
         normalized = np.asarray(new_audio, dtype=np.float32) / 32768.0
@@ -884,16 +1028,23 @@ class VoiceInputSystem:
             if left[-size:] == right[:size]:
                 return left + right[size:]
 
-        def normalized(value):
+        def normalized(value, *, reverse=False):
             chars = []
             raw_ends = []
-            for index, char in enumerate(value):
+            indices = range(len(value) - 1, -1, -1) if reverse else range(len(value))
+            for index in indices:
+                char = value[index]
                 if char.isalnum() or "\u3400" <= char <= "\u9fff":
                     chars.append(char.casefold())
                     raw_ends.append(index + 1)
+                    if len(chars) == 80:
+                        break
+            if reverse:
+                chars.reverse()
+                raw_ends.reverse()
             return chars, raw_ends
 
-        left_chars, _ = normalized(left)
+        left_chars, _ = normalized(left, reverse=True)
         right_chars, right_ends = normalized(right)
         max_normalized_overlap = min(len(left_chars), len(right_chars), 80)
         for size in range(max_normalized_overlap, 1, -1):
@@ -977,11 +1128,7 @@ class VoiceInputSystem:
             tail_start = max(buffer_start_sample, finalized_audio_len - overlap_samples)
             tail = data[tail_start - buffer_start_sample:]
             tail_end = buffer_start_sample + len(data)
-            tail_has_speech = self._contains_speech(tail) if len(tail) else False
-            tail_text = (
-                self._transcribe_audio(tail, activity_checked=True)
-                if tail_has_speech else ""
-            )
+            tail_text, tail_has_speech = self._transcribe_audio(tail, return_activity=True)
             parts = [self._segment_text(segment) for segment in segments]
             text = self._join_transcript_parts(parts + [tail_text])
             committed = getattr(self, "_latest_text", "")
@@ -1035,41 +1182,57 @@ class VoiceInputSystem:
             total_samples=total_samples,
         ).text
 
-    def _contains_speech(self, audio_data):
+    def _contains_speech(self, audio_data, *, sample_rate=None):
         if (
             getattr(self, "_speech_gate_enabled", False)
             and not has_speech_activity(
                 audio_data,
-                self.audio.sample_rate,
+                self.audio.sample_rate if sample_rate is None else sample_rate,
                 rms_threshold=self._speech_rms_threshold,
                 min_active_ms=self._speech_min_active_ms,
             )
         ):
             return False
-        detector = getattr(self, "_speech_detector", None)
-        if detector is not None and not detector.has_speech(
-            audio_data,
-            self.audio.sample_rate,
-        ):
-            return False
         return True
 
-    def _transcribe_audio(self, audio_data, *, blocking=True, activity_checked=False):
-        if not activity_checked and not self._contains_speech(audio_data):
-            return ""
+    def _transcribe_audio(self, audio_data, *, blocking=True, activity_checked=False,
+                          return_activity=False, sample_rate=None):
+        if not len(audio_data):
+            return ("", False) if return_activity else ""
+        if not activity_checked and not self._contains_speech(audio_data, sample_rate=sample_rate):
+            return ("", False) if return_activity else ""
+        rate = self.audio.sample_rate if sample_rate is None else sample_rate
+
+        def recognize():
+            transcribe = getattr(self.transcriber, "transcribe_with_activity", None)
+            if transcribe is not None:
+                text, speech = transcribe(audio_data, rate)
+            else:
+                text = self.transcriber.transcribe(audio_data, rate)
+                speech = True
+            return (text, speech) if return_activity else text
+
         lock = getattr(self, "_transcribe_lock", None)
         if lock is None:
-            return self.transcriber.transcribe(audio_data, self.audio.sample_rate)
+            return recognize()
         acquired = lock.acquire(blocking=blocking)
         if not acquired:
             return None
         try:
-            return self.transcriber.transcribe(audio_data, self.audio.sample_rate)
+            return recognize()
         finally:
             lock.release()
 
+    def _persist_final_history(self, **entry):
+        try:
+            self.history.append(**entry)
+        except OSError:
+            logger.error("history persistence failed")
+            return False
+        return True
+
     def _delivery_hold_ms(self, output_status, _duration):
-        if output_status == "clipboard_verified_paste_dispatched":
+        if output_status == "landed_confirmed":
             return self.SUCCESS_DISMISS_MS
         if output_status == "clipboard_verified_only":
             return self.CLIPBOARD_ONLY_HOLD_MS
@@ -1086,13 +1249,14 @@ class VoiceInputSystem:
         stop_event = threading.Event()
         self._stream_stop_event = stop_event
         preview = getattr(self, "preview_transcriber", None)
-        preview_session = preview.create_session() if preview is not None else None
 
         def preview_loop():
             next_sample = 0
-            if preview is None or preview_session is None:
+            preview_session = None
+            if preview is None:
                 return
             try:
+                preview_session = preview.create_session()
                 while not stop_event.is_set():
                     next_sample = self._feed_preview_audio(
                         preview,
@@ -1100,12 +1264,14 @@ class VoiceInputSystem:
                         next_sample,
                         generation,
                     )
-                    stop_event.wait(self.STREAM_PREVIEW_POLL_SECONDS)
+                    if next_sample >= self._audio_sample_count():
+                        stop_event.wait(self.STREAM_PREVIEW_POLL_SECONDS)
             except Exception:
                 logger.exception("real-time streaming preview failed")
             finally:
                 try:
-                    preview.close_session(preview_session)
+                    if preview_session is not None:
+                        preview.close_session(preview_session)
                 except Exception:
                     pass
 
@@ -1126,16 +1292,14 @@ class VoiceInputSystem:
                         try:
                             segment_start, segment_end = segment_range
                             segment = self._audio_snapshot(segment_start, segment_end)
-                            has_speech = self._contains_speech(segment)
-                            segment_text = (
-                                self._transcribe_audio(
-                                    segment,
-                                    blocking=False,
-                                    activity_checked=True,
-                                )
-                                if has_speech else ""
+                            transcription = self._transcribe_audio(
+                                segment, blocking=False, return_activity=True,
                             )
-                            if segment_text is not None and (
+                            if transcription is None:
+                                stop_event.wait(0.08)
+                                continue
+                            segment_text, has_speech = transcription
+                            if (
                                 not has_speech or segment_text
                             ):
                                 natural_endpoint = self._consume_preview_endpoint(
@@ -1207,25 +1371,11 @@ class VoiceInputSystem:
                     self._recovery_journal = None
                 self._active_session_id = None
                 self._target_snapshot = None
-                self._trial_session = False
                 if hasattr(self, "output_handler"):
                     self.output_handler.cancel_target_tracking()
                 self.overlay.show_canceled()
                 self.overlay.hide_after(800)
-                try:
-                    self.audio.prepare()
-                except Exception as error:
-                    self.controller.mark_degraded(
-                        str(error),
-                        error_code="audio_worker_restart_failed",
-                    )
-                else:
-                    self.controller.mark_ready(
-                        preview_ready=self.preview_transcriber is not None,
-                        worker_pid=getattr(self.transcriber, "worker_pid", None),
-                        worker_pids=self._worker_pids(),
-                        last_heartbeat=self._oldest_worker_heartbeat(),
-                    )
+                self._restore_audio_ready()
             except Exception as error:
                 self._recording_state.mark_error()
                 self.controller.mark_degraded(
@@ -1240,71 +1390,95 @@ class VoiceInputSystem:
         print("[录音] 已取消", flush=True)
 
     def _copy_last_text(self):
-        last = self.history.last()
-        text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
+        self._require_data_ready()
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                self.overlay.show_error("请先结束当前听写或数据操作")
+                return "busy"
+            return self._copy_idle_last_text()
+
+    def _copy_idle_last_text(self):
+        text = getattr(getattr(self, "output_handler", None), "last_text", "")
+        if not text:
+            try:
+                last = self.history.last()
+            except (OSError, ValueError):
+                self.overlay.show_error("暂时无法读取历史，请查看可恢复录音。")
+                return
+            text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
         if text:
-            status = self._copy_text(text)
+            status = self.output_handler.copy_only(text)
             message = "已复制" if status == "clipboard_verified_only" else "复制失败"
             self.overlay.show_result(message)
             self.overlay.hide_after(1200)
 
     def _repaste_last_text(self):
-        last = self.history.last()
-        text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
-        self._output_text(text)
+        return self._copy_last_text()
 
     def _output_text(self, text):
-        if text and hasattr(self, "output_handler"):
-            return self.output_handler.output(text)
-        return "empty"
+        return self._copy_text(text)
 
     def _copy_text(self, text):
-        if text and hasattr(self, "output_handler"):
+        if not text:
+            return "empty"
+        self._require_data_ready()
+        with self._recording_state.idle_operation() as claimed:
+            if not claimed:
+                return "busy"
             return self.output_handler.copy_only(text)
-        return "empty"
 
     def _recover_session(self, session_id):
+        try:
+            self._require_data_ready()
+        except RuntimeError as error:
+            return {"ok": False, "error": str(error)}
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
                 return {"ok": False, "error": "请先结束当前听写或数据操作"}
             return self._recover_idle_session(session_id)
 
     def _recover_idle_session(self, session_id):
-        audio = self._recovery_store.read_pcm(session_id)
-        if not len(audio):
+        session, audio = self._recovery_store.read_recording(session_id)
+        if session is None or not len(audio):
             return {"ok": False, "error": "恢复录音不存在或为空"}
-        raw_text = self._transcribe_audio(audio, activity_checked=False)
-        safe = self._safe_text.sanitize(raw_text or "")
+        raw_text = self._transcribe_audio(audio, activity_checked=False,
+                                          sample_rate=session.sample_rate)
+        text, safe = self._prepare_final_text(raw_text or "", self._final_text_options())
         if safe.rejected or not safe.text:
             return {"ok": False, "error": "没有得到可信文字，录音已继续保留"}
-        text = self.cleaner.clean(safe.text)
         delivery = self.output_handler.deliver(
             text,
             start_target=None,
             session_id=f"recovered-{session_id}",
             allow_paste=False,
         )
-        if not delivery.clipboard_verified:
-            return {"ok": False, "error": "剪贴板暂时不可用，录音已继续保留"}
-        self.history.append(
+        history_saved = self._persist_final_history(
             raw_text=raw_text,
             clean_text=text,
             corrected_text=text,
-            output_status=delivery.output_status,
+            output_status=(delivery.output_status if delivery.clipboard_verified
+                           else "recovery_saved_clipboard_unavailable"),
             model=self._active_engine_name(),
             captured_samples=len(audio),
             covered_samples=len(audio),
-            coverage_ok=True,
-            final_source="recovered_pcm",
+            coverage_ok=not session.partial,
+            final_source="recovered_partial_pcm" if session.partial else "recovered_pcm",
             session_id=session_id,
-            clipboard_verified=True,
+            clipboard_verified=delivery.clipboard_verified,
             paste_dispatched=False,
-            recovery_saved=False,
+            recovery_saved=not delivery.clipboard_verified,
             safe_text_reasons=safe.reasons,
         )
+        if not history_saved:
+            destination = ("文字已复制到剪贴板，录音已继续保留" if delivery.clipboard_verified
+                           else "剪贴板暂时不可用，录音已继续保留")
+            return {"ok": False, "error": "历史未保存。" + destination}
+        if not delivery.clipboard_verified:
+            return {"ok": False, "error": "剪贴板暂时不可用，文字已保存在历史中，录音已继续保留"}
         self.output_handler.acknowledge_delivery(f"recovered-{session_id}")
-        self._recovery_store.delete(session_id)
-        return {"ok": True, "text": text, "output_status": delivery.output_status}
+        retained = session.partial or not self._recovery_store.delete(session_id)
+        return {"ok": True, "text": text, "output_status": delivery.output_status,
+                "partial": session.partial, "recording_retained": retained}
 
     def _open_dictionary(self):
         open_path(self.paths.knowledge_dir)
@@ -1347,8 +1521,11 @@ class VoiceInputSystem:
         self.overlay.show_startup_window()
 
         try:
-            self._start_hotkeys()
-            self.controller.mark_hotkeys("ready")
+            if getattr(self, "_register_hotkeys", True):
+                self._start_hotkeys()
+                self.controller.mark_hotkeys("ready")
+            else:
+                self.controller.mark_hotkeys("disabled_for_diagnostics")
         except Exception:
             self.controller.mark_hotkeys("error")
             logger.exception("global hotkeys unavailable")
@@ -1363,7 +1540,12 @@ class VoiceInputSystem:
                     last_heartbeat=self._oldest_worker_heartbeat(),
                 )
                 self._start_runtime_supervisor()
-                recoverable = self._recovery_store.list_recoverable()
+                try:
+                    recoverable = self._recovery_store.list_recoverable()
+                except OSError:
+                    logger.exception("recoverable recordings could not be read at startup")
+                    self.overlay.show_error("可恢复录音暂时无法读取，请检查数据目录权限后重试。")
+                    return
                 if recoverable:
                     self.overlay.show_recovery_available(len(recoverable))
                 else:
@@ -1371,7 +1553,7 @@ class VoiceInputSystem:
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
-                self.overlay.show_error("快捷键不可用，请从托盘菜单开始听写")
+                self.overlay.show_error("启动未完成，请打开设置运行检查。")
 
         def on_error(e):
             import traceback
@@ -1433,6 +1615,11 @@ class VoiceInputSystem:
         self._runtime_supervisor_thread.start()
 
     def _runtime_supervisor_tick(self):
+        with self._runtime_modules_lock:
+            if not self._runtime_stopping():
+                self._runtime_supervisor_tick_locked()
+
+    def _runtime_supervisor_tick_locked(self):
         workers = [
             getattr(self, "audio", None),
             getattr(self, "transcriber", None),
@@ -1444,6 +1631,16 @@ class VoiceInputSystem:
             worker_pids=self._worker_pids(),
             last_heartbeat=self._oldest_worker_heartbeat(),
         )
+        recovery_error = getattr(getattr(self, "audio", None), "recovery_error", None)
+        if recovery_error and self.controller.phase is RuntimePhase.RECORDING:
+            session_id = self._active_session_id
+            if getattr(self, "_recovery_fault_handled_session", None) != session_id:
+                result = self.controller.toggle_recording(source="recovery_error")
+                if result.accepted:
+                    self._recovery_fault_handled_session = session_id
+                    logger.warning("recording stopped after recovery failure",
+                                   extra={"event": recovery_error})
+            return
         if self.controller.phase is not RuntimePhase.READY:
             return
         unhealthy = [
@@ -1461,7 +1658,11 @@ class VoiceInputSystem:
                 extra={"event": "worker_unhealthy", "state": "restarting"},
             )
             for worker in unhealthy:
+                if self._runtime_stopping():
+                    return
                 worker.ensure_healthy()
+            if self._runtime_stopping():
+                return
             self.controller.mark_ready(
                 preview_ready=preview is not None and preview.is_healthy,
                 worker_pid=getattr(self.transcriber, "worker_pid", None),
@@ -1497,26 +1698,44 @@ class VoiceInputSystem:
         previous_state = self._recording_state.shutdown()
         if previous_state is RecordingState.RECORDING and hasattr(self, "session"):
             try:
-                self.session.cancel()
+                self.session.freeze()
             except Exception:
-                pass
-
-        if hasattr(self, "hotkey_mgr"):
-            self.hotkey_mgr.stop()
-        if hasattr(self, "transcriber"):
-            self.transcriber.shutdown()
-        if getattr(self, "preview_transcriber", None) is not None:
-            self.preview_transcriber.shutdown()
-        if hasattr(self, "audio"):
-            self.audio.shutdown()
-        if hasattr(self, "output_handler"):
-            self.output_handler.shutdown()
+                logger.warning("recording freeze failed during shutdown", exc_info=True)
+        with self._runtime_modules_lock:
+            self._shutdown_modules()
         print("\n[系统] 已退出", flush=True)
+
+    def _shutdown_modules(self):
+        if self._recovery_journal is not None:
+            try:
+                self._recovery_journal.close_interrupted()
+            except Exception:
+                logger.warning("recovery close failed during shutdown", exc_info=True)
+            self._recovery_journal = None
+
+        failed = []
+        for name, method in (
+            ("hotkey_mgr", "stop"), ("transcriber", "shutdown"),
+            ("preview_transcriber", "shutdown"), ("audio", "shutdown"),
+            ("output_handler", "shutdown"),
+        ):
+            service = getattr(self, name, None)
+            if service is not None:
+                try:
+                    getattr(service, method)()
+                except Exception:
+                    failed.append(name)
+                    logger.exception("service cleanup failed: %s", name)
+        if failed:
+            self._shutdown_started = False
+            raise RuntimeError("退出未完成，请从托盘重试。")
 
 
 # ---- 测试 ----
 
 def test_mode(config_path):
+    from audio_capture import AudioCapture
+
     paths = AppPaths.discover(config_path=config_path)
     prepare_runtime_layout(paths)
     config_path = str(paths.config_file)
@@ -1565,13 +1784,15 @@ def runtime_smoke(config_path=None):
 
 
 def main():
-    multiprocessing.freeze_support()
     p = argparse.ArgumentParser(description="VoiceFlow")
     p.add_argument("--test", action="store_true")
     p.add_argument("--runtime-smoke", action="store_true")
     p.add_argument("--config", default=None)
     p.add_argument("--instance-id", default="")
     p.add_argument("--data-dir", default="")
+    p.add_argument("--diagnose-performance", default="", metavar="PUBLIC_WAV")
+    p.add_argument("--diagnostic-output", default="")
+    p.add_argument("--no-hotkeys", action="store_true", help="Isolated GUI diagnostics only; do not register global input hooks")
     args = p.parse_args()
 
     if args.instance_id:
@@ -1579,6 +1800,13 @@ def main():
     if args.data_dir:
         os.environ["VOICEFLOW_DATA_DIR"] = args.data_dir
 
+    if args.diagnose_performance:
+        if not args.config or not args.diagnostic_output:
+            p.error("performance diagnostics require --config and --diagnostic-output")
+        from runtime_probe import run_worker_probe
+        raise SystemExit(run_worker_probe(
+            args.config, args.diagnose_performance, args.diagnostic_output,
+        ))
     if args.runtime_smoke:
         raise SystemExit(runtime_smoke(args.config))
     if args.test:
@@ -1588,7 +1816,7 @@ def main():
         )
         test_mode(config_path)
     else:
-        VoiceInputSystem(args.config).start()
+        VoiceInputSystem(args.config, register_hotkeys=not args.no_hotkeys).start()
 
 
 if __name__ == "__main__":

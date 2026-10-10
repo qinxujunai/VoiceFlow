@@ -30,3 +30,7 @@ output/playwright/
 # IDE
 .vscode/
 .idea/
+# Local validation binaries, recordings, and reversible installed-program backups.
+tests_runtime/
+dictation-preferences.json
+.dictation-preferences.json.tmp

@@ -33,7 +33,7 @@ if (-not $RequireStreamingPreview) {
     $null = New-Item -ItemType Directory -Path $stalePreview -Force
     Set-Content `
         -LiteralPath (Join-Path $stalePreview "stale-internal-model.txt") `
-        -Value "must be removed by the public installer"
+        -Value "untracked files must survive upgrade and uninstall"
 }
 $previousLocalAppData = $env:LOCALAPPDATA
 $appProcess = $null
@@ -87,6 +87,9 @@ try {
         Set-Content -LiteralPath $target -Value $preservedFiles[$relative] -Encoding utf8
         $preservedHashes[$relative] = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
     }
+    $untrackedFile = Join-Path $installRoot "user-notes.txt"
+    Set-Content -LiteralPath $untrackedFile -Value "Untracked upgrade sentinel" -Encoding utf8
+    $untrackedHash = (Get-FileHash -LiteralPath $untrackedFile -Algorithm SHA256).Hash
     $install = Start-Process `
         -FilePath $resolvedInstaller `
         -ArgumentList @(
@@ -152,11 +155,18 @@ try {
     if (Test-Path -LiteralPath (Join-Path $installRoot "models\sensevoice\.cache")) {
         throw "Installer contains a Hugging Face cache"
     }
-    if (
-        -not $RequireStreamingPreview -and
-        (Test-Path -LiteralPath (Join-Path $installRoot "models\streaming-preview"))
-    ) {
-        throw "Public installer retained an experimental preview model"
+    if (-not $RequireStreamingPreview) {
+        if (-not (Test-Path -LiteralPath (Join-Path $stalePreview "stale-internal-model.txt"))) {
+            throw "Upgrade removed an untracked model-directory file"
+        }
+        foreach ($weight in @("encoder-epoch-99-avg-1.int8.onnx", "decoder-epoch-99-avg-1.onnx", "joiner-epoch-99-avg-1.int8.onnx")) {
+            if (Test-Path -LiteralPath (Join-Path $stalePreview $weight)) {
+                throw "Installer unexpectedly bundled preview weights"
+            }
+        }
+    }
+    if ((Get-FileHash -LiteralPath $untrackedFile -Algorithm SHA256).Hash -ne $untrackedHash) {
+        throw "Upgrade modified an untracked application-directory file"
     }
     & python scripts\scan_private_vocabulary.py --root $installRoot
     if ($LASTEXITCODE -ne 0) {
@@ -288,8 +298,11 @@ try {
     if ($uninstall.ExitCode -ne 0) {
         throw "Uninstaller exited with code $($uninstall.ExitCode)"
     }
-    if (Test-Path -LiteralPath $installRoot) {
-        throw "Uninstaller left the application directory behind"
+    if (Test-Path -LiteralPath (Join-Path $installRoot "VoiceFlow.exe")) {
+        throw "Uninstaller left the installed executable behind"
+    }
+    if ((Get-FileHash -LiteralPath $untrackedFile -Algorithm SHA256).Hash -ne $untrackedHash) {
+        throw "Uninstaller removed or modified an untracked application-directory file"
     }
     if (-not (Test-Path -LiteralPath $runtimeState)) {
         throw "Uninstaller removed user-owned VoiceFlow data"

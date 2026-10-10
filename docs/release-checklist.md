@@ -37,9 +37,10 @@ venv\Scripts\python.exe scripts\ui_quality_gate.py
 ## Packaging Verification
 
 ```bat
-venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
+venv\Scripts\python.exe -m PyInstaller VoiceFlow.spec --noconfirm
 "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DINCLUDE_SENSEVOICE=1 installer\VoiceFlow.iss
-venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-<version>-Windows-x64.exe --output-dir release\v<version> --version <version>
+venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\installer\VoiceFlow-<version>-Windows-x64.exe --output-dir release\v<version> --version <version> --package-dir dist\VoiceFlow --analysis-toc build\VoiceFlow\Analysis-00.toc
+venv\Scripts\python.exe scripts\check_release_compliance.py release\v<version>
 ```
 
 - The packaged app includes overlay, config, model manifest, knowledge base,
@@ -61,7 +62,21 @@ venv\Scripts\python.exe scripts\generate_release_assets.py --installer dist\inst
   as trusted-signed.
 - Public filenames follow `VoiceFlow-{version}-Windows-x64.exe`; channel labels
   such as `beta` do not appear in the customer-facing filename.
-- `SBOM.cdx.json` parses as CycloneDX 1.6 and includes the bundled model.
+- `SBOM.cdx.json` parses as CycloneDX 1.6 and reflects actual frozen distribution
+  attribution, every frozen file, CPython and pinned packaged model files.
+  Build/test requirements are not automatically declared as shipped libraries.
+- `BUILD_PROVENANCE.json` records the embedded build inputs, actual package file
+  hashes, application/installer PE identities and installer SHA256. Source changes
+  after freezing require rebuilding. This record covers its explicit input list,
+  not a complete dirty-working-tree archive. Installer payload equivalence still
+  requires installed-file verification.
+- An incomplete SBOM composition or unfinished native/component license review
+  blocks release. Generated inventory is review evidence, not a compliance approval.
+  The release workflow preserves the engineering materials, then checks that
+  recorded review completion and SBOM compositions are complete and identify the
+  same source/build/installer before attestation or public publication. Current
+  engineering output deliberately fails this check until the review is finished;
+  changing flags alone is not review evidence.
 - The tag-driven Release workflow publishes the installer, checksums, SBOM,
   notices, and GitHub build-provenance attestation from the same commit.
 

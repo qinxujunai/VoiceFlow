@@ -1,8 +1,9 @@
 # Local STT Toolkit - Python 依赖
 # 安装: pip install -r requirements.txt
 
-# 核心推理框架
-sherpa-onnx==1.13.3
+# Windows Python 3.12 x64；固定的本地 ASR 构建关闭未使用的 TTS。
+--find-links ./vendor/windows
+sherpa-onnx==1.13.3+voiceflow.5
 
 # 音频采集
 sounddevice==0.5.5

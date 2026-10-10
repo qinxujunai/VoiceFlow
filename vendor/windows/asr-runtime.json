@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "status": "verified development input; final packaged, clean-machine and product acceptance pending",
+  "version": "1.13.3+voiceflow.5",
+  "wheel": {
+    "file": "sherpa_onnx-1.13.3+voiceflow.5-cp312-cp312-win_amd64.whl",
+    "sha256": "ae0e00987d5634026ee64b15e6b577e6b8b24ff5d08810a3deb7026e815fe5ee",
+    "bytes": 1692095
+  },
+  "extension_sha256": "e9adfb09dd79d8ed341ba4534e91cd4580370d2166206472c3d27ce88390e588",
+  "extension_bytes": 4112384,
+  "onnxruntime_sha256": "756c938b0f2d14c45c7ad469c6429041d7e905ee6c6ad6049aa67ce937567e97",
+  "source": {
+    "url": "https://github.com/k2-fsa/sherpa-onnx/archive/330609dab49be6ee8b30702918ca7abbbad1286a.tar.gz",
+    "upstream_commit": "330609dab49be6ee8b30702918ca7abbbad1286a",
+    "archive": "sherpa-onnx-330609dab49be6ee8b30702918ca7abbbad1286a.tar.gz",
+    "sha256": "83e3671094fc191e501b557739230895c919e51a63196f8dfa30183af52b921d",
+    "bytes": 9798677
+  },
+  "source_archive_verified_against_git_tree_blobs": 5383,
+  "local_patch": {
+    "file": "asr-only.patch",
+    "sha256": "2020a054b3e49439cf96a78ef863571893a5a2ade1984649746f8201ce143ef6",
+    "modified_date": "2026-10-07",
+    "scope": "two missing disabled-TTS placeholder bindings; no ASR algorithm changes"
+  },
+  "baked_upstream_git_sha1": "6bcb4f51",
+  "baked_git_sha1_is_source_provenance": false,
+  "build_dependencies": [
+    {
+      "name": "pybind11",
+      "file": "pybind11-3.0.0.tar.gz",
+      "url": "https://github.com/pybind/pybind11/archive/refs/tags/v3.0.0.tar.gz",
+      "sha256": "453b1a3e2b266c3ae9da872411cadb6d693ac18063bd73226d96cfb7015a200c",
+      "bytes": 915234
+    },
+    {
+      "name": "kaldi_native_fbank",
+      "file": "kaldi-native-fbank-1.22.3.tar.gz",
+      "url": "https://github.com/csukuangfj/kaldi-native-fbank/archive/refs/tags/v1.22.3.tar.gz",
+      "sha256": "9176cc66fc7ce1edf85cf355b06e320c57db6297df74277f575183468893cf61",
+      "bytes": 71144
+    },
+    {
+      "name": "kissfft",
+      "file": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "url": "https://github.com/mborgerding/kissfft/archive/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd",
+      "bytes": 74252
+    },
+    {
+      "name": "kaldi_decoder",
+      "file": "kaldi-decoder-0.3.0.tar.gz",
+      "url": "https://github.com/k2-fsa/kaldi-decoder/archive/refs/tags/v0.3.0.tar.gz",
+      "sha256": "b9f34cfb4fd3b1344100eead79ef4d37aa15962274b9e3056de345021f76a1b0",
+      "bytes": 51199
+    },
+    {
+      "name": "kaldifst",
+      "file": "kaldifst-1.8.0.tar.gz",
+      "url": "https://github.com/k2-fsa/kaldifst/archive/refs/tags/v1.8.0.tar.gz",
+      "sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3",
+      "bytes": 172147
+    },
+    {
+      "name": "openfst",
+      "file": "openfst-1.8.5-2026-04-11.tar.gz",
+      "url": "https://github.com/csukuangfj/openfst/archive/refs/tags/v1.8.5-2026-04-11.tar.gz",
+      "sha256": "57fbc4b950ae81b1a0e1e298af15652da968a6723a592b7874e9b4027a80a5b4",
+      "bytes": 1501059
+    },
+    {
+      "name": "eigen",
+      "file": "eigen-5.0.1.tar.gz",
+      "url": "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz",
+      "sha256": "e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec",
+      "bytes": 2967272
+    },
+    {
+      "name": "simple-sentencepiece",
+      "file": "simple-sentencepiece-0.7.tar.gz",
+      "url": "https://github.com/pkufool/simple-sentencepiece/archive/refs/tags/v0.7.tar.gz",
+      "sha256": "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af",
+      "bytes": 355335
+    },
+    {
+      "name": "json",
+      "file": "json-3.12.0.tar.gz",
+      "url": "https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz",
+      "sha256": "4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187",
+      "bytes": 9678593
+    },
+    {
+      "name": "onnxruntime",
+      "file": "onnxruntime-win-x64-MT-Release-1.24.4.tar.bz2",
+      "url": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.24.4/onnxruntime-win-x64-MT-Release-1.24.4.tar.bz2",
+      "sha256": "8e6233057d04470e8a0ca7db266801848d7f6d9390f9273828d772a707911890",
+      "bytes": 5789923
+    }
+  ],
+  "cmake_options": {
+    "SHERPA_ONNX_ENABLE_PYTHON": "ON",
+    "SHERPA_ONNX_ENABLE_TTS": "OFF",
+    "SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION": "OFF",
+    "SHERPA_ONNX_ENABLE_PORTAUDIO": "OFF",
+    "SHERPA_ONNX_ENABLE_WEBSOCKET": "OFF",
+    "SHERPA_ONNX_ENABLE_BINARY": "OFF",
+    "SHERPA_ONNX_ENABLE_C_API": "OFF",
+    "SHERPA_ONNX_USE_STATIC_CRT": "ON",
+    "SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE": "OFF"
+  },
+  "build_tools": {
+    "compiler": "MSVC 19.44.35228.0",
+    "toolset": "14.44.35207/v143",
+    "windows_sdk": "10.0.26100.0",
+    "cmake": "4.4.3",
+    "python": "3.12.13/x64"
+  },
+  "verification_scope": "scripted rebuild; isolated pip target; paired public/constructed audio, not natural holdout or product acceptance",
+  "license_review_complete": false,
+  "patched_binding_sha256": "58bbf26fea13fbeb641ec72d0adbc103c735c99a25ddc4236c464303e4646b4e",
+  "prototype_binding_bytes_sha256": "cdb65c045801a66d41883b1b4326dec0205d8865ef490038d3f2a29297443340",
+  "patch_line_ending_scope": "rebuilder uses archive LF; prototype checkout used CRLF with two inserted LF lines; canonical bytes compared equal",
+  "rebuild_tools": {
+    "cmake_sha256": "ab8247ca4554871e5d75c0ee118ee8663727bd6fdf37ad76b17e9cc8d5f286a8",
+    "python_version": "3.12.13 (main, Jun  2 2026, 22:47:20) [MSC v.1944 64 bit (AMD64)]",
+    "cmake_version": "cmake version 4.4.3",
+    "compiler_version": "19.44.35228.0",
+    "compiler_sha256": "b2d4bc1f29464815439c1fe001af65b671de0b2ce0608d29b7260a4d58ba53dc",
+    "cmake_cache_sha256": "7a15a1e5966103ba5e78f670f895a719989be30becefb5dbd214709fd90f097c"
+  },
+  "bit_reproducibility_claimed": false,
+  "disconnected_build_evidence": {
+    "scope": "all dependency archives validated and pre-extracted; FetchContent fully disconnected; not a system network trace",
+    "cmake_cache_sha256": "7a15a1e5966103ba5e78f670f895a719989be30becefb5dbd214709fd90f097c",
+    "dependency_source_overrides": 10,
+    "fully_disconnected": true,
+    "updates_disconnected": true,
+    "build": {
+      "command": [
+        "D:\\develop\\uv\\tools\\cmake\\Lib\\site-packages\\cmake\\data\\bin\\cmake.exe",
+        "--build",
+        "E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build",
+        "--config",
+        "Release",
+        "--target",
+        "_sherpa_onnx",
+        "--parallel",
+        "4"
+      ],
+      "pid": 37116,
+      "exit_code": 0,
+      "elapsed_seconds": 333.8838423999987,
+      "failure": null,
+      "owned_tree_cleanup": {
+        "attempted": false
+      }
+    },
+    "configure": {
+      "command": [
+        "D:\\develop\\uv\\tools\\cmake\\Lib\\site-packages\\cmake\\data\\bin\\cmake.exe",
+        "-S",
+        "E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\source",
+        "-B",
+        "E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64",
+        "-DCMAKE_GENERATOR_INSTANCE=D:\\Apps\\Microsoft Visual Studio\\2022\\BuildTools",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_INSTALL_PREFIX=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\unused-install-prefix",
+        "-DCMAKE_EXPORT_PACKAGE_REGISTRY=OFF",
+        "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF",
+        "-DPYTHON_EXECUTABLE=E:\\01_Projects\\VoiceFlow\\venv\\Scripts\\python.exe",
+        "-DPython_EXECUTABLE=E:\\01_Projects\\VoiceFlow\\venv\\Scripts\\python.exe",
+        "-DSBPE_BUILD_PYTHON=OFF",
+        "-DSHERPA_ONNX_ENABLE_PYTHON=ON",
+        "-DSHERPA_ONNX_ENABLE_TTS=OFF",
+        "-DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF",
+        "-DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF",
+        "-DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF",
+        "-DSHERPA_ONNX_ENABLE_BINARY=OFF",
+        "-DSHERPA_ONNX_ENABLE_C_API=OFF",
+        "-DSHERPA_ONNX_USE_STATIC_CRT=ON",
+        "-DSHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE=OFF",
+        "-DFETCHCONTENT_FULLY_DISCONNECTED=ON",
+        "-DFETCHCONTENT_UPDATES_DISCONNECTED=ON",
+        "-DFETCHCONTENT_SOURCE_DIR_PYBIND11=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\pybind11-src",
+        "-DFETCHCONTENT_SOURCE_DIR_KALDI_NATIVE_FBANK=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\kaldi_native_fbank-src",
+        "-DFETCHCONTENT_SOURCE_DIR_KISSFFT=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\kissfft-src",
+        "-DFETCHCONTENT_SOURCE_DIR_KALDI_DECODER=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\kaldi_decoder-src",
+        "-DFETCHCONTENT_SOURCE_DIR_KALDIFST=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\kaldifst-src",
+        "-DFETCHCONTENT_SOURCE_DIR_OPENFST=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\openfst-src",
+        "-DFETCHCONTENT_SOURCE_DIR_EIGEN=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\eigen-src",
+        "-DFETCHCONTENT_SOURCE_DIR_SIMPLE-SENTENCEPIECE=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\simple-sentencepiece-src",
+        "-DFETCHCONTENT_SOURCE_DIR_JSON=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\json-src",
+        "-DFETCHCONTENT_SOURCE_DIR_ONNXRUNTIME=E:\\01_Projects\\VoiceFlow\\tests_runtime\\rc-upgrade-2026-10-06\\toolchain\\sherpa-disconnected-rebuild-05\\build\\_deps\\onnxruntime-src"
+      ],
+      "pid": 24684,
+      "exit_code": 0,
+      "elapsed_seconds": 20.113486700000067,
+      "failure": null,
+      "owned_tree_cleanup": {
+        "attempted": false
+      }
+    },
+    "compiled_builder_sha256": "738a390bffc0609d0e097652869f97299cb7fdff417d8bb68bd9532583971187",
+    "post_build_metadata_repair": "removed inherited evidence for previous binary; wheel bytes unchanged"
+  },
+  "paired_component_evidence": {
+    "sha256": "cfb39c822d195eb9c166235720e547c15aaf81bb7088dd32d7098b194346791d",
+    "exact_outputs": 90,
+    "scope": "scripted rebuild; isolated pip target; paired public/constructed audio, not natural holdout or product acceptance"
+  },
+  "compiler_source_evidence": {
+    "read_inventory_sha256": "9cc3a1390edc4998e44d72de28eb4cedf67d6a686a78dc7ab3c0b530d5656170",
+    "source_review_sha256": "af7af0b516ba2e8e8a0982e69b9dfbd2cae46f107c56938d8006e05a17c086d9",
+    "read_files": 1096,
+    "archive_matches": 1095,
+    "mpl_header_files": 185,
+    "license_review_complete": false
+  }
+}

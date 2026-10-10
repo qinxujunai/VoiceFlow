@@ -13,20 +13,24 @@ def _read(relative_path):
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_readmes_lead_with_real_demo_and_two_badges():
+def test_readmes_lead_with_current_usage_and_two_badges():
     for readme_name in ("README.md", "README.en.md"):
         readme = _read(readme_name)
 
-        assert "docs/voiceflow-demo.svg" in readme
+        assert "0.3.7" in readme
+        assert "Ctrl+V" in readme
+        assert "docs/voiceflow-demo.svg" not in readme
         assert "voiceflow-app-home" not in readme
         assert readme.count("badge.svg") == 1
         assert readme.count("img.shields.io") == 1
 
 
-def test_product_site_uses_only_the_real_demo():
+def test_product_site_explains_usage_without_a_stale_demo():
     page = _read("site/index.html")
 
-    assert "assets/voiceflow-demo.svg" in page
+    assert "assets/voiceflow-demo.svg" not in page
+    assert 'data-i18n="usagePunctuation"' in page
+    assert 'data-i18n="usageRecovery"' in page
     assert "voiceflow-app-home" not in page
     assert "voiceflow-ambient" not in page
     assert "voiceflow-overlay" not in page

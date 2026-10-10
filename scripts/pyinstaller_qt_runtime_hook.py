@@ -4,8 +4,15 @@ from __future__ import annotations
 
 import os
 import sys
+import multiprocessing
 from pathlib import Path
+from runtime_bootstrap import configure_native_thread_pools, configure_packaged_audio_backend
 
+# The preceding official multiprocessing hook supplies PyInstaller's override.
+# Exit into a worker before the automatic Qt hook imports QtCore/ICU.
+configure_native_thread_pools()
+configure_packaged_audio_backend()
+multiprocessing.freeze_support()
 
 if sys.platform == "win32":
     bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))

@@ -10,15 +10,20 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from main import VoiceInputSystem
+from app_controller import RuntimePhase
 from recording_state import RecordingState, RecordingStateMachine
 
 
 def _app():
-    return SimpleNamespace(
-        _recording_state=RecordingStateMachine(),
-        history=SimpleNamespace(clear=Mock(return_value=2)),
-        _recovery_store=SimpleNamespace(clear_all=Mock(return_value=["session"])),
-    )
+    app = object.__new__(VoiceInputSystem)
+    app._recording_state = RecordingStateMachine()
+    app.history = SimpleNamespace(clear=Mock(return_value=2))
+    app._recovery_store = SimpleNamespace(clear_all=Mock(return_value=["session"]))
+    app.output_handler = SimpleNamespace(clear_pending=Mock(return_value=0), last_text="")
+    app.controller = SimpleNamespace(phase=RuntimePhase.READY)
+    app._final_cache_lock = threading.Lock()
+    app._final_segments = []
+    return app
 
 
 @pytest.mark.parametrize("phase", ["arming", "recording", "finalizing", "delivering", "canceling"])
@@ -43,7 +48,7 @@ def test_cancel_failure_does_not_expose_active_audio_as_idle():
     app = _app()
     app._recording_state.claim_start()
     app._stop_streaming = Mock()
-    app.controller = SimpleNamespace(mark_degraded=Mock())
+    app.controller = SimpleNamespace(mark_degraded=Mock(), phase=RuntimePhase.READY)
     app.overlay = SimpleNamespace(show_error=Mock())
     app.session = SimpleNamespace(cancel=Mock(side_effect=OSError("device failed")))
     with pytest.raises(OSError):

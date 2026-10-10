@@ -48,7 +48,7 @@ Asset resolution order is:
 - `RuntimeMode.SOURCE` may launch maintainer model tooling with the current
   Python interpreter, but writes downloads to the user model directory.
 - `RuntimeMode.FROZEN` never invokes Python, a venv, or repository scripts.
-- Frozen model repair reports that the signed installer must be re-run if a
+- Frozen model repair reports that the matching installer must be re-run if a
   bundled model is missing.
 - Settings diagnostics run in-process in both modes and do not require
   `scripts/doctor.py`.
@@ -59,7 +59,7 @@ Asset resolution order is:
 ```bat
 venv\Scripts\python.exe -m pytest tests\test_runtime_paths.py tests\test_runtime_services.py tests\test_settings_store.py -q
 venv\Scripts\python.exe scripts\verify.py --quick
-venv\Scripts\pyinstaller.exe VoiceFlow.spec --noconfirm
+venv\Scripts\python.exe -m PyInstaller VoiceFlow.spec --noconfirm
 ```
 
 ## Testing strategy

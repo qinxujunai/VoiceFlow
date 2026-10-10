@@ -30,37 +30,24 @@ def test_starting_hotkey_reports_preparing_without_touching_recording_backend():
     assert messages == ["正在准备"]
 
 
-def test_ready_controller_dispatches_recording_and_trial_through_stable_actions():
+def test_ready_controller_dispatches_recording_through_the_stable_action():
     recording = []
-    trials = []
     recording_done = threading.Event()
-    trial_done = threading.Event()
 
     def record(triggered_at=None):
         recording.append(triggered_at)
         recording_done.set()
 
-    def trial():
-        trials.append("trial")
-        trial_done.set()
-
-    controller = AppController(
-        on_record_toggle=record,
-        on_trial_toggle=trial,
-    )
+    controller = AppController(on_record_toggle=record)
     controller.mark_ready()
 
     record_result = controller.toggle_recording(triggered_at=7.25, source="f2")
     assert record_result.accepted is True
     assert recording_done.wait(timeout=1.0)
 
-    trial_result = controller.start_trial()
-
-    assert trial_result.accepted is True
-    assert trial_done.wait(timeout=1.0)
     assert recording == [7.25]
-    assert trials == ["trial"]
     assert controller.phase is RuntimePhase.READY
+    assert not hasattr(controller, "start_trial")
 
 
 def test_rapid_record_taps_do_not_queue_a_ghost_toggle():

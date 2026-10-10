@@ -1,0 +1,1178 @@
+{
+  "schema_version": 1,
+  "qt_version": "6.11.1",
+  "scope": "Original notices and official upstream build SBOMs for payload-matched DLLs; build closure includes interfaces and tools, not a claim that every listed component ships",
+  "license_review_complete": false,
+  "modules": [
+    {
+      "module": "qtbase",
+      "revision": "59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+      "revision_scope": "Pinned Qt tag; imageformats SPDX omits whole-module revision; individual source matches recorded separately",
+      "archive": {
+        "source": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "bytes": 39469569,
+        "upstream_sha1": "6f554628540ab947d48294e208cc3caae7f023d2",
+        "actual_sha1": "6f554628540ab947d48294e208cc3caae7f023d2",
+        "sha256": "7f97edc3937fec7383eb865e010ed5128155bf9c80a563abca450860f3e9bef5",
+        "executed": false,
+        "installed": false
+      },
+      "retained_payloads": [
+        {
+          "path": "PySide6/Qt6Core.dll",
+          "sha256": "65fe6224b6c47a15b058738031d31dce9928c4d7a58e1b8db6434f6f5cddd702",
+          "payload_sha256": "aa73b987400f788ed66a1f7be2c05c1f9a6b776497177f4ae94e16f98c2bbf8b",
+          "upstream_archive_path": "bin/Qt6Core.dll",
+          "upstream_archive_sha256": "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/Qt6Network.dll",
+          "sha256": "dfd0dd852274a5fe9b3c7d2dd9fffe7e2117d28c10fc862174d6675d42395177",
+          "payload_sha256": "51eb353e86bbae993e5a98718e1d5426c4ab329cc1497baefb98c4e99e2bdc76",
+          "upstream_archive_path": "bin/Qt6Network.dll",
+          "upstream_archive_sha256": "0232076731e386b6cc353bdf743d5fb17e95a3493c2d02afac984db87ed47b96",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/Qt6Gui.dll",
+          "sha256": "cd071161ad325ff2de92b0e33d71334ef20712544796949623ce92dfb3957e90",
+          "payload_sha256": "b59c1fc26a079ef9e4b8b2f859239491d51045a434b1e7ecbc81b8f90ead100d",
+          "upstream_archive_path": "bin/Qt6Gui.dll",
+          "upstream_archive_sha256": "8fceee959a670372aaa5763287c2ef7924cd9ecdbe2c29cf4b6c12a63079c503",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/Qt6Widgets.dll",
+          "sha256": "5a9f37dedd3dc5bcc1a4bb8ea919c49fc62df751a1450accc34379eb6710eab6",
+          "payload_sha256": "5fd66f6cad9d35684f7ed955fc2188a96f51e9f942c2eef1c04c6e41e5f831fc",
+          "upstream_archive_path": "bin/Qt6Widgets.dll",
+          "upstream_archive_sha256": "4d603bff620ae0830d15c25a787f9f10ed3f972d998f1f17c9c4f83937280399",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/platforms/qminimal.dll",
+          "sha256": "97d81b9ee7cbbeb68e46eefce24d4b929b7a24cc646cebe3d4d03e2734f97935",
+          "payload_sha256": "a83e790aa3f51600a8e9271203d0bab510dbd0bf5e85e746fc7ddda52371197d",
+          "upstream_archive_path": "plugins/platforms/qminimal.dll",
+          "upstream_archive_sha256": "c4f03a873f96edd8ab9c3016883f1705669743ba48d1ecbc5132704db48319c7",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/platforms/qoffscreen.dll",
+          "sha256": "426266e8ba0ea07c416616ad9973702fe126d4559cb2ee11e1c9bdbae85ba755",
+          "payload_sha256": "e7fee5f2ec4e6c334a9ff4a00e936d01a0ade27bcebedd4abf72b75e36ef187f",
+          "upstream_archive_path": "plugins/platforms/qoffscreen.dll",
+          "upstream_archive_sha256": "7a3f14ab1f373e96e706db6f3f2d88a4eb7132f3d03e139fdc84a303ca974e22",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/platforms/qwindows.dll",
+          "sha256": "54d736de022f707e9f7f555e4c9f9e993253cd5b0ee2364e6a9458c180828c42",
+          "payload_sha256": "80b8c8ac3a96f6653cda8331a85b846c50996563c37546016cff1e98be7300a6",
+          "upstream_archive_path": "plugins/platforms/qwindows.dll",
+          "upstream_archive_sha256": "dd126e2a47f7f3d4a855981e9d4012076058b1440f6900b9a07aa950e4e4f20a",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/platforms/qdirect2d.dll",
+          "sha256": "f099af483b0d71a6a028bc15ad98a407e4c820400e6626cdc8e66b5f5e4cfed2",
+          "payload_sha256": "e5c40ffd3c0a859f5d474364beff5225f1705fc0d772dfda3d197c1a753b770f",
+          "upstream_archive_path": "plugins/platforms/qdirect2d.dll",
+          "upstream_archive_sha256": "8d08bec97429c4927e5834c97ed5ae4f9086b7b9f85ab1830582cc7afa764cdb",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qico.dll",
+          "sha256": "f81378dd51392ff0d3ae094d5e59dfc4fa664a0ef4d756d6ed40584f90af2758",
+          "payload_sha256": "152a1668b75c4565e7ae8ccfab2143488fe60d8a7d5128e9e64cfbbc25cb929f",
+          "upstream_archive_path": "plugins/imageformats/qico.dll",
+          "upstream_archive_sha256": "0eb08bc9d8f6c1ab05f3a837629eb10e41eb6aa72240d23e291056b801894794",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qjpeg.dll",
+          "sha256": "97af9ceaf3ebefefeb7aede27ae07b73ae1d2ed479427beebf61c58654361d43",
+          "payload_sha256": "d60c21fe448aa07da35fa917399668c1611e2a7db1932793d2388e7e35728b0b",
+          "upstream_archive_path": "plugins/imageformats/qjpeg.dll",
+          "upstream_archive_sha256": "bc3815c58443a01f43417ecac74bbf182c245d433ea82af0b3dc669c2cb064ab",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qgif.dll",
+          "sha256": "8b8dea2abaed333f1fbbdf3c8867ceb6040722c88a1fb81ea451f8b8bc9e8ee0",
+          "payload_sha256": "fc2affb21f966f9d5dd7341b659b35fbf1f886eeffbfae268d64e9780d313f80",
+          "upstream_archive_path": "plugins/imageformats/qgif.dll",
+          "upstream_archive_sha256": "1ac71f48e08ee0aa405d55041f8340d56ed827fb94260bceda46ac0a50dfb7a5",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/generic/qtuiotouchplugin.dll",
+          "sha256": "1ee2810eef83dbb2740d4f796f8149dc5752ffd3dd60e39796a9a4d6a6a0ae38",
+          "payload_sha256": "529623984e7925c45bdba302154cc5488b2bd4ad2c4a341f881da959c3f19435",
+          "upstream_archive_path": "plugins/generic/qtuiotouchplugin.dll",
+          "upstream_archive_sha256": "0a517e732bd6a12889e0708d6c464db1c07cfad9bb80831815d85505378d54ba",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/styles/qmodernwindowsstyle.dll",
+          "sha256": "9af96b09ebaf7ff13e22c70bf69b9c3f226f069375d1a9f9efd63e944e43f5fb",
+          "payload_sha256": "12bb1fdce0792c7f05e47634626bf170231162d08e51e9d4bc4fa598584be825",
+          "upstream_archive_path": "plugins/styles/qmodernwindowsstyle.dll",
+          "upstream_archive_sha256": "093e3ac68dfdac52a2667a2f7ba00b336392f9d6bde08430494ef54dbd120541",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/networkinformation/qnetworklistmanager.dll",
+          "sha256": "aeef84e74d3114f62f4650305b403ef9f81e8c05bc67c86683d999c5c1243926",
+          "payload_sha256": "78c4b41e8262a6dc04a12497cc0109bb1e05eca19fba5b44e86d58e0690e8de8",
+          "upstream_archive_path": "plugins/networkinformation/qnetworklistmanager.dll",
+          "upstream_archive_sha256": "8de339b75f82efac6381ca01e3dd3482c500a9115c49b53fbccafe0d933eef64",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/tls/qopensslbackend.dll",
+          "sha256": "c7222880a7defe7a5c84f5871cdc7e34df22f3de6646026683042fab5c22b561",
+          "payload_sha256": "3df681fa984cb44ad5806d399b935fb25f76792c82f9a6bbf25c620b1c5067d3",
+          "upstream_archive_path": "plugins/tls/qopensslbackend.dll",
+          "upstream_archive_sha256": "bd6c98abd328149e7e3cfa651753ab8654f404c9d63aced7006b3863e6f5aa26",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/tls/qschannelbackend.dll",
+          "sha256": "d09487a64be0e1d4545a8230e7fe05d163375610adf175407a6742944f16deb9",
+          "payload_sha256": "07d56da7b3602e008e4e2cc6eef37972556ccc5cf111316907583599ce4463d3",
+          "upstream_archive_path": "plugins/tls/qschannelbackend.dll",
+          "upstream_archive_sha256": "b263e588f2a93955a3e42b2c0d893d203cbe5a0ac42d1af5840ddd3b9a16b183",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/tls/qcertonlybackend.dll",
+          "sha256": "45b9f59593a1567f7d6725ddfa53f667f8f26b7795b1e2d0e1080a4025bafc02",
+          "payload_sha256": "719306f61af72a1ca4a8fb482c232716b91d34703f6de1a2f885bd9578c37b29",
+          "upstream_archive_path": "plugins/tls/qcertonlybackend.dll",
+          "upstream_archive_sha256": "c1fa08ef8f0ea33370ad8e1239d9147262b08d002edab4bc4e9812827381dbba",
+          "payload_except_signing_fields_identical": true
+        }
+      ],
+      "upstream_build_closure_refs": [
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-BundledFreetype-Attribution-freetype-bdf-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-BundledFreetype-Attribution-freetype-pcf-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-BundledFreetype-Attribution-freetype-zlib-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-BundledPcre2-Attribution-pcre2-sljit-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-blake2-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-doubleconversion-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-easing-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-md4-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-md5-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-rfc6234-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-sha1-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-sha3-endian-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-sha3-keccak-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-siphash-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-tika-mimetypes-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-tinycbor-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-tlexpected-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-unicode-character-database-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Core-Attribution-unicode-cldr-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-aglfn-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-d3d12memoryallocator-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-emoji-segmenter-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-grayraster-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-icc-srgb-color-profile-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-md4c-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-opengl-es2-headers-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-opengl-headers-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-rhi-miniengine-d3d12-mipmap-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-smooth-scaling-algorithm-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-vulkan-xml-spec-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-vulkanmemoryallocator-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-webgradients-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-xserverhelper-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Gui-Attribution-zlib-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Network-Attribution-libpsl-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Network-Attribution-psl-data-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Network-Attribution-zlib-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Platform-Attribution-extra-cmake-modules-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-Platform-Attribution-kwin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-3rdparty-sources-QWindowsIntegrationPlugin-Attribution-wintab-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledFreetype-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledHarfbuzz-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledLibjpeg-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledLibpng-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledPcre2-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-bundled-3rdparty-module-BundledZLIB-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Core-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-GlobalConfigPrivate-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Gui-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Network-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-OpenGL-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Platform-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-PlatformModuleInternal-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-PlatformPluginInternal-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Widgets-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QGifPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QICOPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QJpegPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QMinimalIntegrationPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QModernWindowsStylePlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QNLMNIPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QOffscreenIntegrationPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QSchannelBackendPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QTlsBackendCertOnlyPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QTlsBackendOpenSSLPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QTuioTouchPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QWindowsDirect2DIntegrationPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-plugin-QWindowsIntegrationPlugin-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-system-3rdparty-WrapAtomic-14f2e7e421b1"
+      ],
+      "original_sources": [
+        {
+          "path": "qtbase/cmake/3rdparty/extra-cmake-modules/qt_attribution.json",
+          "bytes": 479,
+          "sha256": "f34f498d6c63a78a882b352fa38c9dd076a59b1696cd6a6f921151a61f2a02e0",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/cmake/3rdparty/extra-cmake-modules/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/cmake/3rdparty/kwin/qt_attribution.json",
+          "bytes": 663,
+          "sha256": "bf3a3c09e99f1c9fab7553ebc4a7548b71dc23fcfdbe6e5df0fa0e7847c2efc3",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/cmake/3rdparty/kwin/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/D3D12MemoryAllocator/qt_attribution.json",
+          "bytes": 727,
+          "sha256": "182d7e5ed90dc592b01a50635c85f4039ca6f25f88ec4700b08faf6f07fda09e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/D3D12MemoryAllocator/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/VulkanMemoryAllocator/qt_attribution.json",
+          "bytes": 699,
+          "sha256": "833626a9e955bdae274f076786ca2cc7c8b50f9e382dff566db89ec69f8178cf",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/VulkanMemoryAllocator/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/blake2/qt_attribution.json",
+          "bytes": 926,
+          "sha256": "bab552307bdd03ed9a4cf7f8f1397c3d18d4dbee19ee576033284104785245be",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/blake2/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/double-conversion/qt_attribution.json",
+          "bytes": 771,
+          "sha256": "4d9c7505a7c12e4e6b57bbee63af926c861abb5515cdf802b8f3491e321146fe",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/double-conversion/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/easing/qt_attribution.json",
+          "bytes": 471,
+          "sha256": "77d67a1db5882bb0b9a1278b014885bee45a4c059d1da9f835b6da5bc4b9c93d",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/easing/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/emoji-segmenter/qt_attribution.json",
+          "bytes": 682,
+          "sha256": "9a980fc0f9e478d2a7e9a571d4cd234c259aaf8e2ea3fb60a0a7cf02cc3c3700",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/emoji-segmenter/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/freetype/qt_attribution.json",
+          "bytes": 5328,
+          "sha256": "628b68bf60eb3bc1616342bc3545b63be2392e78bbebbc4c19f49675dd2ac8a7",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/freetype/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/harfbuzz-ng/qt_attribution.json",
+          "bytes": 1646,
+          "sha256": "101bc6bb1cc964f3b51adbe6b65ef75cdb5b37fa5a592d72d4d9672250cc6c56",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/harfbuzz-ng/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/icc/qt_attribution.json",
+          "bytes": 775,
+          "sha256": "509da9bd2b3f769c730aa4627b1080d65f39b0ecd4130111c9e1122e13cd35b5",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/icc/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libjpeg/qt_attribution.json",
+          "bytes": 859,
+          "sha256": "a6ae6df0d944727fd06c0594f8974a21f49328f6d25fd40957037f8b62c12778",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libjpeg/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libpng/qt_attribution.json",
+          "bytes": 1763,
+          "sha256": "a43ff8e146c949f7cd14e00bd681f4957e27def06ecafec55ccc7231c451d3fa",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpng/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libpsl/qt_attribution.json",
+          "bytes": 2458,
+          "sha256": "249db4fc311357b0080ccbc123f49e8cd0004dfe86a44f2855f7ea5837ae40f1",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/md4/qt_attribution.json",
+          "bytes": 574,
+          "sha256": "34bda63a2fcc23c83f2e5364ccd394553b4baa505b1f79ded9cc2161c56a9b4c",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/md4/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/md4c/qt_attribution.json",
+          "bytes": 673,
+          "sha256": "59098b9262ac268e73495cb1b1603b5c899d5c532db6ca96e69ffac7062445f5",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/md4c/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/md5/qt_attribution.json",
+          "bytes": 446,
+          "sha256": "20b0f1b17ccd1bd5e8d763b1cdca4b095b8f0c037644b5ee18154536b7d8425e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/md5/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/pcre2/qt_attribution.json",
+          "bytes": 1829,
+          "sha256": "e009f73100ef4aed400257a095cdb25ee31980c4a290f1aca52d147cb3067abc",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/pcre2/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/rfc6234/qt_attribution.json",
+          "bytes": 660,
+          "sha256": "fa24413bdc5015fc7fc84297fa17d4c8a598f8f7c76b9495a6e6b26a77b4a324",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/rfc6234/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/sha1/qt_attribution.json",
+          "bytes": 618,
+          "sha256": "53cab2c771f7f7ffbf6a58ff759e5846b746e91d98dfe467d5145edf8cd7d306",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/sha1/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/sha3/qt_attribution.json",
+          "bytes": 2322,
+          "sha256": "d904a6c21c150d9cac693c0806a469480306cb4e5879cc13c994fbadba71a56e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/sha3/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/siphash/qt_attribution.json",
+          "bytes": 793,
+          "sha256": "8614947dfc0ca1d21aad2f88b4400598262ab8c08aa87c4f7acc0c2de6e5619e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/siphash/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/tinycbor/qt_attribution.json",
+          "bytes": 685,
+          "sha256": "788408509fb7967042640f24ba78b263712e816d886303ba1733f49753d33863",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/tinycbor/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/wintab/qt_attribution.json",
+          "bytes": 602,
+          "sha256": "b879ea91b719531d45e1cfe33d2241d060a9260200bd91a09ada074b16063f9c",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/wintab/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/3rdparty/zlib/qt_attribution.json",
+          "bytes": 731,
+          "sha256": "0346805e9c4048316dbc7c58d560a20c12482ea0218de264282212e9619b6d64",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/zlib/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/corelib/global/qt_attribution.json",
+          "bytes": 814,
+          "sha256": "64698063a65a1502b986bd61163b5eb9c6bde87f93feb28e4eab43ff07a4f10a",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/corelib/global/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/corelib/mimetypes/3rdparty/qt_attribution.json",
+          "bytes": 1383,
+          "sha256": "c4489b84900db9b66a20ab237f162f406ef3f670d008d9f7e0038e651302649e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/corelib/mimetypes/3rdparty/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/corelib/text/qt_attribution.json",
+          "bytes": 2170,
+          "sha256": "b6a2f9a2a33c4c0a951ffd15ceafd5c21dba5a4e5e2e246d5db3493440362302",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/corelib/text/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/gui/opengl/qt_attribution.json",
+          "bytes": 1526,
+          "sha256": "d05626e02386f22186b385b3ce2cd5a6431b84e2fc552c68f7133e38da552fc1",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/opengl/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/gui/painting/qt_attribution.json",
+          "bytes": 2256,
+          "sha256": "8cddd6c73a885f697261c4d6d60e5cd814a2544fcd407504b52a5eb9b7cc3600",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/painting/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/gui/rhi/qt_attribution.json",
+          "bytes": 782,
+          "sha256": "59df3efb041ed346aa797602a76ef8d284e84c3cc6ace30967d6704fc65dbb47",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/rhi/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/gui/text/qt_attribution.json",
+          "bytes": 807,
+          "sha256": "73066a55ff52c6546753e1dc0802d8890d58e93e7efa394565cd8bdd0df0995b",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/text/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/src/gui/vulkan/qt_attribution.json",
+          "bytes": 801,
+          "sha256": "b4beb6ac27b066a6a71408da116fea60131c06ac9799c9763fe9cef28a76e7b9",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/vulkan/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/util/gradientgen/qt_attribution.json",
+          "bytes": 596,
+          "sha256": "6e87ac5d79ab92110e6e517b2c74e4f4fd15878540e93eea0300e529d3318572",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/util/gradientgen/qt_attribution.json"
+        },
+        {
+          "path": "qtbase/cmake/3rdparty/extra-cmake-modules/COPYING-CMAKE-SCRIPTS",
+          "bytes": 1327,
+          "sha256": "46cde7dc11e64c78d650b4851b88f6704b4665ff60f22a1caf68ceb15e217e5b",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/cmake/3rdparty/extra-cmake-modules/COPYING-CMAKE-SCRIPTS"
+        },
+        {
+          "path": "qtbase/cmake/3rdparty/kwin/COPYING-CMAKE-SCRIPTS",
+          "bytes": 1327,
+          "sha256": "46cde7dc11e64c78d650b4851b88f6704b4665ff60f22a1caf68ceb15e217e5b",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/cmake/3rdparty/kwin/COPYING-CMAKE-SCRIPTS"
+        },
+        {
+          "path": "qtbase/src/3rdparty/D3D12MemoryAllocator/LICENSE.txt",
+          "bytes": 1099,
+          "sha256": "1b3941c52b26d42c510afbdf205a8b96a6d64f5a7b8ebff0287979fd91dfd52f",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/D3D12MemoryAllocator/LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/VulkanMemoryAllocator/LICENSE.txt",
+          "bytes": 1099,
+          "sha256": "846d97c8b74ccaa92b9ad031140a04363b3b3985f318094552f297b8bda1c68e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/VulkanMemoryAllocator/LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/blake2/COPYING",
+          "bytes": 17914,
+          "sha256": "4103f471877ed0bae500752c5fcd7ecca409d4a4a8dc2ad40437daba60f1a2bc",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/blake2/COPYING"
+        },
+        {
+          "path": "qtbase/src/3rdparty/double-conversion/LICENSE",
+          "bytes": 1527,
+          "sha256": "4af93c12062c58058378de2397dc1c92bbff9ddfb1d583a01c84127557ce97ca",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/double-conversion/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/easing/LICENSE",
+          "bytes": 1505,
+          "sha256": "92fac99458f1754b73edf50f9c9983e0efaa06ad96e2afd5e538c79f45b4b191",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/easing/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/freetype/BDF-LICENSE.txt",
+          "bytes": 2305,
+          "sha256": "e4e792f29e66750f2e410fd7b50a567652c180f6ee15e1a4dfa0bb5cde524537",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/freetype/BDF-LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/freetype/LICENSE.txt",
+          "bytes": 26234,
+          "sha256": "bf543cdda11864477b8d2ca2aa9afc2aaa8f9133461b4d962ed6ec73646256a1",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/freetype/LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/freetype/PCF-LICENSE.txt",
+          "bytes": 2218,
+          "sha256": "6938597bfdeca0db191a8f9ede52eaf2482c2c71a0094c084747a1235f9958fe",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/freetype/PCF-LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/freetype/ZLIB-LICENSE.txt",
+          "bytes": 962,
+          "sha256": "2b1f5d615382a151af3eb71462ad17d89e2efee8fa7664058d35d3d9237ebb19",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/freetype/ZLIB-LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/harfbuzz-ng/COPYING",
+          "bytes": 1971,
+          "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/harfbuzz-ng/COPYING"
+        },
+        {
+          "path": "qtbase/src/3rdparty/icc/LICENSE.txt",
+          "bytes": 463,
+          "sha256": "9e34ff47b3a44814e183342e7e198d127a6740e29d20e8381fba7688dafc79dd",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/icc/LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libjpeg/COPYRIGHT.txt",
+          "bytes": 593,
+          "sha256": "67464ebd2f477d2f631234df7761ab578a17a07ea96fc9174c99638b9cefff6a",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libjpeg/COPYRIGHT.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libjpeg/LICENSE",
+          "bytes": 5622,
+          "sha256": "e10114e6e40f3d0311c401ca25245ac5ef459a43c20f976fd63f03e816f5741f",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libjpeg/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libjpeg/ijg-license.txt",
+          "bytes": 1815,
+          "sha256": "1cb448f5e2e6d3aca60943f4eee1a04675628dc0266a074a42bc1560ebc28d61",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libjpeg/ijg-license.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libpng/LICENSE",
+          "bytes": 5345,
+          "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpng/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libpsl/PSL-LICENSE.txt",
+          "bytes": 16726,
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/PSL-LICENSE.txt"
+        },
+        {
+          "path": "qtbase/src/3rdparty/libpsl/src/LICENSE.chromium",
+          "bytes": 1664,
+          "sha256": "1d7f52747a9169751cdf2641a8299c0098e9ecdf9429296ffd55bdb14c9ed5b3",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/src/LICENSE.chromium"
+        },
+        {
+          "path": "qtbase/src/3rdparty/md4c/LICENSE.md",
+          "bytes": 1096,
+          "sha256": "d30937367d5413e7eaa218b1640b8946ff76fd34d97152f6979fd96169d5d0fc",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/md4c/LICENSE.md"
+        },
+        {
+          "path": "qtbase/src/3rdparty/pcre2/LICENCE.md",
+          "bytes": 4011,
+          "sha256": "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/pcre2/LICENCE.md"
+        },
+        {
+          "path": "qtbase/src/3rdparty/pcre2/LICENSE-SLJIT",
+          "bytes": 1444,
+          "sha256": "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/pcre2/LICENSE-SLJIT"
+        },
+        {
+          "path": "qtbase/src/3rdparty/rfc6234/LICENSE",
+          "bytes": 1568,
+          "sha256": "7ccebd514aaabc86192f957d773cebf06577c12fe9f25ecd419c6cac5da7a14c",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/rfc6234/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/sha3/BRG_ENDIAN_LICENSE",
+          "bytes": 645,
+          "sha256": "2fed6f252ca4a7e813811de3cd3cd08183edd4138bdee909410ef6eee394e82c",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/sha3/BRG_ENDIAN_LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/sha3/CC0_LICENSE",
+          "bytes": 7013,
+          "sha256": "1f2786e2c5befeb4dcba6638db6528bf96ef5d2cf24bc85ab5a81ef00abef59d",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/sha3/CC0_LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/tinycbor/LICENSE",
+          "bytes": 1074,
+          "sha256": "3c6ba0b5bfa7830505301ffb336a17b0748e0d61c4d34216e9dc98f10e40395e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/tinycbor/LICENSE"
+        },
+        {
+          "path": "qtbase/src/3rdparty/zlib/LICENSE",
+          "bytes": 1465,
+          "sha256": "d7e3139972874dc8abdbbfce27ec1e6f942b28279dd7d27453630a8b4610e080",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/zlib/LICENSE"
+        },
+        {
+          "path": "qtbase/src/gui/opengl/LICENSE.KHRONOS.txt",
+          "bytes": 1084,
+          "sha256": "2e484f3c26ff5008c704a3ca9dd809d43f24a004a1abb6c202660fbff0d19715",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/opengl/LICENSE.KHRONOS.txt"
+        },
+        {
+          "path": "qtbase/src/gui/painting/LICENSE.QIMAGETRANSFORM.txt",
+          "bytes": 3004,
+          "sha256": "46b3cbfa2f2946b93291506351e9be1dd0a28d2a53260f5aa488abd36fbeca9d",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/painting/LICENSE.QIMAGETRANSFORM.txt"
+        },
+        {
+          "path": "qtbase/src/gui/painting/LICENSE.XCONSORTIUM.txt",
+          "bytes": 2294,
+          "sha256": "a216b01291eb38fc1af93cfccf1fc67b48d9923612e517c2a695e95b3f03c22c",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/painting/LICENSE.XCONSORTIUM.txt"
+        },
+        {
+          "path": "qtbase/src/gui/rhi/LICENSE.MiniEngine.txt",
+          "bytes": 1077,
+          "sha256": "cf248820bf1178370bb4f1670a59f8748d46bc96d0f64080cd631511c6046409",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/rhi/LICENSE.MiniEngine.txt"
+        },
+        {
+          "path": "qtbase/src/gui/text/LICENSE.AGLFN.txt",
+          "bytes": 1425,
+          "sha256": "40818155548ff41c67d3a40edf355e9658992b292c227f4c1147425cedc746c6",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/text/LICENSE.AGLFN.txt"
+        },
+        {
+          "path": "qtbase/src/gui/vulkan/LICENSE.txt",
+          "bytes": 11473,
+          "sha256": "5f618873b0cdd1e84c611c5529212c2524bfc887bdfd7d1f3b568bad3c649612",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/gui/vulkan/LICENSE.txt"
+        },
+        {
+          "path": "qtbase/util/gradientgen/LICENSE.WEBGRADIENTS.txt",
+          "bytes": 1062,
+          "sha256": "9be732e45b638c74f9c0e5248541dd54dc7e8e9a5545df96b5c4b7c9ac0c68ba",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/util/gradientgen/LICENSE.WEBGRADIENTS.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/Apache-2.0.txt",
+          "bytes": 10398,
+          "sha256": "e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/Apache-2.0.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/BSD-2-Clause.txt",
+          "bytes": 1276,
+          "sha256": "8fda146749ca071ac9cdce2e24d25444676ea48d1f9dccc2b7c15c054b717db8",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/BSD-2-Clause.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/BSD-3-Clause.txt",
+          "bytes": 1469,
+          "sha256": "9f0490f18656c6f2435bd14f603ef0c96434d1825615363dce43abb42ed1dcce",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/BSD-3-Clause.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/CC0-1.0.txt",
+          "bytes": 7048,
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/CC0-1.0.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/FTL.txt",
+          "bytes": 6743,
+          "sha256": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/FTL.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/GPL-2.0-only.txt",
+          "bytes": 18092,
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/GPL-2.0-only.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/GPL-3.0-only.txt",
+          "bytes": 35147,
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/GPL-3.0-only.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/HPND.txt",
+          "bytes": 1188,
+          "sha256": "67ac968431270291f5e9cd3ed76705e1169f57082ee102093b2543b28cef63cf",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/HPND.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/IJG.txt",
+          "bytes": 1815,
+          "sha256": "1cb448f5e2e6d3aca60943f4eee1a04675628dc0266a074a42bc1560ebc28d61",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/IJG.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/Imlib2.txt",
+          "bytes": 1986,
+          "sha256": "8846f2baba1a7f4c36f7ca19a923a000d8a21afa37cf0fe006f6ce88a6058a89",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/Imlib2.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LGPL-3.0-only.txt",
+          "bytes": 7651,
+          "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LGPL-3.0-only.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/Libpng.txt",
+          "bytes": 4120,
+          "sha256": "58fe669792f9b4e0740bf75ecfe90b5326128bb2ce7e27e1c342abd9db4d8ea6",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/Libpng.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LicenseRef-BSD-3-Clause-with-PCRE2-Binary-Like-Packages-Exception.txt",
+          "bytes": 1852,
+          "sha256": "0526625fcc746a42d3f19a0ab357d3dc8479fdbe3bfd168825498f50215c7a63",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LicenseRef-BSD-3-Clause-with-PCRE2-Binary-Like-Packages-Exception.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LicenseRef-ICC-License.txt",
+          "bytes": 463,
+          "sha256": "9e34ff47b3a44814e183342e7e198d127a6740e29d20e8381fba7688dafc79dd",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LicenseRef-ICC-License.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LicenseRef-Lcs-Telegraphics.txt",
+          "bytes": 139,
+          "sha256": "c10225ebbd5191bfdd761b0d7752c785f2453ab665d6c454473fb12d254668aa",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LicenseRef-Lcs-Telegraphics.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LicenseRef-Qt-Commercial.txt",
+          "bytes": 462,
+          "sha256": "9b1f50aae6267f9d5e0ceb6775ee86450262c25ec7c0573e151fe5d3f18a4700",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LicenseRef-Qt-Commercial.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/LicenseRef-SHA1-Public-Domain.txt",
+          "bytes": 144,
+          "sha256": "65d86b8ec6b1cd8b8f6e64fd8710274ba00d6a3c520e00dfdcd1c3d2071f3305",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/LicenseRef-SHA1-Public-Domain.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/MIT.txt",
+          "bytes": 1111,
+          "sha256": "d040359701c01996a017d5c515678929cd1b0625e64cb86db44025fbb6cdf1fc",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/MIT.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/MIT-open-group.txt",
+          "bytes": 897,
+          "sha256": "c55d2ab72d8a4f9e9cd8fbd1379268e575e8cfa16874affa5899b75a6d754514",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/MIT-open-group.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/MPL-2.0.txt",
+          "bytes": 16726,
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/MPL-2.0.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/Unicode-3.0.txt",
+          "bytes": 1995,
+          "sha256": "80bb6294022d8764adb36a9d65ebb6bd94efb1865918a71e31e6c247607d7634",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/Unicode-3.0.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/X11.txt",
+          "bytes": 1338,
+          "sha256": "e2936c6509784b4f0ec27bac74182393866fad9422b29a70e085ff14aba87193",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/X11.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/Zlib.txt",
+          "bytes": 1465,
+          "sha256": "d7e3139972874dc8abdbbfce27ec1e6f942b28279dd7d27453630a8b4610e080",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/Zlib.txt"
+        },
+        {
+          "path": "qtbase/LICENSES/libpng-2.0.txt",
+          "bytes": 5345,
+          "sha256": "7317e078e2d3b5d7ba5a6159e650945153262b44b76f6700f8e9edb261c5143e",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/LICENSES/libpng-2.0.txt"
+        }
+      ],
+      "upstream_sboms": [
+        {
+          "path": "qtbase/upstream-sbom/qtbase-6.11.1.cdx.json",
+          "bytes": 301560,
+          "sha256": "7ff0833e418ac970d275e73de6fe6ac595ddcf82e8b090b44582edc5fa5c8eb5",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        },
+        {
+          "path": "qtbase/upstream-sbom/qtbase-6.11.1.spdx",
+          "bytes": 2347961,
+          "sha256": "c8ceace4efa14d933d09d8a58a279992be257d1c8e889152ae972346f07be5e3",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        },
+        {
+          "path": "qtbase/upstream-sbom/qtbase-6.11.1.spdx.json",
+          "bytes": 3864208,
+          "sha256": "9fd83c910ee41bf0b749e79d1f69658613a4143cecbba982d16821692fc7d7e2",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        }
+      ],
+      "sdk_source_spdx_matches": []
+    },
+    {
+      "module": "qtsvg",
+      "revision": "2596f43da2dc72d2afecc084355b0f5f87922a6c",
+      "revision_scope": "Pinned Qt tag; imageformats SPDX omits whole-module revision; individual source matches recorded separately",
+      "archive": {
+        "source": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "bytes": 689094,
+        "upstream_sha1": "353d70f58e5cd55d4217e3ec806a4b5dad4d320b",
+        "actual_sha1": "353d70f58e5cd55d4217e3ec806a4b5dad4d320b",
+        "sha256": "1d75ccf1f1a8fc78612c2c78bc2448f8f68949096d38ff9afe21980e0cb3d9b5",
+        "executed": false,
+        "installed": false
+      },
+      "retained_payloads": [
+        {
+          "path": "PySide6/Qt6Svg.dll",
+          "sha256": "a7352e8062d02e2108e37db4050fb3315d3c03c7d36acdc24b98b9a6c129c1de",
+          "payload_sha256": "ec789d2eecc511bbf70760b20990ca06adece1ddaf3f07b6b1a8f4d10a4375e8",
+          "upstream_archive_path": "bin/Qt6Svg.dll",
+          "upstream_archive_sha256": "a5866fa80cca10dd58e31f277b62f1a1060d3a495fabcea72e2f9ade0f9e45fe",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/iconengines/qsvgicon.dll",
+          "sha256": "dd60826f1959faa7ea137e00959717450da9f2e0c151054daeff1e9d1226fab2",
+          "payload_sha256": "6f013552a84230bb38d3dade9d688d89804f03caf14aa4ad1cfc886b1089e60f",
+          "upstream_archive_path": "plugins/iconengines/qsvgicon.dll",
+          "upstream_archive_sha256": "dcfe12e028e1fd694a99fbc18f6aebf08d36223f5fd99c1bc1e7bc85eee11281",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qsvg.dll",
+          "sha256": "d4100055c3a4d6c1bca5e303e3d2049bde54d4e916442ee0a3e9b4dfa7d416fc",
+          "payload_sha256": "5f350f45835e6001f56d6181ddf0ba10aba3727b1e82cc0691d710d1fd28c4c5",
+          "upstream_archive_path": "plugins/imageformats/qsvg.dll",
+          "upstream_archive_sha256": "8a4db91d1cb7689554794e93a9b0811fdffecfa43fc8c703049092ca27097ab7",
+          "payload_except_signing_fields_identical": true
+        }
+      ],
+      "upstream_build_closure_refs": [
+        "SPDXRef-Package-qtbase-qt-module-Core-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Gui-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-PlatformModuleInternal-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-PlatformPluginInternal-14f2e7e421b1",
+        "SPDXRef-Package-qtsvg-qt-3rdparty-sources-Svg-Attribution-xsvg-052b8a6d22a3",
+        "SPDXRef-Package-qtsvg-qt-module-Svg-052b8a6d22a3",
+        "SPDXRef-Package-qtsvg-qt-plugin-QSvgIconPlugin-052b8a6d22a3",
+        "SPDXRef-Package-qtsvg-qt-plugin-QSvgPlugin-052b8a6d22a3"
+      ],
+      "original_sources": [
+        {
+          "path": "qtsvg/src/svg/qt_attribution.json",
+          "bytes": 551,
+          "sha256": "c1b0472511c791561b89ee0d11c11d78a85fbdf5df5ad94c1a4653e192367759",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/src/svg/qt_attribution.json"
+        },
+        {
+          "path": "qtsvg/src/svg/LICENSE.XSVG.txt",
+          "bytes": 1185,
+          "sha256": "3a946598a9f674d44df764279ca0b85b5d6faba08f3bc75d8e0fcf6cd729a9bd",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/src/svg/LICENSE.XSVG.txt"
+        },
+        {
+          "path": "qtsvg/LICENSES/GPL-2.0-only.txt",
+          "bytes": 18092,
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/LICENSES/GPL-2.0-only.txt"
+        },
+        {
+          "path": "qtsvg/LICENSES/GPL-3.0-only.txt",
+          "bytes": 35147,
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/LICENSES/GPL-3.0-only.txt"
+        },
+        {
+          "path": "qtsvg/LICENSES/HPND-sell-variant.txt",
+          "bytes": 1185,
+          "sha256": "3a946598a9f674d44df764279ca0b85b5d6faba08f3bc75d8e0fcf6cd729a9bd",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/LICENSES/HPND-sell-variant.txt"
+        },
+        {
+          "path": "qtsvg/LICENSES/LGPL-3.0-only.txt",
+          "bytes": 7651,
+          "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/LICENSES/LGPL-3.0-only.txt"
+        },
+        {
+          "path": "qtsvg/LICENSES/LicenseRef-Qt-Commercial.txt",
+          "bytes": 462,
+          "sha256": "9b1f50aae6267f9d5e0ceb6775ee86450262c25ec7c0573e151fe5d3f18a4700",
+          "url": "https://raw.githubusercontent.com/qt/qtsvg/2596f43da2dc72d2afecc084355b0f5f87922a6c/LICENSES/LicenseRef-Qt-Commercial.txt"
+        }
+      ],
+      "upstream_sboms": [
+        {
+          "path": "qtsvg/upstream-sbom/qtsvg-6.11.1.cdx.json",
+          "bytes": 19911,
+          "sha256": "24e5a0c1213538a52924c41d2ae5bd217cba48a578743b148a4702ba7f34fb1e",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        },
+        {
+          "path": "qtsvg/upstream-sbom/qtsvg-6.11.1.spdx.json",
+          "bytes": 113390,
+          "sha256": "de944338b78a99a9d4d88df10c58c27118cb6459d0045bdb8bbec0c0daec0007",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.win64_msvc2022_64/6.11.1-0-202605090529qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        }
+      ],
+      "sdk_source_spdx_matches": []
+    },
+    {
+      "module": "qtimageformats",
+      "revision": "77f35e5694885844c3eb3a737769b5ed290b8ccc",
+      "revision_scope": "Pinned Qt tag; imageformats SPDX omits whole-module revision; individual source matches recorded separately",
+      "archive": {
+        "source": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.addons.qtimageformats.win64_msvc2022_64/6.11.1-0-202605090529qtimageformats-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "bytes": 823619,
+        "upstream_sha1": "50ef50e84bf83ce1a3125572c15f729f1c5470ee",
+        "actual_sha1": "50ef50e84bf83ce1a3125572c15f729f1c5470ee",
+        "sha256": "8ba70600a3343fa0f1101fd304be32a58c3fe85fc6c6b316115e9d03a1be560a",
+        "executed": false,
+        "installed": false
+      },
+      "retained_payloads": [
+        {
+          "path": "PySide6/plugins/imageformats/qtga.dll",
+          "sha256": "50f0e6ff9b7fca9386ccad52eb5e83466774e6282c9532b03b11e5a64951dffb",
+          "payload_sha256": "abd1fc271aec95068c7701e12604e524ca9a6588cfe75f67f00391116d498796",
+          "upstream_archive_path": "plugins/imageformats/qtga.dll",
+          "upstream_archive_sha256": "307ba8cb4aff7626d081d8f1a9ddd0581069e4fba845735ed236ec386e19a20c",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qwbmp.dll",
+          "sha256": "28a6447d44169acbf2eab38c475dc0aa9e32abb3f29f72257726497353b9bf63",
+          "payload_sha256": "770169c662d481195f0030c6aabfb11a39f45ab0281aa81cd3312bc6dab46662",
+          "upstream_archive_path": "plugins/imageformats/qwbmp.dll",
+          "upstream_archive_sha256": "a4a6f28f2be50a9698c44d39db865124c143ac8260a32925ef0f99ad542326d8",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qtiff.dll",
+          "sha256": "087a3425962e838c35c9073bdf8de13712466e9b9590717666af7839db068dba",
+          "payload_sha256": "36e19237a58a7b48426aec055ec65d2e83230f287b02f2e8b12b3ed2a8d8940a",
+          "upstream_archive_path": "plugins/imageformats/qtiff.dll",
+          "upstream_archive_sha256": "88cff8f7084ee2b02657922cbbcb17a24c58c9fdcf30ec4a20196fc28e2a7973",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qwebp.dll",
+          "sha256": "3e2bf546a3885cbe3e2b64058b1c58377d3c8822f51b37ba967f61e8054d7719",
+          "payload_sha256": "a13491a783681d2c314f4f1365a4c29d238ac7eeb7b4527aca72bfdbcda36e15",
+          "upstream_archive_path": "plugins/imageformats/qwebp.dll",
+          "upstream_archive_sha256": "5b3412d4df198847fa8953d7af857bbddc46e58d0cab53725821d245b65d802c",
+          "payload_except_signing_fields_identical": true
+        },
+        {
+          "path": "PySide6/plugins/imageformats/qicns.dll",
+          "sha256": "6a5aed435989d54234c16581e66f6a59137bfccd180565a217a8676bcda6dc8d",
+          "payload_sha256": "51a6fed16450d25a3e3a17a32ff4f89a6bfb0840f7ce57d7eb1d4364c0da861d",
+          "upstream_archive_path": "plugins/imageformats/qicns.dll",
+          "upstream_archive_sha256": "c20ad45b3c2891d9f7a501d7e9f6354e1734244bc455d185ffd45ec08fb3e43d",
+          "payload_except_signing_fields_identical": true
+        }
+      ],
+      "upstream_build_closure_refs": [
+        "SPDXRef-Package-qtbase-qt-module-Core-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-Gui-14f2e7e421b1",
+        "SPDXRef-Package-qtbase-qt-module-PlatformPluginInternal-14f2e7e421b1",
+        "SPDXRef-Package-qtimageformats-qt-3rdparty-sources-QTiffPlugin-Attribution-libtiff-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-3rdparty-sources-QWebpPlugin-Attribution-libwebp-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-plugin-QICNSPlugin-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-plugin-QTgaPlugin-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-plugin-QTiffPlugin-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-plugin-QWbmpPlugin-90a835b519cb",
+        "SPDXRef-Package-qtimageformats-qt-plugin-QWebpPlugin-90a835b519cb"
+      ],
+      "original_sources": [
+        {
+          "path": "qtimageformats/src/3rdparty/libtiff/qt_attribution.json",
+          "bytes": 758,
+          "sha256": "3feff143a03929a929ba2d187195c82b495e1cb0c372e233a3e55272daa6d038",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/src/3rdparty/libtiff/qt_attribution.json"
+        },
+        {
+          "path": "qtimageformats/src/3rdparty/libwebp/qt_attribution.json",
+          "bytes": 880,
+          "sha256": "0a9f45a5ea57dea6b6987ec2974c4a785cd0cb6850df96af49a544068577363b",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/src/3rdparty/libwebp/qt_attribution.json"
+        },
+        {
+          "path": "qtimageformats/src/3rdparty/libtiff/COPYRIGHT",
+          "bytes": 1146,
+          "sha256": "fbd6fed7938541d2c809c0826225fc85e551fdbfa8732b10f0c87e0847acafd7",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/src/3rdparty/libtiff/COPYRIGHT"
+        },
+        {
+          "path": "qtimageformats/src/3rdparty/libwebp/COPYING",
+          "bytes": 1496,
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/src/3rdparty/libwebp/COPYING"
+        },
+        {
+          "path": "qtimageformats/LICENSES/BSD-3-Clause.txt",
+          "bytes": 1469,
+          "sha256": "9f0490f18656c6f2435bd14f603ef0c96434d1825615363dce43abb42ed1dcce",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/BSD-3-Clause.txt"
+        },
+        {
+          "path": "qtimageformats/LICENSES/GPL-2.0-only.txt",
+          "bytes": 18092,
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/GPL-2.0-only.txt"
+        },
+        {
+          "path": "qtimageformats/LICENSES/GPL-3.0-only.txt",
+          "bytes": 35147,
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/GPL-3.0-only.txt"
+        },
+        {
+          "path": "qtimageformats/LICENSES/LGPL-3.0-only.txt",
+          "bytes": 7651,
+          "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/LGPL-3.0-only.txt"
+        },
+        {
+          "path": "qtimageformats/LICENSES/LicenseRef-Qt-Commercial.txt",
+          "bytes": 462,
+          "sha256": "9b1f50aae6267f9d5e0ceb6775ee86450262c25ec7c0573e151fe5d3f18a4700",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/LicenseRef-Qt-Commercial.txt"
+        },
+        {
+          "path": "qtimageformats/LICENSES/libtiff.txt",
+          "bytes": 1146,
+          "sha256": "fbd6fed7938541d2c809c0826225fc85e551fdbfa8732b10f0c87e0847acafd7",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/LICENSES/libtiff.txt"
+        },
+        {
+          "path": "qtimageformats/src/3rdparty/libwebp/PATENTS",
+          "bytes": 1436,
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+          "url": "https://raw.githubusercontent.com/qt/qtimageformats/77f35e5694885844c3eb3a737769b5ed290b8ccc/src/3rdparty/libwebp/PATENTS"
+        }
+      ],
+      "upstream_sboms": [
+        {
+          "path": "qtimageformats/upstream-sbom/qtimageformats-6.11.1.cdx.json",
+          "bytes": 24004,
+          "sha256": "a04f2c0ab60cf197efd72ce26bfc4ff6f55cba74a22aab49bc3e6a16bd34df70",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.addons.qtimageformats.win64_msvc2022_64/6.11.1-0-202605090529qtimageformats-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        },
+        {
+          "path": "qtimageformats/upstream-sbom/qtimageformats-6.11.1.source.spdx",
+          "bytes": 232339,
+          "sha256": "377260c2d8ab46945ac3ead20d4b7127568f1c41f4eb58f756f29aaec1cbf894",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.addons.qtimageformats.win64_msvc2022_64/6.11.1-0-202605090529qtimageformats-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        },
+        {
+          "path": "qtimageformats/upstream-sbom/qtimageformats-6.11.1.spdx.json",
+          "bytes": 156605,
+          "sha256": "bd30c6bb6c3a595744753b42d256061621816ca37baab3f7e4d70974a25a7613",
+          "source_archive": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6111/qt6_6111_msvc2022_64/qt.qt6.6111.addons.qtimageformats.win64_msvc2022_64/6.11.1-0-202605090529qtimageformats-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+        }
+      ],
+      "sdk_source_spdx_matches": [
+        {
+          "path": "src/3rdparty/libtiff/qt_attribution.json",
+          "sdk_source_spdx_sha1": "01904d9b827b6712cc625fb924c1ce7223b2f06b",
+          "download_sha1": "9ee3bc36a6a7392875ae27c61cafd662c18c365e",
+          "crlf_sha1": "01904d9b827b6712cc625fb924c1ce7223b2f06b",
+          "whole_file_identical": false,
+          "matches_after_only_lf_to_crlf": true,
+          "download_bytes_unchanged": true
+        },
+        {
+          "path": "src/3rdparty/libwebp/qt_attribution.json",
+          "sdk_source_spdx_sha1": "abfd1a00e6e840132c1bef284fca690df7aafb8a",
+          "download_sha1": "47fcd4fbbd05302b2c12fe8ad97fd5e14095aa04",
+          "crlf_sha1": "abfd1a00e6e840132c1bef284fca690df7aafb8a",
+          "whole_file_identical": false,
+          "matches_after_only_lf_to_crlf": true,
+          "download_bytes_unchanged": true
+        },
+        {
+          "path": "src/3rdparty/libtiff/COPYRIGHT",
+          "sdk_source_spdx_sha1": "f1a98d8f62af0ecf27736e2117608360013aea61",
+          "download_sha1": "a2f64f2a85f5fd34bda8eb713c3aad008adbb589",
+          "crlf_sha1": "f1a98d8f62af0ecf27736e2117608360013aea61",
+          "whole_file_identical": false,
+          "matches_after_only_lf_to_crlf": true,
+          "download_bytes_unchanged": true
+        },
+        {
+          "path": "src/3rdparty/libwebp/COPYING",
+          "sdk_source_spdx_sha1": null,
+          "download_sha1": "59cd938fcbd6735b1ef91781280d6eb6c4b7c5d9",
+          "scope": "Pinned tag source only; not listed in SDK source SPDX"
+        },
+        {
+          "path": "src/3rdparty/libwebp/PATENTS",
+          "sdk_source_spdx_sha1": "6b2fbd7595914015d01deb15e2decc1b755cb52c",
+          "download_sha1": "0337e3b325c62ff52a0362695afa2fb9b97ce1f0",
+          "crlf_sha1": "6b2fbd7595914015d01deb15e2decc1b755cb52c",
+          "whole_file_identical": false,
+          "matches_after_only_lf_to_crlf": true,
+          "download_bytes_unchanged": true
+        }
+      ]
+    }
+  ],
+  "covered_source_supplements": {
+    "public_suffix_data": {
+      "license": "MPL-2.0",
+      "generator_license": "BSD-3-Clause",
+      "preferred_source_revision": "944fb53321606f08740f04ef7c386f64df34ff76",
+      "qtbase_revision": "59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+      "dafsa_sha256": "962518d29af9a2fd7d983f0bae881ff465628bb5043e9341ee686c08b7c09534",
+      "dafsa_bytes": 55320,
+      "exact_preferred_source_regeneration_verified": true,
+      "exact_dafsa_occurrences_in_dev16_network_dll": 1,
+      "network_dll_sha256": "dfd0dd852274a5fe9b3c7d2dd9fffe7e2117d28c10fc862174d6675d42395177",
+      "complete_qt_license_approval": false,
+      "scope": "unchanged preferred source, generated data and standalone BSD generator for the exact embedded table; no Qt rebuild, SDK source-file match or whole Qt license approval",
+      "original_sources": [
+        {
+          "file": "public_suffix_list.dat",
+          "source_path": "public_suffix_list.dat",
+          "repository": "publicsuffix/list",
+          "revision": "944fb53321606f08740f04ef7c386f64df34ff76",
+          "source": "https://raw.githubusercontent.com/publicsuffix/list/944fb53321606f08740f04ef7c386f64df34ff76/public_suffix_list.dat",
+          "bytes": 329275,
+          "sha256": "8932f171723344c037d0f4a7fe5e4c553880f6f70e3e3e317ea15383c6e3e4e2",
+          "git_blob_sha1": "b0036f0b7aba6efc423220aeebd65d9f1b0c02ea",
+          "matches_pinned_repository_blob": true,
+          "sdk_source_spdx_file_match_claimed": false,
+          "path": "public-suffix-data/public_suffix_list.dat"
+        },
+        {
+          "file": "psl_data.cpp",
+          "source_path": "src/3rdparty/libpsl/psl_data.cpp",
+          "repository": "qt/qtbase",
+          "revision": "59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+          "source": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/psl_data.cpp",
+          "bytes": 341349,
+          "sha256": "ceba7d5244fd9599201bdd2f9eac490a3caaaab5c08e22a87cdad98b1a4d4023",
+          "git_blob_sha1": "5923d9b0528768d5bf1f78c297cc3455103ec340",
+          "matches_pinned_repository_blob": true,
+          "sdk_source_spdx_file_match_claimed": false,
+          "path": "public-suffix-data/psl_data.cpp"
+        },
+        {
+          "source_path": "src/3rdparty/libpsl/src/psl-make-dafsa",
+          "repository": "qt/qtbase",
+          "revision": "59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+          "source": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/src/psl-make-dafsa",
+          "git_blob_sha1": "8a374053d588ceb57d3fad9c83bb8dbf74e19288",
+          "matches_pinned_repository_blob": true,
+          "path": "public-suffix-data/psl-make-dafsa",
+          "bytes": 22739,
+          "sha256": "bae0c67459150063c253ed308d35a1b2b1ef883dd89de6d294037afac9b41779"
+        },
+        {
+          "path": "public-suffix-data/LICENSE.chromium",
+          "bytes": 1664,
+          "sha256": "1d7f52747a9169751cdf2641a8299c0098e9ecdf9429296ffd55bdb14c9ed5b3",
+          "url": "https://raw.githubusercontent.com/qt/qtbase/59c81a3c2247b821b9b84b4eb8d939b77e07e276/src/3rdparty/libpsl/src/LICENSE.chromium",
+          "copied_from_bundled_original": "qtbase/src/3rdparty/libpsl/src/LICENSE.chromium",
+          "matches_pinned_repository_blob": true,
+          "git_blob_sha1": "e29f4ffbe499f0af97f146a333eaa159ddffbb66"
+        }
+      ]
+    }
+  }
+}

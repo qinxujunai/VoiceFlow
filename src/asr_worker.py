@@ -3,13 +3,58 @@
 from __future__ import annotations
 
 import multiprocessing
+import logging
 import queue
 import threading
 import time
 import uuid
+from pathlib import Path
 from multiprocessing import shared_memory
 
 import numpy as np
+import yaml
+
+from audio_activity import SileroSpeechDetector, has_speech_activity
+
+
+logger = logging.getLogger("voiceflow.asr")
+
+
+class _WorkerSpeechGate:
+    """Speech presence only: never trim or modify authoritative PCM."""
+
+    def __init__(self, worker_config):
+        config_path = Path(worker_config["config_path"])
+        with config_path.open("r", encoding="utf-8") as stream:
+            config = yaml.safe_load(stream) or {}
+        vad = config.get("vad", {})
+        self.enabled = bool(vad.get("enabled", True))
+        self.rms_threshold = float(vad.get("asr_energy_floor", 0.002))
+        self.min_active_ms = int(vad.get("min_speech_ms", 90))
+        self.detector = None
+        if not self.enabled:
+            return
+        model_path = Path(vad.get("model_path", "assets/silero_vad.onnx"))
+        if not model_path.is_absolute():
+            roots = worker_config.get("asset_roots") or (config_path.parent,)
+            model_path = next((Path(root) / model_path for root in roots
+                               if (Path(root) / model_path).is_file()), config_path.parent / model_path)
+        try:
+            self.detector = SileroSpeechDetector(
+                model_path, threshold=float(vad.get("speech_probability_threshold", 0.5)),
+                min_speech_ms=self.min_active_ms,
+                sample_rate=int(config.get("audio", {}).get("sample_rate", 16000)),
+            )
+        except Exception:
+            logger.exception("Silero VAD unavailable; using the energy safety gate")
+
+    def contains_speech(self, audio, sample_rate):
+        if not self.enabled:
+            return True
+        if not has_speech_activity(audio, sample_rate, rms_threshold=self.rms_threshold,
+                                   min_active_ms=self.min_active_ms):
+            return False
+        return self.detector is None or self.detector.has_speech(audio, sample_rate)
 
 
 def _asr_worker_main(
@@ -43,6 +88,7 @@ def _asr_worker_main(
             asset_roots=worker_config.get("asset_roots"),
         )
         transcriber.load_engine(engine)
+        speech_gate = _WorkerSpeechGate(worker_config)
         response_queue.put({"kind": "ready", "engine": engine})
         while True:
             command = command_queue.get()
@@ -60,12 +106,15 @@ def _asr_worker_main(
                     dtype=np.int16,
                     buffer=memory.buf,
                 )
-                text = transcriber.transcribe(audio, int(command["sample_rate"]))
+                sample_rate = int(command["sample_rate"])
+                has_speech = speech_gate.contains_speech(audio, sample_rate)
+                text = transcriber.transcribe(audio, sample_rate) if has_speech else ""
                 response_queue.put(
                     {
                         "kind": "result",
                         "request_id": request_id,
                         "text": text or "",
+                        "has_speech": has_speech,
                     }
                 )
             except Exception as error:
@@ -188,11 +237,15 @@ class SupervisedTranscriber:
         raise RuntimeError("本地识别初始化超时")
 
     def transcribe(self, audio_data, sample_rate=16000):
+        text, _has_speech = self.transcribe_with_activity(audio_data, sample_rate)
+        return text
+
+    def transcribe_with_activity(self, audio_data, sample_rate=16000):
         if not self.is_ready:
             raise RuntimeError("本地识别尚未就绪")
         audio = np.asarray(audio_data, dtype=np.int16).reshape(-1)
         if len(audio) == 0:
-            return ""
+            return "", False
         with self._request_lock:
             return self._transcribe_locked(audio, int(sample_rate))
 
@@ -233,7 +286,8 @@ class SupervisedTranscriber:
                 if response.get("request_id") != request_id:
                     continue
                 if response.get("kind") == "result":
-                    return response.get("text") or ""
+                    text = response.get("text") or ""
+                    return text, bool(response.get("has_speech", bool(text)))
                 error = response.get("error") or "未知错误"
                 raise RuntimeError(f"本地识别失败: {error}")
             self._ready = False

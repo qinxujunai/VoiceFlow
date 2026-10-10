@@ -24,7 +24,7 @@ VENV_DIR = ROOT / "venv"
 VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe"
 REQUIREMENTS = ROOT / "requirements.txt"
 BOOTSTRAP_STATE = ROOT / "logs" / "bootstrap-state.json"
-BOOTSTRAP_VERSION = 2
+BOOTSTRAP_VERSION = 3
 MODEL_FILES = (
     ROOT / "models" / "sensevoice" / "model.int8.onnx",
     ROOT / "models" / "sensevoice" / "tokens.txt",
@@ -80,10 +80,17 @@ def _file_signature(path: Path, *, include_hash: bool = True) -> dict[str, objec
 
 
 def _startup_signature() -> dict[str, object]:
+    try:
+        from asr_runtime_assets import checked_wheel_path
+    except ModuleNotFoundError:
+        from scripts.asr_runtime_assets import checked_wheel_path
+
     return {
         "version": BOOTSTRAP_VERSION,
         "requirements": _file_signature(REQUIREMENTS),
         "config": _file_signature(ROOT / "config.yaml"),
+        "asr_manifest": _file_signature(ROOT / "vendor/windows/asr-runtime.json"),
+        "asr_wheel": _file_signature(checked_wheel_path(ROOT)),
         "models": {
             str(path.relative_to(ROOT)): _file_signature(path, include_hash=False)
             for path in MODEL_FILES
@@ -120,7 +127,7 @@ def is_fast_path_ready() -> bool:
     if not _models_present():
         return False
     state = _read_bootstrap_state()
-    return state.get("signature") == _startup_signature()
+    return state.get("signature") == _startup_signature() and _native_runtime_ready()
 
 
 def is_python_usable(python: Path | str) -> bool:
@@ -145,15 +152,36 @@ def _create_venv(base_python: str) -> None:
     completed = _run([base_python, "-m", "venv", str(VENV_DIR)])
     _print_output(completed)
     if completed.returncode != 0:
-        raise RuntimeError("Failed to create venv. Install Python 3.10+ and try again.")
+        raise RuntimeError("Failed to create venv. Use Python 3.12 x64 for Windows.")
+
+
+def _require_supported_python(python: Path | str) -> None:
+    code = "import sys,struct; print(f'{sys.version_info.major}.{sys.version_info.minor} {struct.calcsize(\"P\")*8} {sys.platform}')"
+    completed = _run([str(python), "-c", code])
+    if completed.returncode or completed.stdout.strip() != "3.12 64 win32":
+        raise RuntimeError("VoiceFlow requires Windows Python 3.12 x64 (64 bit); existing environments are preserved.")
+
+
+def _native_runtime_ready() -> bool:
+    completed = _run([str(VENV_PYTHON), str(ROOT / "scripts/asr_runtime_assets.py")])
+    return completed.returncode == 0
 
 
 def _install_requirements() -> None:
+    checker = str(ROOT / "scripts/asr_runtime_assets.py")
+    preflight = _run([str(VENV_PYTHON), checker, "--hash-only"])
+    _print_output(preflight)
+    if preflight.returncode:
+        raise RuntimeError("Pinned ASR wheel integrity check failed; dependencies were not changed.")
     print("[Setup] Installing dependencies...", flush=True)
     completed = _run([str(VENV_PYTHON), "-m", "pip", "install", "-r", str(REQUIREMENTS)])
     _print_output(completed)
     if completed.returncode != 0:
         raise RuntimeError("pip install failed.")
+    checked = _run([str(VENV_PYTHON), checker])
+    _print_output(checked)
+    if checked.returncode:
+        raise RuntimeError("Installed ASR build verification failed.")
 
 
 def _missing_imports() -> list[str]:
@@ -176,10 +204,7 @@ def _missing_imports() -> list[str]:
 
 
 def ensure_venv(base_python: str, *, force_install: bool = False) -> None:
-    if VENV_PYTHON.exists() and not is_python_usable(VENV_PYTHON):
-        print("[Setup] Existing venv is broken; rebuilding it.", flush=True)
-        _safe_remove_venv()
-
+    _require_supported_python(VENV_PYTHON if VENV_PYTHON.exists() else base_python)
     if not VENV_PYTHON.exists():
         _create_venv(base_python)
         force_install = True
@@ -188,7 +213,7 @@ def ensure_venv(base_python: str, *, force_install: bool = False) -> None:
         raise RuntimeError("venv python is still not runnable after setup.")
 
     missing = _missing_imports()
-    if force_install or missing:
+    if force_install or missing or not _native_runtime_ready():
         if missing:
             print(f"[Setup] Missing dependencies: {', '.join(missing)}", flush=True)
         _install_requirements()

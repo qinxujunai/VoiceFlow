@@ -9,8 +9,6 @@
 [![Windows quality](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml/badge.svg)](https://github.com/qinxujunai/VoiceFlow/actions/workflows/windows-quality.yml)
 [![Windows 下载](https://img.shields.io/badge/Windows-下载-087FE7)](https://github.com/qinxujunai/VoiceFlow/releases/latest)
 
-![VoiceFlow 动态演示](docs/voiceflow-demo.svg)
-
 VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，再按一下完成；
 无需切换应用，声音在本机变成文字，结果回到当前光标。
 
@@ -19,7 +17,7 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 - **离线使用**：安装后即可听写，录音和识别都在你的电脑上完成。
 - **说完，接着写**：写邮件、记笔记、回消息。在输入框中按下 F2，说完再按一下。
 - **随时回看**：在本地历史中查看和复制听写内容，需要时手动粘贴。
-- **安静陪伴**：小胶囊在听写时显示文字，完成后收起。
+- **句末由你选择**：保留识别标点、省略最后一个句号，或补全句末句号。
 
 ## 下载
 
@@ -27,6 +25,18 @@ VoiceFlow 是 Windows 上的离线语音输入工具。按一下 `F2` 开始，�
 安装包已经包含默认离线模型，不需要 Python，安装完成即可使用。
 
 系统要求：Windows 10 / 11 x64、可用麦克风。
+
+### 0.3.7 更新
+
+针对「识别出了文字却没有插入」的反馈，改进停止时的目标窗口判断与粘贴路径。
+已经在记事本、Word 和 Notepad++ 中验证受控听写插入；其他应用的权限、输入法和焦点状态仍可能影响自动输入。
+如果没有自动插入，按 `Ctrl+V` 粘贴；终稿也可以在本地历史中找回。
+
+日常聊天不想带句号：在设置的「听写」中选择「省略最后一个句号」。
+问号、感叹号、省略号、内部标点和明显技术字符串受到保护。
+也可以选择「保留识别标点」或「补全句末句号」；后者是确定性规则，不调用云端 AI。
+
+Windows 安装包目前未签名；下载页附有 SHA256 校验值。升级前从托盘退出正在运行的 VoiceFlow。
 
 ### 更新与本地数据
 
@@ -55,12 +65,15 @@ VoiceFlow 不会在后台联网或静默更新。需要升级时，在托盘菜�
 
 录音、转写、词库和历史默认只保存在本机。安装包不包含开发者或其他用户的
 听写历史；历史页可以删除单条记录或清空全部。日常运行不会自动下载模型、
-检查更新或调用云端识别服务。源码模式只有在用户明确准备模型时才会联网。
+检查更新或调用云端识别服务。源码模式准备依赖或经确认下载模型时需要联网。
 
 <details>
 <summary><strong>开发、验证与许可</strong></summary>
 
 ### 从源码运行
+
+Windows 源码环境使用 Python 3.12 x64。ASR 依赖来自仓库内固定的构建，
+关闭未使用的语音合成功能；[构建来源与重建步骤](docs/asr-runtime-build.md)。
 
 ```bat
 git clone https://github.com/qinxujunai/VoiceFlow.git
@@ -80,6 +93,7 @@ venv\Scripts\python.exe scripts\verify.py --release
 - [模型策略与准入结论](docs/model-strategy.md)
 - [产品质量标准](docs/product-quality-standard.md)
 - [0.3.6 发布验证证据](docs/release-evidence-0.3.6.md)
+- [2026-10-04 本机响应与资源修复](docs/local-upgrade-2026-10-04.md)
 - [运行时与用户数据边界](docs/runtime-boundary.md)
 - [更新与本地数据契约](docs/upgrade-and-data-contract.md)
 - [发布检查清单](docs/release-checklist.md)

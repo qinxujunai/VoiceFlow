@@ -39,7 +39,7 @@ src/
   hotkey_manager.py    # keyboard + pynput mouse side buttons
   recording_session.py # recording lifecycle
   audio_capture.py     # sounddevice microphone adapter
-  audio_worker.py      # supervised disposable microphone process
+  audio_worker.py      # supervised microphone, reused only after verified teardown
   asr_worker.py        # supervised authoritative-ASR process
   preview_worker.py    # supervised online-preview ASR process
   transcriber.py       # sherpa-onnx ASR
@@ -48,8 +48,10 @@ src/
   text_cleaner.py      # deterministic cleanup
   output_handler.py    # clipboard first, then Ctrl+V
   history_store.py     # logs/history.jsonl
-  overlay_webview.py   # PyQt overlay + tray menu
-  overlay.html         # centered pill UI
+  overlay_webview.py   # Qt Widgets settings, overlay facade + tray menu
+  capsule_native.py    # native black/red capsule, bounded append-only animation
+  overlay.html         # retired renderer retained for development comparison
+  runtime_bootstrap.py # process-local native thread budget before NumPy imports
   tray_icon.py         # runtime status tray icon
 ```
 
@@ -57,18 +59,26 @@ The Qt process must not load or call native audio/ASR engines directly in the
 normal runtime. Construct `AppController` before the overlay or tray, register
 hotkeys before worker initialization, and keep worker IPC bounded. See
 `docs/decisions/ADR-004-supervised-runtime-boundary.md`.
+The capsule uses native Qt painting; release builds exclude WebEngine/QML/Quick.
+Workers dispatch through PyInstaller freeze support before Qt runtime hooks.
+OpenBLAS uses one thread per process; the ASR runtime has its own explicit budget.
+Do not reintroduce synchronous focus/UIA inspection or optional preview startup
+on the recording action path. Preview PCM blocks are at most 100 ms.
 
 ## Product Rules
 
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
-- After verified clipboard delivery, dispatch one paste to the ordinary
-  foreground application observed at stop time unless there is positive
+- After verified clipboard delivery, revalidate and dispatch one paste to the ordinary
+  foreground application observed at stop time unless the target or clipboard
+  changed, a physical modifier remains held, or there is positive
   evidence of a blocked target (desktop, secure desktop, incompatible UIPI,
   VoiceFlow's own non-input window, or no valid foreground window). The start
   target is diagnostic context only; transient UIA unknown/group nodes are not
   a clipboard-only gate.
+- Only reliable verification of inserted final text means confirmed success.
+  Input event dispatch remains unverified and must retain recovery guidance.
 - Recovery PCM is temporary local state. Delete it only after verified
   clipboard delivery plus history, or after an explicit user delete action.
 - Final output must cover the complete stopped audio; streaming preview is only preview.
@@ -174,11 +184,13 @@ Use `wrong=correct` only in correction files.
 
 ## Troubleshooting
 
-- **Desktop shortcut runs stale code:** The shortcut points to the windowed source launcher, `scripts\launch_voiceflow.pyw`, through `venv\Scripts\pythonw.exe`. It still uses source code directly. But if an old process is still running, it holds the old config in memory. After changing `config.yaml` or `hotkey_manager.py`, kill all Python processes before restarting:
-  ```powershell
-  Stop-Process -Name python -Force
-  ```
-- **`dist/VoiceFlow.exe` is a frozen snapshot.** If the desktop shortcut ever points to the exe instead of the windowed source launcher, the exe must be rebuilt with `venv\Scripts\pyinstaller.exe VoiceFlow.spec` to pick up config changes.
+- **A running program is a snapshot.** Verify the actual process executable,
+  shortcut target, and runtime-state build before diagnosing source changes.
+  Exit the identified VoiceFlow instance from its tray before restarting. Never
+  terminate all Python processes, change shortcuts, or interrupt live recording.
+- **Frozen builds require rebuilding.** Source edits do not update an installed
+  `VoiceFlow.exe`. Record the exact candidate, backup, data hashes, and readiness
+  checks for an authorized in-place upgrade; restore the old files on failure.
 
 
 ## Craft Standard
@@ -190,11 +202,17 @@ Match the existing code as if the same person wrote every line. Indentation, nam
 
 ## Regression Guards
 
-- **Pill flash on new recording.** The old failure modes were showing the Qt window before WebEngine had reset the DOM, writing the previous final long text back into the pill before hiding, and resetting DOM while the window was still visible. Keep `prepareRecording()` as the JS-then-show entrypoint and keep hide as hide-first then offscreen `resetHidden()`. Normal stop atomically freezes the sample boundary, invalidates preview without joining workers, keeps the existing text unchanged for 350 ms, optionally changes only the mark to a spinner, and replaces the draft with authoritative final text in place. Verified paste dispatch then fades the capsule without a success label; only fallback or failure paths stay visible. Do not call `show_result(text)` for the normal recording stop path.
+- **Pill flash on new recording.** Prepare the native state and cancel previous
+  width/level/fade animation before showing the Qt window. Hide first, then reset
+  offscreen. All timers belong to the Qt thread. Normal stop freezes the sample
+  boundary, invalidates preview without joining workers, and replaces draft with
+  the authoritative final text in place. Confirmed insertion fades silently; fallback
+  and failure retain their truthful labels. Never call `show_result(text)` for a
+  normal recording stop.
 
 - **Streaming text replay and reverse motion.** The online recognizer owns one
   stream per recording and receives each new PCM sample exactly once. Its
-  Python-to-JavaScript contract is `appendStreaming(delta, session_id)`:
+  renderer contract is an append delta plus session generation:
   characters are appended once and are never retracted or replayed. Cadence is
   normally 48 ms, may smoothly accelerate under backlog, and must coalesce
   stale animation after the 600 ms hard lag. Do not restore rolling-window
@@ -206,7 +224,7 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   signal cancellation and transfer ownership; it must not join worker threads.
   Session guards prevent stale preview work from updating settling, final, or
   delivery states. The capsule replaces the draft with final text in place.
-  Verified paste dispatch fades out silently; clipboard-only shows
+  Reliably confirmed insertion fades out silently; unverified dispatch and clipboard-only show
   `已复制到剪贴板`, and durable recovery shows `已保存`. Never restore the
   character-count summary or claim paste success.
 
@@ -214,10 +232,10 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   Both render in one text color, and the three recording bars remain red until recording
   actually ends. Do not couple recognition confidence to visible color changes.
 
-- **One recording entry point.** Settings may include a plain text box for trying the
-  normal global shortcut, but must not add a separate Trial/试说 recording button. That
-  second action competed with the F2 session state and could freeze or terminate the
-  settings window. F2, Right Ctrl, and mouse side buttons use the same controller path.
+- **One recording entry point.** Do not put a transcript input/result box on the
+  settings home page. Settings may show plain shortcut guidance. F2, Right Ctrl, and
+  mouse side buttons use the same controller path; no independent Trial/试说 session
+  or result-writeback path is allowed.
 
 - **Long dictation preview cost and coverage.** The lightweight online preview
   and SenseVoice progressive final cache use separate workers. Active recording

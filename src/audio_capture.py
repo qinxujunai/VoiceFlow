@@ -104,9 +104,9 @@ class AudioCapture:
                     self._audio_buffer.append(block)
                     self._total_samples += len(block)
                     self._audio_buffer_ends.append(self._total_samples)
-                recovery_sink = self._recovery_sink
-                if recovery_sink is not None and not recovery_sink.append_pcm(block):
-                    self._recovery_drop_count += 1
+                    recovery_sink = self._recovery_sink
+                    if recovery_sink is not None and not recovery_sink.append_pcm(block):
+                        self._recovery_drop_count += 1
                 pcm_callback = self._on_pcm_callback
                 if pcm_callback is not None:
                     try:
@@ -216,6 +216,15 @@ class AudioCapture:
             self._stream_teardown_threads = teardown_threads
         teardown_threads.append(thread)
         thread.start()
+
+    def wait_for_stream_teardown(self, timeout=0.25):
+        """Confirm the previous device is closed before reusing its worker."""
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        threads = tuple(self._stream_teardown_threads)
+        for thread in threads:
+            thread.join(timeout=max(0.0, deadline - time.monotonic()))
+        self._stream_teardown_threads = [thread for thread in threads if thread.is_alive()]
+        return not self._stream_teardown_threads
 
     def set_silence_callback(self, callback):
         """设置静音超时回调"""

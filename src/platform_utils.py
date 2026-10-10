@@ -9,6 +9,28 @@ from collections.abc import Mapping
 from pathlib import Path
 
 
+def system_high_contrast_enabled() -> bool:
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class HighContrast(ctypes.Structure):
+            _fields_ = [("cbSize", wintypes.UINT), ("dwFlags", wintypes.DWORD),
+                        ("lpszDefaultScheme", wintypes.LPWSTR)]
+
+        query = ctypes.WinDLL("user32", use_last_error=True).SystemParametersInfoW
+        query.argtypes = [wintypes.UINT, wintypes.UINT, ctypes.c_void_p, wintypes.UINT]
+        query.restype = wintypes.BOOL
+        value = HighContrast()
+        value.cbSize = ctypes.sizeof(value)
+        return bool(query(0x0042, value.cbSize, ctypes.byref(value), 0)
+                    and value.dwFlags & 0x00000001)
+    except (OSError, AttributeError):
+        return False
+
+
 def default_data_dir(
     environ: Mapping[str, str] | None = None,
     *,

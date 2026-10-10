@@ -185,7 +185,9 @@ def test_stop_recording_returns_frozen_audio_when_driver_teardown_blocks():
         assert audio.tolist() == list(range(1600))
         assert capture._stream is None
         assert not close_called.is_set()
+        assert not capture.wait_for_stream_teardown(timeout=0.02)
     finally:
         release_abort.set()
 
     assert close_called.wait(timeout=0.5)
+    assert capture.wait_for_stream_teardown(timeout=0.2)
