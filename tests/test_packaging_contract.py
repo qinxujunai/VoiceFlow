@@ -220,11 +220,11 @@ def test_product_site_is_bilingual_and_truthful_about_windows_download():
     assert "Not available yet" not in copy
     assert index.count("data-download") == 1
     assert (
-        'data-i18n="releaseStatus">离线使用 · 无需登录</p>'
+        'data-i18n="releaseStatus">为 Windows 而设计 · 离线使用 · 无需登录</p>'
         in index
     )
-    assert 'releaseStatus: "离线使用 · 无需登录"' in copy
-    assert 'releaseStatus: "Works offline · No sign-in"' in copy
+    assert 'releaseStatus: "为 Windows 而设计 · 离线使用 · 无需登录"' in copy
+    assert 'releaseStatus: "Made for Windows · Works offline · No sign-in"' in copy
     assert "未代码签名" not in index + copy
     assert "not code-signed" not in index + copy
     assert "Beta" not in index
@@ -262,7 +262,7 @@ def test_product_site_localizes_demo_links_and_accessibility_labels():
     assert 'data-i18n-src="demoSrc"' in index
     assert 'data-i18n-href="privacyHref"' in index
     assert 'demoSrc: "assets/voiceflow-demo.en.svg"' in copy
-    assert "README.en.md#privacy-and-networking" in copy
+    assert "docs/help.en.md#privacy-and-networking" in copy
     assert "Press once to start, again to finish" in english_demo
     assert "prefers-reduced-motion: reduce" in english_demo
 
