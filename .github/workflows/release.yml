@@ -120,9 +120,17 @@ jobs:
         shell: pwsh
         run: |
           # Match the offline assets added by the installer before startup smoke.
-          New-Item -ItemType Directory -Path dist\VoiceFlow\models -Force | Out-Null
-          Copy-Item -LiteralPath models\sensevoice -Destination dist\VoiceFlow\models -Recurse
-          Copy-Item -LiteralPath models\streaming-preview -Destination dist\VoiceFlow\models -Recurse
+          foreach ($relative in @(
+            'sensevoice/model.int8.onnx', 'sensevoice/tokens.txt',
+            'streaming-preview/encoder-epoch-99-avg-1.int8.onnx',
+            'streaming-preview/decoder-epoch-99-avg-1.onnx',
+            'streaming-preview/joiner-epoch-99-avg-1.int8.onnx',
+            'streaming-preview/tokens.txt'
+          )) {
+            $target = Join-Path 'dist/VoiceFlow/models' $relative
+            New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path 'models' $relative) -Destination $target
+          }
           ./scripts/smoke_packaged_runtime.ps1
       - name: Build full offline installer
         shell: pwsh
