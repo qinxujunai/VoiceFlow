@@ -91,9 +91,17 @@ jobs:
           if (-not (Test-Path dist\VoiceFlow\VoiceFlow.exe)) { throw "VoiceFlow.exe missing" }
           Get-AuthenticodeSignature dist\VoiceFlow\VoiceFlow.exe | Format-List
           # Stage the same offline assets that Inno adds to the installed app.
-          New-Item -ItemType Directory -Path dist\VoiceFlow\models -Force | Out-Null
-          Copy-Item -LiteralPath models\sensevoice -Destination dist\VoiceFlow\models -Recurse
-          Copy-Item -LiteralPath models\streaming-preview -Destination dist\VoiceFlow\models -Recurse
+          foreach ($relative in @(
+            'sensevoice/model.int8.onnx', 'sensevoice/tokens.txt',
+            'streaming-preview/encoder-epoch-99-avg-1.int8.onnx',
+            'streaming-preview/decoder-epoch-99-avg-1.onnx',
+            'streaming-preview/joiner-epoch-99-avg-1.int8.onnx',
+            'streaming-preview/tokens.txt'
+          )) {
+            $target = Join-Path 'dist/VoiceFlow/models' $relative
+            New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path 'models' $relative) -Destination $target
+          }
           ./scripts/smoke_packaged_runtime.ps1
       - name: Build unsigned installer smoke artifact
         shell: pwsh
