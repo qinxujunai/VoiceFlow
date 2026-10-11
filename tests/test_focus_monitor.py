@@ -11,6 +11,40 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 
+def test_default_focus_monitor_does_not_register_python_com_callbacks(monkeypatch):
+    from delivery import FocusMonitor, TargetSnapshot
+
+    automation_access = []
+    class ForbiddenAutomation:
+        def __getattr__(self, _name):
+            automation_access.append(_name)
+            raise AssertionError("Qt must not register in-process UIA focus callbacks")
+
+    monkeypatch.setitem(sys.modules, "uiautomation", ForbiddenAutomation())
+
+    @contextmanager
+    def context():
+        yield
+
+    calls = []
+    def inspect():
+        calls.append(True)
+        return TargetSnapshot(101, 202, "editor", True, True, True)
+
+    monitor = FocusMonitor(inspector=inspect, initializer=context, poll_interval=0.01)
+    try:
+        assert monitor.warmup()
+        assert not automation_access
+        assert not calls
+        assert monitor.start_tracking().snapshot.window_handle == 101
+        deadline = time.monotonic() + 0.5
+        while len(calls) < 2 and time.monotonic() < deadline:
+            time.sleep(0.005)
+        assert len(calls) >= 2
+    finally:
+        monitor.shutdown()
+
+
 def test_start_target_tracking_can_be_nonblocking_when_uia_is_slow():
     from delivery import FocusMonitor, TargetSnapshot
 
