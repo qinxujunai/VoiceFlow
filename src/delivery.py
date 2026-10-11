@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from collections import deque
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from ctypes import wintypes
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -199,43 +199,6 @@ def _mta_initializer():
         comtypes.CoUninitialize()
 
 
-@contextmanager
-def _uia_focus_subscription(notify: Callable[[], None]):
-    if sys.platform != "win32":
-        yield
-        return
-    client = None
-    handler = None
-    try:
-        from comtypes import COMObject
-        from uiautomation import uiautomation as automation
-
-        core = automation._AutomationClient.instance().UIAutomationCore
-        client = automation._AutomationClient.instance().IUIAutomation
-
-        class Handler(COMObject):
-            _com_interfaces_ = [core.IUIAutomationFocusChangedEventHandler]
-
-            def HandleFocusChangedEvent(self, _sender):
-                notify()
-                return 0
-
-        handler = Handler()
-        client.AddFocusChangedEventHandler(None, handler)
-    except Exception:
-        client = None
-        handler = None
-        logger.exception("UI Automation focus subscription unavailable")
-    try:
-        yield
-    finally:
-        if client is not None and handler is not None:
-            try:
-                client.RemoveFocusChangedEventHandler(handler)
-            except Exception:
-                logger.exception("UI Automation focus subscription cleanup failed")
-
-
 class FocusMonitor:
     """Own UI Automation on one MTA worker and retain a bounded focus trace."""
 
@@ -251,7 +214,9 @@ class FocusMonitor:
     ):
         self._inspector = inspector or inspect_current_target
         self._initializer = initializer or _mta_initializer
-        self._subscriber = subscriber or _uia_focus_subscription
+        # Python COM focus callbacks can deadlock Qt while a focused widget is
+        # disabled. Poll only during tracking; stop-time inspection stays exact.
+        self._subscriber = subscriber or (lambda _notify: nullcontext())
         self._insertion_verifier = insertion_verifier
         self._observations = deque(maxlen=max(1, int(max_observations)))
         self._poll_interval = max(0.01, float(poll_interval))

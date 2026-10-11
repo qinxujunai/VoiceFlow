@@ -1,8 +1,8 @@
 """Single source of truth for the public version and traceable build revision."""
 
-APP_VERSION = "0.3.7"
-BUILD_ID = "261011.1"
-WINDOWS_REVISION = 1
+APP_VERSION = "0.3.8"
+BUILD_ID = "261011.3"
+WINDOWS_REVISION = 3
 
 
 def display_version() -> str:
