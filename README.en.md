@@ -24,7 +24,7 @@ Your voice becomes text on your computer. Recording and recognition stay local.
 Skip the final period in a chat. Keep punctuation when writing. Choose the ending that suits you.
 Your dictation stays in local history, ready to revisit and copy.
 
-[What is new in 0.3.7?](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.7)
+[What is new in 0.3.8?](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.8)
 
 ---
 

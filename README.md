@@ -24,7 +24,7 @@ Windows 10 / 11 · 离线使用 · 无需登录
 聊天时省略句号，写作时保留标点。你来选择自己的句末习惯。
 听写留在本地历史，想回看、复制，随时都可以。
 
-[0.3.7 有什么新变化？](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.7)
+[0.3.8 有什么新变化？](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.8)
 
 ---
 
