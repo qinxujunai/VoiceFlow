@@ -13,7 +13,7 @@ def _read(relative_path):
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_readmes_lead_with_real_demo_and_two_badges():
+def test_readmes_lead_with_brand_and_keep_the_real_demo():
     for readme_name in ("README.md", "README.en.md"):
         readme = _read(readme_name)
 
@@ -21,8 +21,12 @@ def test_readmes_lead_with_real_demo_and_two_badges():
         assert "Ctrl+V" in readme
         assert "docs/voiceflow-demo.svg" in readme
         assert "voiceflow-app-home" not in readme
-        assert readme.count("badge.svg") == 1
-        assert readme.count("img.shields.io") == 1
+        assert "docs/voiceflow-brand." in readme
+        assert "badge.svg" not in readme
+        assert "img.shields.io" not in readme
+        assert "docs/help." in readme
+        assert "## 验证" not in readme
+        assert "## Verify" not in readme
 
 
 def test_product_site_preserves_the_demo_and_explains_sentence_endings():
@@ -96,7 +100,7 @@ def test_public_copy_describes_user_actions_and_manual_paste():
     page = _read("site/index.html")
     copy = _read("site/app.js")
 
-    assert "在输入框中按下 F2" in page + copy
+    assert "按一下 F2 开口，再按一下完成" in page + copy
     assert "本地历史" in page + copy
     assert "local history" in copy
     assert "未知输入框只复制" not in page + copy

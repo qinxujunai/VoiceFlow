@@ -728,22 +728,22 @@ def test_readme_defaults_to_chinese_with_english_switch():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
 
-    assert '<strong>简体中文</strong> · <a href="README.en.md">English</a>' in readme
-    assert "Windows 上的离线语音输入工具" in readme
-    assert "## 为什么是 VoiceFlow" in readme
-    assert "## 下载" in readme
-    assert "## 使用" in readme
+    assert '<strong>中文</strong> · <a href="README.en.md">English</a>' in readme
+    assert "Windows 10 / 11 · 离线使用 · 无需登录" in readme
+    assert "docs/voiceflow-brand.zh-CN.svg" in readme
+    assert "[下载 VoiceFlow]" in readme
+    assert "docs/help.zh-CN.md" in readme
     assert "docs/voiceflow-demo.svg" in readme
-    assert "省略最后一个句号" in readme
+    assert "聊天时省略句号" in readme
     assert "Ctrl+V" in readme
     assert "面试" not in readme
     assert "Codex" not in readme
     assert "GitHub 右侧的语言统计" not in readme
-    assert '<a href="README.md">简体中文</a> · <strong>English</strong>' in english
-    assert "offline dictation for Windows" in english
-    assert "## Why VoiceFlow" in english
-    assert "## Download" in english
-    assert "## Controls" in english
+    assert '<a href="README.md">中文</a> · <strong>English</strong>' in english
+    assert "Windows 10 / 11 · Works offline · No sign-in" in english
+    assert "docs/voiceflow-brand.en.svg" in english
+    assert "[Download VoiceFlow]" in english
+    assert "docs/help.en.md" in english
     assert "docs/voiceflow-demo.svg" in english
     assert "Ctrl+V" in english
 
