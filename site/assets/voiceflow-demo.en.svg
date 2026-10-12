@@ -8,10 +8,11 @@
     </filter>
     <style>
       .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
-      #capsule { animation: capsuleState 6.8s steps(1) infinite; }
-      #demo-pill { width: 380px; }
+      #capsule { animation: capsuleState 6.8s cubic-bezier(.22,1,.36,1) infinite; transform-origin: 0 0; }
+      #demo-pill { animation: pillState 6.8s cubic-bezier(.22,1,.36,1) infinite; width: 96px; }
       #wave { animation: waveState 6.8s ease-in-out infinite; }
-      #liveText { animation: liveTextState 6.8s steps(1) infinite; }
+      #liveText { animation: liveTextState 6.8s steps(1) infinite; clip-path: url(#previewReveal); }
+      #previewRevealRect { animation: revealState 6.8s linear infinite; }
       #finalText { animation: finalTextState 6.8s steps(1) infinite; }
       #outputText, #outputCaret { animation: outputState 6.8s steps(1) infinite; }
       .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
@@ -19,8 +20,13 @@
       .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
       #outputCaret { animation-name: outputState, caretBlink; animation-duration: 6.8s, 900ms; animation-timing-function: ease-in-out, steps(1); animation-iteration-count: infinite, infinite; }
       @keyframes capsuleState {
-        0%, 76%, 96%, 100% { opacity: 1; }
-        82%, 92% { opacity: 0; }
+        0%, 12%, 96%, 100% { opacity: 1; transform: translate(552px,168px); }
+        22%, 76% { opacity: 1; transform: translate(410px,168px); }
+        82%, 92% { opacity: 0; transform: translate(552px,168px); }
+      }
+      @keyframes revealState {
+        0%, 24%, 100% { width: 0px; }
+        64%, 80% { width: 314px; }
       }
       @keyframes pillState {
         0%, 12%, 96%, 100% { width: 96px; }
@@ -49,6 +55,7 @@
         .bar-a, .bar-b, .bar-c { animation: none; }
       }
     </style>
+    <clipPath id="previewReveal"><rect id="previewRevealRect" x="66" y="0" width="314" height="52"/></clipPath>
   </defs>
 
   <rect x="1" y="1" width="1198" height="438" rx="48" fill="#f5f5f7"/>
