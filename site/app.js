@@ -307,37 +307,97 @@ const output = document.querySelector("#demo-output");
 const status = document.querySelector("#demo-status");
 const pause = document.querySelector("#demo-pause");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-let demoTimer;
-let demoStep = 0;
+const capsule = document.querySelector(".demo-capsule");
+const demoWindow = document.querySelector(".demo-window");
+let demoFrame;
+let demoElapsed = 0;
+let demoLastFrame;
+let demoWidth = 96;
+let demoTargetWidth = 96;
 let demoPaused = false;
+let demoVisible = true;
 function demoCopy() { return copy[document.documentElement.lang === "en" ? "en" : "zh"]; }
+function demoDuration() { return 600 + demoCopy().demoText.length * 48 + 800; }
 function renderDemo() {
   const words = demoCopy();
-  const count = Math.max(0, Math.floor((demoStep - 10) / 2));
-  const finished = demoStep >= 14 + words.demoText.length * 2;
-  demo.dataset.state = finished ? "done" : demoStep < 10 ? "ready" : count >= words.demoText.length ? "finishing" : "speaking";
-  transcript.textContent = demoStep < 10 ? "F2" : words.demoText.slice(0, count);
-  output.textContent = finished ? words.demoText : words.demoPlaceholder;
-  status.textContent = finished ? words.demoDone : demoStep < 10 ? words.demoStart : count >= words.demoText.length ? words.demoFinish : words.demoSpeaking;
+  const count = Math.min(words.demoText.length, Math.max(0, Math.floor((demoElapsed - 600) / 48)));
+  const finished = demoElapsed >= demoDuration();
+  const delivering = demoElapsed >= demoDuration() - 400;
+  const state = finished ? "done" : delivering ? "delivering" : demoElapsed < 600 ? "ready" : count >= words.demoText.length ? "finishing" : "speaking";
+  const text = demoElapsed < 600 ? "F2" : words.demoText.slice(0, count);
+  if (transcript.textContent !== text) {
+    transcript.textContent = text;
+    demoTargetWidth = Math.max(96, Math.min(700, demoWindow.clientWidth - 64, transcript.scrollWidth + 66));
+  }
+  if (delivering) demoTargetWidth = 96;
+  // Announce state boundaries, not every letter.
+  if (demo.dataset.state !== state) {
+    demo.dataset.state = state;
+    output.textContent = delivering ? words.demoText : words.demoPlaceholder;
+    status.textContent = delivering ? words.demoDone : state === "ready" ? words.demoStart : state === "finishing" ? words.demoFinish : words.demoSpeaking;
+  }
+  capsule.style.opacity = String(1 - Math.min(1, Math.max(0, (demoElapsed - demoDuration() + 400) / 240)));
+  demo.dataset.paused = String(demoPaused || document.hidden || !demoVisible);
   pause.textContent = demoPaused ? words.demoResume : words.demoPause;
   pause.setAttribute("aria-pressed", String(demoPaused));
-  if (finished) clearInterval(demoTimer);
+  pause.disabled = finished;
+  return finished;
+}
+function animateDemo(timestamp) {
+  demoFrame = undefined;
+  const elapsed = demoLastFrame === undefined ? 0 : timestamp - demoLastFrame;
+  demoLastFrame = timestamp;
+  demoElapsed += Math.min(elapsed, 64);
+  const finished = renderDemo();
+  // Background geometry moves; the text is never scaled or filtered.
+  demoWidth += (demoTargetWidth - demoWidth) * (1 - Math.exp(-elapsed / 85));
+  if (Math.abs(demoTargetWidth - demoWidth) < .1) demoWidth = demoTargetWidth;
+  capsule.style.width = `${demoWidth}px`;
+  if (!finished) scheduleDemo();
+}
+function scheduleDemo() {
+  if (demo && !demoPaused && !document.hidden && demoVisible && demoElapsed < demoDuration() && demoFrame === undefined) {
+    demoFrame = requestAnimationFrame(animateDemo);
+  }
+}
+function syncDemoPlayback() {
+  if (!demo) return;
+  if (demoFrame !== undefined) cancelAnimationFrame(demoFrame);
+  demoFrame = undefined;
+  demoLastFrame = undefined;
+  renderDemo();
+  scheduleDemo();
 }
 function resetDemo() {
-  clearInterval(demoTimer);
   if (!demo) return;
+  if (demoFrame !== undefined) cancelAnimationFrame(demoFrame);
+  demoFrame = undefined;
+  demoLastFrame = undefined;
   demoPaused = reducedMotion.matches;
-  demoStep = reducedMotion.matches ? 14 + demoCopy().demoText.length * 2 : 0;
+  demoElapsed = reducedMotion.matches ? demoDuration() : 0;
+  demoWidth = demoTargetWidth = 96;
+  capsule.style.width = "96px";
+  demo.dataset.state = "";
   renderDemo();
-  if (!reducedMotion.matches) demoTimer = setInterval(() => {
-    if (!demoPaused && !document.hidden) { demoStep += 1; renderDemo(); }
-  }, 80);
+  scheduleDemo();
 }
 pause?.addEventListener("click", () => {
-  const finished = demoStep >= 14 + demoCopy().demoText.length * 2;
-  if (finished) { resetDemo(); return; }
-  demoPaused = !demoPaused; renderDemo();
+  if (demoElapsed >= demoDuration()) { resetDemo(); return; }
+  demoPaused = !demoPaused;
+  syncDemoPlayback();
 });
 document.querySelector("#demo-replay")?.addEventListener("click", resetDemo);
+document.addEventListener?.("visibilitychange", syncDemoPlayback);
+window.addEventListener?.("resize", () => {
+  if (!demo) return;
+  demoTargetWidth = Math.max(96, Math.min(700, demoWindow.clientWidth - 64, transcript.scrollWidth + 66));
+  if (demoPaused) { demoWidth = demoTargetWidth; capsule.style.width = `${demoWidth}px`; }
+});
+if (demo && typeof IntersectionObserver !== "undefined") {
+  new IntersectionObserver(([entry]) => {
+    demoVisible = entry.isIntersecting;
+    syncDemoPlayback();
+  }, {threshold: .15}).observe(demo);
+}
 reducedMotion.addEventListener("change", resetDemo);
 setLanguage(requestedLanguage || "zh");

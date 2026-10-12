@@ -234,13 +234,20 @@ nav a:hover{
 .demo-input{min-height:105px;border:1px solid #dcdce0;border-radius:14px;padding:20px;font-size:18px;line-height:1.7;color:#8a8a92}
 .live-demo[data-state=done] .demo-input{color:#1d1d1f}
 .demo-caret{display:inline-block;width:2px;height:20px;vertical-align:middle;background:#1d1d1f;margin-left:3px}
-.demo-capsule{display:flex;align-items:center;gap:12px;min-height:42px;width:fit-content;max-width:100%;background:#18181a;color:#f5f5f7;border-radius:24px;margin:24px auto 0;padding:10px 18px;font-size:15px;text-align:left}
-#demo-transcript{min-width:25px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:430px}
+.demo-capsule{display:flex;align-items:center;gap:12px;height:48px;width:96px;max-width:100%;background:#18181a;color:#f5f5f7;border-radius:24px;margin:24px auto 0;padding:10px 18px;font-size:15px;text-align:left;overflow:hidden;box-shadow:0 8px 22px #00000012}
+#demo-transcript{min-width:0;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .demo-bars{display:flex;gap:3px;align-items:center;height:16px;flex-shrink:0}
 .demo-bars i{width:3px;height:8px;background:#ff453a;border-radius:2px}
 .demo-bars i:nth-child(2){height:16px}
 .demo-bars i:nth-child(3){height:11px}
-.live-demo[data-state=done] .demo-bars i{background:#a7a7ae}
+.live-demo[data-state=speaking] .demo-bars i{animation:demo-wave 680ms ease-in-out infinite;transform-origin:center}
+.live-demo[data-state=speaking] .demo-bars i:nth-child(2){animation-duration:530ms;animation-delay:-180ms}
+.live-demo[data-state=speaking] .demo-bars i:nth-child(3){animation-duration:790ms;animation-delay:-340ms}
+.live-demo[data-paused=true] .demo-bars i{animation-play-state:paused}
+.live-demo[data-state=finishing] .demo-bars i{background:#a7a7ae}
+.demo-controls button:disabled{opacity:.45;cursor:default}
+@keyframes demo-wave{0%,100%{transform:scaleY(.45)}45%{transform:scaleY(1.45)}70%{transform:scaleY(.8)}}
+@media(prefers-reduced-motion:reduce){.demo-capsule{transition:none}.demo-bars i{animation:none!important}}
 .demo-controls{display:flex;justify-content:space-between;align-items:center;gap:16px;max-width:820px;margin:20px auto 0;font-size:13px;color:#68686f}
 .demo-controls button{background:transparent;border:1px solid #d2d2d7;border-radius:8px;padding:7px 12px;margin-left:8px;color:#45454b;font:inherit;cursor:pointer}
 .demo-controls button:focus-visible{outline:2px solid #1d1d1f;outline-offset:3px}
