@@ -7,6 +7,7 @@ also contains third-party components under their own licenses.
 |---|---|---|
 | PySide6 / Qt for Python | LGPL-3.0-only or commercial | Native desktop UI binding |
 | Qt 6 libraries | LGPL-3.0-only, GPL, or commercial depending on module | Desktop UI runtime |
+| Apache Tika MIME definitions / PRONOM | Apache-2.0 / Open Government Licence 3.0 attribution | MIME data included in QtCore |
 | Mesa llvmpipe 11.2.2 | MIT and Boost-1.0 component notices | Qt's optional Windows software OpenGL runtime |
 | LLVM 3.6.2 | University of Illinois/NCSA and component notices | Compiler support statically included in Mesa llvmpipe |
 | CPython | PSF and included component notices | Bundled Python interpreter and standard library |
@@ -49,6 +50,7 @@ The packaged application includes these verbatim upstream license texts:
 - `licenses/GPL-3.0-only.txt`
 - `licenses/Chromium-BSD.txt`
 - `licenses/Apache-2.0.txt`
+- `licenses/Apache-Tika-MIME-NOTICE.txt`
 - `licenses/comtypes-MIT.txt`
 - `licenses/Mesa-llvmpipe-NOTICES.txt`
 - `licenses/LLVM-3.6.2-LICENSE.txt`
@@ -161,6 +163,15 @@ must additionally retain their bundled generated Chromium credits resources.
 
 ## Speech models
 
+Final Chinese punctuation uses the pinned `CT-Transformer` int8 model,
+`iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch`, by Alibaba Group /
+FunASR / ModelScope, converted for sherpa-onnx by k2-fsa. See
+`docs/punctuation-model-review.md` for source URLs, exact artifact hashes,
+language limits and the dated distribution record. Retain the model name,
+source and author attribution, `licenses/Apache-2.0.txt` and the additional
+`licenses/FunASR-MODEL-LICENSE.txt`. The VoiceFlow MIT license does not replace
+the model's upstream terms.
+
 The bundled Silero VAD is byte-identical to k2-fsa's official 16 kHz release
 asset (asset ID 271935959), SHA256
 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`.
@@ -194,3 +205,5 @@ This notice is an engineering inventory, not legal advice. Release owners must
 retain upstream copyright and license files in every public build. The
 UIAutomation package is covered by the bundled Apache-2.0 text; the exact
 comtypes copyright and MIT terms are retained separately.
+
+QtCore MIME data attribution: upstream Apache Tika revision 408c26e1e03e018a623e732dff6fb047a2fb8e19. The complete upstream NOTICE is retained verbatim (SHA256 4cd09bac8d81bd34decf6b95fb23d42fc9b3d6b653ec4be8ef44674b692c97cd). Only MIME definitions are used here; other components mentioned in that upstream NOTICE are not claims of bundled VoiceFlow dependencies. The definitions include PRONOM material from The National Archives under Open Government Licence 3.0.

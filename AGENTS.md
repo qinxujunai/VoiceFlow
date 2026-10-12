@@ -42,6 +42,7 @@ src/
   audio_worker.py      # supervised microphone, reused only after verified teardown
   asr_worker.py        # supervised authoritative-ASR process
   preview_worker.py    # supervised online-preview ASR process
+  punctuation_worker.py # optional bounded Chinese punctuation worker
   transcriber.py       # sherpa-onnx ASR
   streaming_transcriber.py # small online ASR for capsule preview
   vocabulary.py        # layered dictionary/corrections
@@ -68,6 +69,11 @@ on the recording action path. Preview PCM blocks are at most 100 ms.
 ## Product Rules
 
 - Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
+- Text cleanup preserves wording and repetitions. Only visible dictionary corrections
+  may replace words. Punctuation inference preserves lexical content, bypasses technical
+  or preserve-format input, and falls back unchanged on failure or timeout.
+- Settings use one dirty draft and one save transaction. Missing evaluation audio
+  does not block ordinary settings saves; pinned runtime weights remain verified.
 - Never lose text. If text exists, it must remain in clipboard and `logs/history.jsonl`.
 - Do not restore the previous clipboard after dictation.
 - After verified clipboard delivery, revalidate and dispatch one paste to the ordinary

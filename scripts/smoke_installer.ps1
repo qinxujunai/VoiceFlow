@@ -2,7 +2,9 @@ param(
     [string]$InstallerPath = "",
     [string]$PreviousInstallerPath = "",
     [int]$StartupSeconds = 30,
-    [switch]$RequireStreamingPreview
+    [switch]$RequireStreamingPreview,
+    [switch]$RequirePunctuation,
+    [switch]$DisableHotkeys
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +43,12 @@ $appProcess = $null
 function Remove-SmokeRoot {
     if (-not (Test-Path -LiteralPath $smokeRoot)) {
         return
+    }
+    $resolvedSmokeRoot = (Resolve-Path -LiteralPath $smokeRoot).Path
+    $resolvedTemporaryRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path.TrimEnd('\') + '\'
+    if (-not $resolvedSmokeRoot.StartsWith($resolvedTemporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $resolvedSmokeRoot) -notmatch '^VoiceFlow-installer-smoke-[a-f0-9]{32}$') {
+        throw "Refusing cleanup outside the owned installer smoke directory"
     }
     for ($attempt = 1; $attempt -le 8; $attempt++) {
         try {
@@ -177,6 +185,9 @@ try {
         Join-Path $installRoot "model-manifest.json"
     ) | ConvertFrom-Json
     $modelIds = @("sensevoice-small-int8")
+    if ($RequirePunctuation) {
+        $modelIds += "ct-transformer-punctuation-int8"
+    }
     if ($RequireStreamingPreview) {
         $modelIds += "streaming-zipformer-small-bilingual-zh-en-int8"
     }
@@ -209,12 +220,11 @@ try {
     $env:LOCALAPPDATA = $localAppData
     $smokeDataDir = Join-Path $localAppData "VoiceFlow"
     $instanceId = "installer-smoke-" + [guid]::NewGuid().ToString("N")
+    $appArguments = @("--instance-id", $instanceId, "--data-dir", $smokeDataDir)
+    if ($DisableHotkeys) { $appArguments += "--no-hotkeys" }
     $appProcess = Start-Process `
         -FilePath (Join-Path $installRoot "VoiceFlow.exe") `
-        -ArgumentList @(
-            "--instance-id", $instanceId,
-            "--data-dir", $smokeDataDir
-        ) `
+        -ArgumentList $appArguments `
         -WorkingDirectory $installRoot `
         -WindowStyle Hidden `
         -PassThru
@@ -231,7 +241,7 @@ try {
                 $candidate = Get-Content -Raw $runtimeState | ConvertFrom-Json
                 if (
                     $candidate.phase -eq "ready" -and
-                    $candidate.hotkeys -eq "ready" -and
+                    ($candidate.hotkeys -eq "ready" -or ($DisableHotkeys -and $candidate.hotkeys -eq "disabled_for_diagnostics")) -and
                     $candidate.worker -eq "ready" -and
                     $candidate.final_asr -eq "ready"
                 ) {

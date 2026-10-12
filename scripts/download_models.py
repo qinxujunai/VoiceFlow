@@ -207,6 +207,7 @@ def main():
         choices=[
             "sensevoice",
             "streaming-preview",
+            "punctuation",
             "streaming-paraformer",
             "streaming-zipformer-2025-06-30",
             "qwen3-asr",
@@ -237,6 +238,8 @@ def main():
         succeeded = download_sensevoice(base_dir)
     elif args.engine == "streaming-preview":
         succeeded = download_streaming_preview(base_dir)
+    elif args.engine == "punctuation":
+        succeeded = _download_pinned_model(base_dir, "ct-transformer-punctuation-int8")
     elif args.engine == "streaming-paraformer":
         succeeded = download_streaming_paraformer(base_dir)
     elif args.engine == "streaming-zipformer-2025-06-30":

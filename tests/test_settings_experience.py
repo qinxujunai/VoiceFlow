@@ -28,7 +28,8 @@ def test_sidebar_version_is_two_lines_and_the_shell_avoids_a_double_border():
     source = OVERLAY.read_text(encoding="utf-8")
 
     assert 'QLabel(f"{display_version()}\\n{platform_label()}")' in source
-    assert "self.setMinimumSize(980, 660)" in source
+    assert "self.setMinimumSize(600, 460)" in source
+    assert "availableGeometry" in source
     assert "QStackedWidget#contentStack {" in source
     assert "QWidget#contentPage {" in source
 
@@ -83,7 +84,8 @@ def test_dictionary_uses_an_entry_list_instead_of_a_raw_file_editor():
     assert "添加" in dictionary
     assert "删除所选" in dictionary
     assert "dictionary_editors" not in dictionary
-    assert 'setPlaceholderText("错误词=正确词")' in source
+    assert 'setPlaceholderText("识别成")' in source
+    assert 'setPlaceholderText("应改为")' in source
 
 
 def test_dictionary_exposes_bundled_ai_terms_as_read_only_product_content():
@@ -107,7 +109,7 @@ def test_dictionary_copy_explains_what_each_entry_can_reliably_change():
 
     assert "英文术语会规范大小写" in dictionary
     assert "误识别请使用确定性纠错" in rendering
-    assert 'self._set_status_badge("词典已保存")' in saving
+    assert '"词典已保存" if not self._dictionary_dirty' in saving
     assert "词典已保存，重启后生效" not in saving
 
 

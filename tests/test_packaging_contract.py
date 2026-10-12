@@ -337,7 +337,8 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
     ) in installer
     assert 'Source: "..\\models\\sensevoice\\*"' not in installer
     assert ".cache" not in installer
-    assert "AppId={{" in installer
+    assert 'AppId={#MyAppId}' in installer
+    assert '{{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}' in installer
     assert "Uninstallable=yes" in installer
     assert 'Name: "autostart"' not in installer
     assert r"Software\Microsoft\Windows\CurrentVersion\Run" not in installer
