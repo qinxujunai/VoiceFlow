@@ -225,6 +225,7 @@ def test_model_manifest_contains_all_fixed_lab_candidates():
         "fun-asr-nano-0.8b-int8",
         "qwen3-asr-1.7b-conditional",
         "whisper-large-v3-turbo-int8",
+        "ct-transformer-punctuation-int8",
     }
     assert models["qwen3-asr-1.7b-conditional"]["eligible"] is False
     assert models["whisper-large-v3-turbo-int8"]["license"]["spdx"] == "MIT"

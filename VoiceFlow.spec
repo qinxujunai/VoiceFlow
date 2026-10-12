@@ -50,6 +50,7 @@ a = Analysis(
             "docs",
         ),
         (str(PROJECT_ROOT / "docs" / "asr-runtime-build.md"), "docs"),
+        (str(PROJECT_ROOT / "docs" / "punctuation-model-review.md"), "docs"),
         # Vocabulary files.
         (str(PROJECT_ROOT / "knowledge-base"), "knowledge-base"),
         (str(PROJECT_ROOT / "assets" / "voiceflow.ico"), "assets"),

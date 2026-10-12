@@ -18,6 +18,7 @@ def window(tmp_path):
     from overlay_webview import _SettingsWindow
     from qt_compat import QApplication
     from runtime_paths import AppPaths, RuntimeMode
+    from settings_store import save_settings_transaction
 
     app = QApplication.instance() or QApplication([])
     data = tmp_path / "data"
@@ -31,8 +32,14 @@ def window(tmp_path):
         return {**store.snapshot(), "last_app": "msedge.exe"}
 
     controller = AppController(on_query_dictation_preferences=query,
+                              on_save_settings=lambda draft: save_settings_transaction(paths, store, draft),
                               on_update_dictation_preferences=lambda options: store.update(**options))
     ui = _SettingsWindow(paths=paths, controller=controller)
+    ui.refresh()
+    deadline = time.monotonic() + 2
+    while ui._refresh_in_progress and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(.005)
     yield app, ui, store, query
     ui.close()
     app.processEvents()
@@ -47,15 +54,15 @@ def test_sentence_end_controls_preview_and_save_explicit_application_scope(windo
     ui.sentence_end_combo.setCurrentIndex(ui.sentence_end_combo.findData("omit_period"))
     assert "你好。" not in ui.sentence_end_sample.text()
     assert "你好" in ui.sentence_end_sample.text()
-    ui._save_dictation_preferences()
+    ui._save_settings()
     deadline = time.monotonic() + 2
-    while ui._dictation_save_in_progress and time.monotonic() < deadline:
+    while ui._switch_in_progress and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert not ui._dictation_save_in_progress
+    assert not ui._switch_in_progress
     assert store.options_for("msedge.exe").sentence_end == "omit_period"
     assert store.options_for("chrome.exe").sentence_end == "preserve"
-    assert "下一次" in ui.status_badge.text()
+    assert "下一次" in ui.operation_feedback.text()
 
 
 def test_tray_sentence_end_menu_uses_the_same_live_store_without_new_hotkeys(window):
@@ -101,12 +108,12 @@ def test_preferences_save_failure_keeps_live_policy_and_shows_failure(window, mo
     ui._apply_dictation_preferences(query())
     monkeypatch.setattr(store, "_write", lambda *_args: (_ for _ in ()).throw(OSError("fixture disk failure")))
     ui.sentence_end_combo.setCurrentIndex(ui.sentence_end_combo.findData("omit_period"))
-    ui._save_dictation_preferences()
+    ui._save_settings()
     deadline = time.monotonic() + 2
-    while ui._dictation_save_in_progress and time.monotonic() < deadline:
+    while ui._switch_in_progress and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
-    assert "未保存" in ui.status_badge.text()
+    assert "保存失败" in ui.operation_feedback.text()
     assert store.options_for("notepad.exe").sentence_end == "preserve"
 
 
@@ -117,13 +124,15 @@ def test_settings_can_remove_an_application_override(window):
     ui.dictation_scope_combo.setCurrentIndex(ui.dictation_scope_combo.findData("msedge.exe"))
     assert ui.follow_default_button.isEnabled()
     ui.follow_default_button.click()
+    assert "msedge.exe" in store.snapshot()["apps"]
+    ui._save_settings()
     deadline = time.monotonic() + 2
-    while ui._dictation_save_in_progress and time.monotonic() < deadline:
+    while ui._switch_in_progress and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
     assert "msedge.exe" not in store.snapshot()["apps"]
     assert not ui.follow_default_button.isEnabled()
-    assert "默认" in ui.status_badge.text()
+    assert "已保存" in ui.operation_feedback.text()
 
 
 def test_stale_open_settings_refreshes_instead_of_overwriting_tray_change(window):
@@ -131,15 +140,16 @@ def test_stale_open_settings_refreshes_instead_of_overwriting_tray_change(window
     ui._apply_dictation_preferences(query())
     store.update(sentence_end="complete_period", preserve_format=False)
     ui.preserve_format_check.setChecked(True)
-    ui._save_dictation_preferences()
+    ui._save_settings()
     deadline = time.monotonic() + 2
-    while ui._dictation_save_in_progress and time.monotonic() < deadline:
+    while ui._switch_in_progress and time.monotonic() < deadline:
         app.processEvents()
         time.sleep(0.005)
     assert store.options_for("notepad.exe").sentence_end == "complete_period"
     assert not store.options_for("notepad.exe").preserve_format
-    assert ui.sentence_end_combo.currentData() == "complete_period"
-    assert "重新保存" in ui.status_badge.text()
+    assert ui.preserve_format_check.isChecked()
+    assert "重新载入" in ui.operation_feedback.text()
+    assert not ui.reload_settings_button.isHidden()
 
 
 def test_open_settings_releases_custom_colors_when_high_contrast_changes(window, monkeypatch):

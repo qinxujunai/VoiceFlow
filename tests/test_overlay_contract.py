@@ -463,7 +463,7 @@ def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
     assert 'self.dictionary_section.addItem("专有词", "user-dictionary.txt")' in settings_block
     assert 'self.dictionary_section.addItem("常用短语", "phrases.txt")' in settings_block
     assert 'self.dictionary_section.addItem("确定性纠错", "corrections.txt")' in settings_block
-    assert "不会调用生成模型改写意思" in settings_block
+    assert "不改写你的意思" in settings_block
 
 
 def test_settings_runtime_actions_do_not_depend_on_source_tree_tools():
