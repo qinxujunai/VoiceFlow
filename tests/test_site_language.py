@@ -27,17 +27,18 @@ function load(search, storage) {
   }));
   const document = {
     documentElement: {},
-    querySelector() { return {}; },
+    querySelector(selector) { return selector.startsWith('meta[') ? {} : null; },
     querySelectorAll(selector) {
       return selector === '[data-language]' ? buttons : [];
     }
   };
   const window = {
+    matchMedia() { return {matches:true, addEventListener(){}}; },
     location: {search, href: 'https://example.test/' + search},
     history: {replaceState(state, title, url) { window.url = String(url); }}
   };
   vm.runInNewContext(source, {document, window, localStorage: storage,
-    URL, URLSearchParams});
+    URL, URLSearchParams, clearInterval(){}, setInterval(){}});
   return {document, window, buttons};
 }
 const oldEnglish = {getItem() { return 'en'; }, setItem() {}};

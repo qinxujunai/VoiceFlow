@@ -3,16 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="让想法成文。VoiceFlow 是 Windows 上的离线语音输入工具，陪你写邮件、记灵感、回消息。">
+    <meta name="description" content="VoiceFlow：Windows 离线语音输入。在当前输入框听写，与 AI 对话、写邮件、回消息。完整终稿保留在剪贴板和本地历史，无需登录。">
     <meta name="theme-color" content="#fafafa">
     <meta property="og:title" content="VoiceFlow — 让想法成文">
-    <meta property="og:description" content="按下 F2，把想说的说出来。声音在你的电脑上变成文字。">
+    <meta property="og:description" content="Windows 离线语音输入。在当前输入框听写，终稿保留在剪贴板和本地历史。无需登录。">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://qinxujunai.github.io/VoiceFlow/">
-    <meta property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-demo.svg">
+    <meta property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-share.png">
     <title>VoiceFlow — 让想法成文</title>
     <link rel="icon" href="assets/voiceflow.ico">
-    <link rel="preload" href="assets/voiceflow-demo.svg" as="image" fetchpriority="high">
     <link rel="stylesheet" href="styles.css">
     <script type="application/ld+json">
       {"@context":"https://schema.org","@type":"SoftwareApplication","name":"VoiceFlow","applicationCategory":"UtilitiesApplication","operatingSystem":"Windows 10, Windows 11","softwareVersion":"__VOICEFLOW_VERSION__","license":"https://github.com/qinxujunai/VoiceFlow/blob/master/LICENSE","downloadUrl":"__VOICEFLOW_INSTALLER_URL__"}
@@ -40,12 +39,12 @@
     <main id="main">
       <section class="hero" id="top">
         <div class="hero-copy">
-          <p class="eyebrow" data-i18n="heroEyebrow">VoiceFlow · 为你的表达而来</p>
+          <p class="eyebrow" data-i18n="heroEyebrow">Windows 离线语音输入</p>
           <h1>
-            <span data-i18n="heroTitle">开口。</span>
-            <span class="title-soft" data-i18n="heroTitleSecond">让想法成文。</span>
+            <span data-i18n="heroTitle">让想法成文。</span>
+            <span class="title-soft" data-i18n="heroTitleSecond">按一下，说出你的话。</span>
           </h1>
-          <p class="hero-lede" data-i18n="heroLede">把邮件、消息和灵感说出来。声音化为文字，你继续眼前的事。</p>
+          <p class="hero-lede" data-i18n="heroLede">与 AI 对话、写邮件、回消息，文字回到你正在使用的输入框。无需切换应用，无需登录。</p>
           <div class="hero-actions">
             <a class="button primary" href="__VOICEFLOW_INSTALLER_URL__" data-download data-i18n="downloadVoiceFlow">下载 VoiceFlow</a>
             <a class="text-link" href="#film">
@@ -57,34 +56,42 @@
         </div>
         <div class="film-section" id="film">
           <figure class="product-stage">
-            <img src="assets/voiceflow-demo.svg" alt="VoiceFlow 听写时显示文字，完成后收起" data-i18n-alt="demoAlt" data-i18n-src="demoSrc">
+            <div class="live-demo" aria-label="听写流程示意" data-i18n-aria="demoAlt">
+              <div class="demo-window">
+                <div class="demo-window-title"><span class="demo-dot"></span><span data-i18n="demoApp">与 AI 对话</span></div>
+                <p class="demo-context" data-i18n="demoContext">说清楚你的需求，不用先把整段话打出来。</p>
+                <div class="demo-input"><span id="demo-output" data-i18n="demoPlaceholder">在这里输入你的问题…</span><span class="demo-caret" aria-hidden="true"></span></div>
+                <div class="demo-capsule"><span class="demo-bars" aria-hidden="true"><i></i><i></i><i></i></span><span id="demo-transcript"></span></div>
+              </div>
+              <div class="demo-controls"><span id="demo-status" role="status"></span><div><button id="demo-pause" type="button">暂停</button><button id="demo-replay" type="button" data-i18n="demoReplay">重播</button></div></div>
+            </div>
             <figcaption>
-              <span data-i18n="filmCaption">一枚小胶囊。从开口，到落笔。</span>
-              <span class="film-tag" data-i18n="filmTag">产品演示</span>
+              <span data-i18n="filmCaption">按 F2 开始 → 说话 → 再按 F2 完成</span>
+              <span class="film-tag" data-i18n="filmTag">流程示意</span>
             </figcaption>
           </figure>
         </div>
       </section>
       <section class="flow-section section-shell" id="values" aria-label="VoiceFlow 核心价值" data-i18n-aria="valuesAria">
         <div class="section-heading">
-          <p class="eyebrow" data-i18n="flowEyebrow">跟得上表达，也容得下思路。</p>
+          <p class="eyebrow" data-i18n="flowEyebrow">少打字，少切换</p>
           <h2>
-            <span data-i18n="valueEverywhere">说出你的想法。</span>
-            <span class="title-soft" data-i18n="flowTitleSecond">继续你的事。</span>
+            <span data-i18n="valueEverywhere">你正在做的事，</span>
+            <span class="title-soft" data-i18n="flowTitleSecond">直接说下去。</span>
           </h2>
-          <p class="section-lede" data-i18n="valueEverywhereBody">光标在哪里，表达就从哪里开始。按一下 F2 开口，再按一下完成。</p>
+          <p class="section-lede" data-i18n="valueEverywhereBody">用快捷键在当前输入框听写。说完继续工作，不用打开另一款转写工具再搬运文字。</p>
         </div>
         <div class="scene-grid">
           <article class="scene scene-note">
-            <p class="scene-category" data-i18n="sceneNotes">记灵感</p>
+            <p class="scene-category" data-i18n="sceneNotes">与 AI 对话</p>
             <div class="paper-note">
-              <span class="paper-date" data-i18n="noteDate">一个想法</span>
-              <h3 data-i18n="noteTitle">先把灵感留下。</h3>
-              <p data-i18n="noteBody">做一个更安静的工具，让人专注在想说的话上。</p>
+              <span class="paper-date" data-i18n="noteDate">一个完整的需求</span>
+              <h3 data-i18n="noteTitle">把上下文一起说清楚。</h3>
+              <p data-i18n="noteBody">请比较这两份方案的成本与风险，列出差异，再给出你的建议。</p>
               <span class="note-caret" aria-hidden="true">
               </span>
             </div>
-            <p class="scene-caption" data-i18n="noteCaption">想法刚来，先说下来。</p>
+            <p class="scene-caption" data-i18n="noteCaption">适合高频追问、补充上下文和描述复杂需求。</p>
           </article>
           <article class="scene scene-mail">
             <p class="scene-category" data-i18n="sceneMail">写邮件</p>
@@ -100,7 +107,7 @@
                 </i>
               </div>
             </div>
-            <p class="scene-caption" data-i18n="mailCaption">把一段思路，说清楚。</p>
+            <p class="scene-caption" data-i18n="mailCaption">把完整思路输入邮件，不用一句句敲出来。</p>
           </article>
           <article class="scene scene-chat">
             <p class="scene-category" data-i18n="sceneChat">回消息</p>
@@ -109,19 +116,19 @@
               <span class="chat-bubble outgoing" data-i18n="chatOutgoing">好呀，那家店我也想去</span>
               <span class="chat-compose" data-i18n="chatCompose">接着聊…</span>
             </div>
-            <p class="scene-caption" data-i18n="chatCaption">像说话一样，回一句。</p>
+            <p class="scene-caption" data-i18n="chatCaption">在聊天输入框听写，说完就接着聊。</p>
           </article>
         </div>
         <p class="art-note" data-i18n="sceneArtNote">使用场景示意。部分应用需要手动粘贴。</p>
       </section>
       <section class="quiet-section">
         <div class="quiet-inner">
-          <p class="eyebrow" data-i18n="quietEyebrow">小一点。专注，多一点。</p>
+          <p class="eyebrow" data-i18n="quietEyebrow">输入受限，也有下一步</p>
           <h2>
-            <span data-i18n="quietTitle">只占一点目光。</span>
-            <span class="quiet-soft" data-i18n="quietTitleSecond">留出整片思路。</span>
+            <span data-i18n="quietTitle">说完的话，</span>
+            <span class="quiet-soft" data-i18n="quietTitleSecond">有地方找回。</span>
           </h2>
-          <p class="section-lede" data-i18n="quietBody">开始说话，一枚小胶囊陪你表达。你看到文字，把注意力留给想法。</p>
+          <p class="section-lede" data-i18n="quietBody">先把终稿复制到剪贴板，再尝试粘贴到目标应用。未确认输入时，明确提示手动粘贴。</p>
           <div class="capsule-art" role="img" aria-label="黑色听写胶囊与红色录音指示" data-i18n-aria="capsuleAria">
             <div class="capsule-bars" aria-hidden="true">
               <i>
@@ -131,20 +138,24 @@
               <i>
               </i>
             </div>
-            <span data-i18n="capsuleText">把这个想法，记下来。</span>
+            <span data-i18n="capsuleText">已复制到剪贴板</span>
           </div>
-          <p class="art-note" data-i18n="capsuleArtNote">听写界面示意</p>
+          <p class="art-note" data-i18n="capsuleArtNote">自动输入受限时的恢复提示示意</p>
+          <div class="reliability-grid">
+            <article><h3 data-i18n="safeClipboard">先复制，再输入。</h3><p data-i18n="safeClipboardBody">自动粘贴受限时，在目标输入框按 Ctrl+V。听写完成后的文字保留在剪贴板，不恢复成之前的内容。</p></article>
+            <article><h3 data-i18n="safeHistory">完整终稿，可以找回。</h3><p data-i18n="safeHistoryBody">停止后处理完整录音，预览不会覆盖终稿。结果保存到本地历史，可回看和复制；未交付录音有本地恢复入口。</p></article>
+          </div>
         </div>
       </section>
       <section class="personal-section section-shell">
         <div class="personal-copy">
-          <p class="eyebrow" data-i18n="valueRecoveryLabel">表达，自有你的习惯。</p>
+          <p class="eyebrow" data-i18n="valueRecoveryLabel">专有词与文字习惯</p>
           <h2>
-            <span data-i18n="valueRecovery">连句末，</span>
-            <span class="title-soft" data-i18n="personalTitleSecond">也由你决定。</span>
+            <span data-i18n="valueRecovery">你的词，</span>
+            <span class="title-soft" data-i18n="personalTitleSecond">按你的习惯。</span>
           </h2>
-          <p class="section-lede" data-i18n="valueRecoveryBody">聊天时省略句号，写作时保留标点。选好自己的习惯，下一次开口就照着来。</p>
-          <p class="small-copy" data-i18n="personalNote">保留标点、省略最后一个句号，或补全句末句号。问号和感叹号仍会保留。</p>
+          <p class="section-lede" data-i18n="valueRecoveryBody">添加人名、品牌和项目名，规范英文术语大小写。用纠错词对指定容易识别错的词该怎么写。</p>
+          <p class="small-copy" data-i18n="personalNote">词典在本地维护。句末标点可按应用设置；代码编辑器和终端默认保留格式。</p>
         </div>
         <div class="ending-art">
           <div class="ending-row">
@@ -167,10 +178,10 @@
               <path d="M23 28V20a9 9 0 0 1 18 0v8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
               <circle cx="32" cy="40" r="2.5" fill="currentColor"/>
             </svg>
-            <p class="eyebrow" data-i18n="valueOfflineLabel">表达，属于你。</p>
+            <p class="eyebrow" data-i18n="valueOfflineLabel">本机处理，无需账户</p>
             <h2>
-              <span data-i18n="privacyTitle">你的话。</span>
-              <span class="title-soft" data-i18n="privacyTitleSecond">留在你的电脑。</span>
+              <span data-i18n="privacyTitle">录音与识别，</span>
+              <span class="title-soft" data-i18n="privacyTitleSecond">都在你的电脑。</span>
             </h2>
             <p class="section-lede" data-i18n="valueOfflineBody">安装后即可离线听写。录音和识别都在你的电脑上完成，不需要账户，也不上传录音。</p>
             <a class="text-link" href="https://github.com/qinxujunai/VoiceFlow/blob/master/docs/help.zh-CN.md#隐私与联网" data-i18n-href="privacyHref">
@@ -195,8 +206,8 @@
       <section class="download-section section-shell" id="download">
         <p class="eyebrow">VoiceFlow</p>
         <h2>
-          <span data-i18n="downloadTitle">下一句话。</span>
-          <span class="title-soft" data-i18n="downloadTitleSecond">从开口开始。</span>
+          <span data-i18n="downloadTitle">用说话代替打字。</span>
+          <span class="title-soft" data-i18n="downloadTitleSecond">从下一次输入开始。</span>
         </h2>
         <a class="button primary" href="__VOICEFLOW_INSTALLER_URL__" data-i18n="downloadVoiceFlow">下载 VoiceFlow</a>
         <p class="compatibility" data-i18n="compatibility">Windows 10 / 11 · x64 · v__VOICEFLOW_VERSION__</p>
