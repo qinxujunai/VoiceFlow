@@ -17,7 +17,7 @@ def test_readmes_lead_with_brand_and_keep_the_real_demo():
     for readme_name in ("README.md", "README.en.md"):
         readme = _read(readme_name)
 
-        assert "0.3.7" in readme
+        assert "/releases/latest" in readme
         assert "Ctrl+V" in readme
         assert "docs/voiceflow-demo.svg" in readme
         assert "voiceflow-app-home" not in readme
@@ -32,7 +32,8 @@ def test_readmes_lead_with_brand_and_keep_the_real_demo():
 def test_product_site_preserves_the_demo_and_explains_sentence_endings():
     page = _read("site/index.html")
 
-    assert "assets/voiceflow-demo.svg" in page
+    assert 'class="live-demo"' in page
+    assert 'id="demo-transcript"' in page
     assert "句末" in page
     assert "voiceflow-app-home" not in page
     assert "voiceflow-ambient" not in page
@@ -73,6 +74,18 @@ def test_product_site_demo_matches_readme_demo():
     assert "deliveryDismissState" in site_demo
 
 
+def test_svg_demo_text_is_outside_filter_groups():
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(_read("docs/voiceflow-demo.svg"))
+    def inspect(element, filtered=False):
+        filtered = filtered or "filter" in element.attrib
+        if element.tag.endswith("}text"):
+            assert not filtered
+        for child in element:
+            inspect(child, filtered)
+    inspect(root)
+
+
 def test_bilingual_demo_uses_the_real_quiet_success_state():
     chinese_demo = _read("site/assets/voiceflow-demo.svg")
     english_demo = _read("site/assets/voiceflow-demo.en.svg")
@@ -89,8 +102,8 @@ def test_public_demo_descriptions_and_metrics_are_not_stale():
     page = _read("site/index.html")
     copy = _read("site/app.js")
 
-    assert "听写时显示文字，完成后收起" in page + copy
-    assert "shows words during dictation" in copy
+    assert "当前输入框听写" in page + copy
+    assert "at the current cursor" in copy
     for phrase in ("发布门槛", "内部候选", "10,000", "metricScopeValue",
                    "release gate", "Internal candidates"):
         assert phrase not in page + copy
@@ -100,7 +113,7 @@ def test_public_copy_describes_user_actions_and_manual_paste():
     page = _read("site/index.html")
     copy = _read("site/app.js")
 
-    assert "按一下 F2 开口，再按一下完成" in page + copy
+    assert "按 F2 开始" in page + copy
     assert "本地历史" in page + copy
     assert "local history" in copy
     assert "未知输入框只复制" not in page + copy

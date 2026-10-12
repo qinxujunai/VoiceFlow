@@ -8,22 +8,19 @@
     </filter>
     <style>
       .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif; }
-      #capsule { animation: capsuleState 6.8s ease-in-out infinite; }
-      #demo-pill { animation: pillState 6.8s ease-in-out infinite; }
+      #capsule { animation: capsuleState 6.8s steps(1) infinite; }
+      #demo-pill { width: 380px; }
       #wave { animation: waveState 6.8s ease-in-out infinite; }
-      #liveText { animation: liveTextState 6.8s ease-in-out infinite; }
-      #finalText { animation: finalTextState 6.8s ease-in-out infinite; }
-      #outputText, #outputCaret { animation: outputState 6.8s ease-in-out infinite; }
+      #liveText { animation: liveTextState 6.8s steps(1) infinite; }
+      #finalText { animation: finalTextState 6.8s steps(1) infinite; }
+      #outputText, #outputCaret { animation: outputState 6.8s steps(1) infinite; }
       .bar-a { animation: barA 720ms ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
       .bar-b { animation: barB 880ms ease-in-out infinite 140ms; transform-box: fill-box; transform-origin: center; }
       .bar-c { animation: barC 790ms ease-in-out infinite 260ms; transform-box: fill-box; transform-origin: center; }
       #outputCaret { animation-name: outputState, caretBlink; animation-duration: 6.8s, 900ms; animation-timing-function: ease-in-out, steps(1); animation-iteration-count: infinite, infinite; }
       @keyframes capsuleState {
-        0%, 12%, 96%, 100% { transform: translate(552px, 168px); opacity: 1; }
-        22%, 64% { transform: translate(410px, 168px); opacity: 1; }
-        72%, 76% { transform: translate(410px, 168px); opacity: 1; }
-        82%, 88% { transform: translate(552px, 168px); opacity: 0; }
-        92% { transform: translate(552px, 168px); opacity: 0; }
+        0%, 76%, 96%, 100% { opacity: 1; }
+        82%, 92% { opacity: 0; }
       }
       @keyframes pillState {
         0%, 12%, 96%, 100% { width: 96px; }
@@ -36,8 +33,8 @@
       @keyframes finalTextState { 0%, 67%, 82%, 100% { opacity: 0; } 72%, 76% { opacity: 1; } }
       @keyframes deliveryDismissState { 0%, 76% { opacity: 1; } 82%, 100% { opacity: 0; } }
       @keyframes outputState {
-        0%, 68%, 100% { opacity: 0; transform: translateY(5px); }
-        75%, 88% { opacity: 1; transform: translateY(0); }
+        0%, 68%, 100% { opacity: 0; }
+        75%, 88% { opacity: 1; }
       }
       @keyframes caretBlink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: 0; } }
       @keyframes barA { 0%, 100% { transform: scaleY(0.55); opacity: 0.55; } 50% { transform: scaleY(1.22); opacity: 1; } }
@@ -63,8 +60,8 @@
     <text x="600" y="123" text-anchor="middle" font-size="15" font-weight="500" fill="#6e6e73">Press once to start, again to finish</text>
   </g>
 
-  <g id="capsule" transform="translate(552 168)" filter="url(#pillShadow)">
-    <rect id="demo-pill" x="0" y="0" width="96" height="52" rx="26" fill="#1c1c1e"/>
+  <g id="capsule" transform="translate(410 168)">
+    <rect id="demo-pill" x="0" y="0" width="380" height="52" rx="26" fill="#1c1c1e" filter="url(#pillShadow)"/>
     <g id="wave" transform="translate(22 16)">
       <rect class="bar-a" x="0" y="5.5" width="2.4" height="9" rx="1.2" fill="#ff453a"/>
       <rect class="bar-b" x="7" y="2.5" width="2.4" height="15" rx="1.2" fill="#ff453a"/>

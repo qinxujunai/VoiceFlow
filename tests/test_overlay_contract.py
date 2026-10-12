@@ -714,9 +714,9 @@ def test_readme_demo_uses_single_product_pill_state_machine():
 def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
     svg = (ROOT / "docs" / "voiceflow-demo.svg").read_text(encoding="utf-8")
 
-    assert 'width="96" height="52" rx="26"' in svg
-    assert "@keyframes pillState" in svg
-    assert "22%, 64% { width: 380px; }" in svg
+    assert 'width="380" height="52" rx="26"' in svg
+    assert '#demo-pill { width: 380px; }' in svg
+    assert '#demo-pill { animation: pillState' not in svg
     assert "prefers-reduced-motion: reduce" in svg
     assert "明早十点，把方案同步给团队。" in svg
     assert "按一下开始，再按一下完成" in svg
