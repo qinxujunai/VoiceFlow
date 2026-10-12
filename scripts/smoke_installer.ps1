@@ -241,7 +241,7 @@ try {
                 $candidate = Get-Content -Raw $runtimeState | ConvertFrom-Json
                 if (
                     $candidate.phase -eq "ready" -and
-                    ($candidate.hotkeys -eq "ready" -or ($DisableHotkeys -and $candidate.hotkeys -eq "disabled")) -and
+                    ($candidate.hotkeys -eq "ready" -or ($DisableHotkeys -and $candidate.hotkeys -eq "disabled_for_diagnostics")) -and
                     $candidate.worker -eq "ready" -and
                     $candidate.final_asr -eq "ready"
                 ) {
