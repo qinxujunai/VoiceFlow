@@ -21,6 +21,7 @@ from qt_compat import (
     QCheckBox, QComboBox, QMessageBox, QScrollArea,
     Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket, QEvent,
+    QIcon, QPixmap, QPainter, QPen, QColor, QRectF,
 )
 
 from tray_icon import (
@@ -270,7 +271,10 @@ class _SettingsWindow(QMainWindow):
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
         for label in ("听写", "词典", "历史"):
-            self.sidebar.addItem(QListWidgetItem(label))
+            item = QListWidgetItem(label)
+            item.setIcon(self._navigation_icon(self.sidebar.count()))
+            self.sidebar.addItem(item)
+        self.sidebar.setIconSize(QSize(20, 20))
         self.sidebar.setCurrentRow(0)
         self.sidebar.setAccessibleName("主要导航")
         sidebar_layout.addWidget(self.sidebar, 1)
@@ -314,6 +318,7 @@ class _SettingsWindow(QMainWindow):
         body.addWidget(content_container, 1)
         root.addLayout(body, 1)
         self.operation_feedback = QLabel()
+        self.operation_feedback.setObjectName("operationFeedback")
         self.operation_feedback.setWordWrap(True)
         self.operation_feedback.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.operation_feedback.setContentsMargins(24, 8, 24, 12)
@@ -384,6 +389,28 @@ class _SettingsWindow(QMainWindow):
         block.addWidget(sub)
         return block
 
+    def _navigation_icon(self, index):
+        image = QPixmap(40, 40)
+        image.setDevicePixelRatio(2)
+        image.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(image)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#c8c8d0"), 1.5))
+        if index == 0:
+            for x, height in ((5, 7), (10, 14), (15, 10)):
+                painter.drawLine(x, int(10 - height / 2), x, int(10 + height / 2))
+        elif index == 1:
+            painter.drawRoundedRect(QRectF(3, 3, 14, 14), 2, 2)
+            painter.drawLine(7, 3, 7, 17)
+            painter.drawLine(10, 7, 14, 7)
+            painter.drawLine(10, 11, 14, 11)
+        else:
+            painter.drawEllipse(QRectF(3, 3, 14, 14))
+            painter.drawLine(10, 6, 10, 10)
+            painter.drawLine(10, 10, 14, 12)
+        painter.end()
+        return QIcon(image)
+
     def _home_page(self):
         page = QWidget()
         page.setObjectName("contentPage")
@@ -404,6 +431,14 @@ class _SettingsWindow(QMainWindow):
         self.home_ready_subtitle.setWordWrap(True)
         intro.addWidget(self.home_ready_title)
         intro.addWidget(self.home_ready_subtitle)
+        shortcuts = QHBoxLayout()
+        shortcuts.setSpacing(8)
+        for text in ("F2", "右 Ctrl", "鼠标侧键"):
+            key = QLabel(text)
+            key.setObjectName("shortcutKey")
+            shortcuts.addWidget(key)
+        shortcuts.addStretch(1)
+        intro.addLayout(shortcuts)
         layout.addLayout(intro)
 
         self.onboarding_panel = QWidget()
@@ -1071,6 +1106,9 @@ class _SettingsWindow(QMainWindow):
             self.operation_feedback.setText(str(text))
             self.operation_details_button.hide()
             self.operation_feedback.setProperty("attention", bool(attention))
+            style = self.operation_feedback.style()
+            style.unpolish(self.operation_feedback)
+            style.polish(self.operation_feedback)
             self.operation_feedback.show()
             return
         if attention is None:
@@ -2235,16 +2273,16 @@ class _SettingsWindow(QMainWindow):
     def _style(self):
         return """
         * {
-            font-size: 14px;
+            font-size: 13px;
         }
         QWidget#appShell {
             background: #f7f7f8;
             color: #1d1d1f;
         }
         QWidget#sidebarPanel {
-            background: #f0f0f2;
+            background: #17171b;
             border: none;
-            border-right: 1px solid #dedee3;
+            border-right: 1px solid #29292f;
             border-radius: 0px;
         }
         QLabel#brandIcon {
@@ -2252,9 +2290,9 @@ class _SettingsWindow(QMainWindow):
             min-height: 32px;
         }
         QLabel#appTitle {
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 650;
-            color: #1d1d1f;
+            color: #f5f5f7;
         }
         QScrollArea#settingsPageScroll {
             background: #ffffff;
@@ -2264,19 +2302,20 @@ class _SettingsWindow(QMainWindow):
             color: #6e6e73;
         }
         QLabel#appSubtitle, QLabel#sidebarVersion {
-            font-size: 12px;
-            color: #6b6b70;
+            font-size: 11px;
+            color: #a7a7b1;
         }
         QLabel#statusBadge {
-            padding: 7px 2px;
-            background: transparent;
-            color: #6b6b70;
+            padding: 10px 12px;
+            background: #242429;
+            color: #b6dfc2;
+            border-radius: 10px;
             border: none;
             font-weight: 600;
         }
         QLabel#statusBadge[attention="true"] {
-            color: #9a5b00;
-            background: transparent;
+            color: #edbe78;
+            background: #242429;
         }
         QListWidget#sidebar {
             background: transparent;
@@ -2284,15 +2323,16 @@ class _SettingsWindow(QMainWindow):
             outline: none;
         }
         QListWidget#sidebar::item {
-            min-height: 38px;
+            min-height: 42px;
             padding-left: 12px;
-            border-radius: 9px;
-            color: #515154;
+            border-radius: 10px;
+            color: #b6b6c0;
         }
         QListWidget#sidebar::item:selected {
-            background: #e4e4e9;
-            color: #1d1d1f;
+            background: #303037;
+            color: #ffffff;
             border: none;
+            border-left: 3px solid #ff453a;
             font-weight: 600;
         }
         QStackedWidget#contentStack {
@@ -2314,7 +2354,7 @@ class _SettingsWindow(QMainWindow):
             color: #1d1d1f;
         }
         QLabel#commandTitle {
-            font-size: 27px;
+            font-size: 30px;
             font-weight: 650;
             color: #1d1d1f;
         }
@@ -2328,9 +2368,9 @@ class _SettingsWindow(QMainWindow):
             font-weight: 600;
         }
         QWidget#dictationSettingsPanel {
-            background: #fbfbfc;
-            border: 1px solid #e5e5e8;
-            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid #e7e7ec;
+            border-radius: 18px;
         }
         QLabel#systemStatusItem {
             color: #4d4d50;
@@ -2370,7 +2410,7 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#diagnosticSummary {
             color: #3a3a3c;
-            background: #f0f6ff;
+            background: #f6f6f8;
             border: 1px solid #ececf0;
             border-radius: 12px;
             padding: 13px;
@@ -2404,10 +2444,34 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#privacyNote {
             color: #515154;
-            background: #f0f6ff;
-            border: 1px solid #dce9fb;
+            background: #f6f6f8;
+            border: 1px solid #e4e4e9;
             border-radius: 11px;
             padding: 11px 13px;
+        }
+        QWidget#sidebarPanel QPushButton {
+            color: #d6d6de;
+            background: #232329;
+            border: 1px solid #34343c;
+        }
+        QWidget#sidebarPanel QPushButton:hover { background: #303037; }
+        QListWidget#sidebar::item:hover { background: #25252c; }
+        QLabel#shortcutKey {
+            color: #56565f;
+            background: #f3f3f6;
+            border: 1px solid #e7e7eb;
+            border-radius: 7px;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        QLabel#operationFeedback {
+            color: #285b3a;
+            background: #f1f7f3;
+            border-top: 1px solid #e0ebe3;
+        }
+        QLabel#operationFeedback[attention="true"] {
+            color: #874914;
+            background: #fff5ec;
         }
         QLabel#fieldValue {
             color: #1d1d1f;
@@ -2424,7 +2488,7 @@ class _SettingsWindow(QMainWindow):
             selection-color: #ffffff;
         }
         QComboBox {
-            min-height: 18px;
+            min-height: 24px;
             padding: 6px 11px;
         }
         QComboBox::drop-down {
@@ -2448,8 +2512,8 @@ class _SettingsWindow(QMainWindow):
         QListWidget#diagnosticList::item:selected,
         QListWidget#dictionaryList::item:selected {
             color: #1d1d1f;
-            background: #eef5ff;
-            border: 1px solid #c8dfff;
+            background: #fff3f1;
+            border: 1px solid #eec7c2;
         }
         QWidget#historyCard, QWidget#emptyCard,
         QWidget#diagnosticCard {

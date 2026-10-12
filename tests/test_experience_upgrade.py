@@ -175,6 +175,17 @@ def test_single_save_does_not_check_model_or_send_feedback_to_sidebar(settings_u
     assert ui.operation_feedback.width() <= ui.width()
 
 
+def test_feedback_changes_from_success_to_failure_without_stale_green(settings_ui):
+    app, ui, _store = settings_ui
+    ui.show()
+    ui._set_status_badge("已保存", attention=False)
+    app.processEvents()
+    assert ui.operation_feedback.palette().windowText().color().name() == "#285b3a"
+    ui._set_status_badge("保存失败，请重试", attention=True)
+    app.processEvents()
+    assert ui.operation_feedback.palette().windowText().color().name() == "#874914"
+
+
 def test_dictionary_search_selection_undo_retains_subsequent_additions(settings_ui):
     from qt_compat import Qt
     app, ui, _store = settings_ui
