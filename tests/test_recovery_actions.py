@@ -107,7 +107,7 @@ def test_manual_first_use_confirmation_requires_user_attestation(window):
     assert not ui._onboarding_save_in_progress
     assert onboarding_completed(ui.paths.config_file)
     assert ui.onboarding_panel.isHidden()
-    assert "已确认" in ui.status_badge.text()
+    assert "已确认" in ui.operation_feedback.text()
 
 
 def test_first_use_save_failure_never_claims_completion(window, monkeypatch):
@@ -127,4 +127,4 @@ def test_first_use_save_failure_never_claims_completion(window, monkeypatch):
         time.sleep(.005)
     assert not onboarding_completed(ui.paths.config_file)
     assert not ui.onboarding_panel.isHidden()
-    assert "未保存" in ui.status_badge.text()
+    assert "未保存" in ui.operation_feedback.text()

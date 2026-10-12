@@ -7,12 +7,71 @@ import plistlib
 import re
 import sys
 import threading
+import copy
+from dataclasses import asdict
 from functools import wraps
 from pathlib import Path
 
 
 MACOS_LAUNCH_AGENT_LABEL = "ai.voiceflow.app"
 _config_update_lock = threading.RLock()
+
+
+def save_settings_transaction(paths, preferences, payload):
+    """Commit one viewed draft, retaining old values on any write failure."""
+    import yaml
+    from dictation_preferences import PreferencesChangedError, normalize_app_id
+
+    engine, language = payload["engine"], payload["language"]
+    device = payload["device_index"]
+    enabled = payload["autostart"]
+    if (engine != "sensevoice" or language not in {"auto", "zh", "en", "ja", "ko", "yue"}
+            or isinstance(device, bool) or device is not None and (not isinstance(device, int) or device < 0)
+            or not isinstance(enabled, bool)):
+        raise ValueError("invalid runtime settings")
+    draft = payload["preferences"]
+    if draft.get("schema_version") != 1 or not isinstance(draft.get("apps"), dict) or len(draft["apps"]) > 128:
+        raise ValueError("invalid preferences schema")
+    candidate = {"schema_version": 1, "global": asdict(preferences._validate_options(draft["global"])),
+                 "apps": {normalize_app_id(key): asdict(preferences._validate_options(value))
+                          for key, value in draft["apps"].items()}}
+    with _config_update_lock, preferences._write_lock:
+        before = paths.config_file.read_bytes()
+        config_text = before.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        if config_text != payload["expected_config"] or preferences.snapshot() != payload["expected_preferences"]:
+            raise PreferencesChangedError("settings changed; reload before saving")
+        config = yaml.safe_load(config_text) or {}
+        restart = (config.get("engine", {}).get(engine, {}).get("language") != language
+                   or config.get("audio", {}).get("device_index") != device)
+        previous_autostart = is_autostart_enabled(paths)
+        autostart_snapshot = read_autostart_state()
+        try:
+            if restart:
+                update_runtime_settings(paths.config_file, engine=engine, language=language, device_index=device)
+            if enabled != previous_autostart:
+                set_autostart(paths, enabled)
+            preferences._write(candidate)
+        except Exception:
+            rollback_errors = []
+            try:
+                temporary = paths.config_file.with_suffix(".rollback.tmp")
+                temporary.write_bytes(before)
+                os.replace(temporary, paths.config_file)
+            except Exception as error:
+                rollback_errors.append(str(error))
+            if enabled != previous_autostart:
+                try:
+                    restore_autostart_state(autostart_snapshot)
+                except Exception as error:
+                    rollback_errors.append(str(error))
+            if rollback_errors:
+                raise RuntimeError("settings rollback failed: " + "; ".join(rollback_errors))
+            raise
+        with preferences._lock:
+            preferences._payload = copy.deepcopy(candidate)
+            preferences.load_error = False
+        return {"restart_required": restart, "preferences": candidate,
+                "config_text": paths.config_file.read_text(encoding="utf-8")}
 
 
 def _serialized_config_update(update):
@@ -200,6 +259,42 @@ def is_autostart_enabled(root) -> bool:
         return value == autostart_command(root)
     except OSError:
         return False
+
+
+def read_autostart_state():
+    if sys.platform == "darwin":
+        path = _macos_launch_agent_path()
+        return path.read_bytes() if path.exists() else None
+    if sys.platform == "win32":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
+                return winreg.QueryValueEx(key, "VoiceFlow")
+        except FileNotFoundError:
+            return None
+    return None
+
+
+def restore_autostart_state(snapshot):
+    if sys.platform == "darwin":
+        path = _macos_launch_agent_path()
+        if snapshot is None:
+            path.unlink(missing_ok=True)
+        else:
+            temporary = path.with_suffix(".rollback.tmp")
+            temporary.write_bytes(snapshot)
+            os.replace(temporary, path)
+    elif sys.platform == "win32":
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
+            if snapshot is None:
+                try:
+                    winreg.DeleteValue(key, "VoiceFlow")
+                except FileNotFoundError:
+                    pass
+            else:
+                value, value_type = snapshot
+                winreg.SetValueEx(key, "VoiceFlow", 0, value_type, value)
 
 
 def set_autostart(root, enabled: bool) -> None:

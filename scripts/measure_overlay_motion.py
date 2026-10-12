@@ -296,7 +296,10 @@ def main():
               and all(0.72 <= value["fillRatio"] <= 1.02 for value in fill.values()))
     result = {"renderer": "native-qt", "passed": passed, "frames": frames,
               "first_paint_ack_ms": painted[0]["elapsed_ms"] if painted else None,
-              "intervals_ms": intervals, "language_fill": fill}
+              "intervals_ms": intervals, "language_fill": fill,
+              "recording_frame_intervals_ms": list(view.frame_intervals_ms),
+              "recording_paint_durations_ms": list(view.paint_durations_ms),
+              "evidence_scope": "native Qt event-loop and paint measurement; no microphone or ASR"}
     view.close()
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if passed else 1

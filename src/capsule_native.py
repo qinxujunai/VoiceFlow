@@ -149,6 +149,9 @@ class NativeCapsuleView(QWidget):
         self.frame_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.frame_timer.setInterval(16)
         self.frame_timer.timeout.connect(self._animate)
+        self.frame_intervals_ms = deque(maxlen=2048)
+        self.paint_durations_ms = deque(maxlen=2048)
+        self._last_recording_paint = None
 
     @Slot(str, object)
     def present(self, command, args):
@@ -156,6 +159,9 @@ class NativeCapsuleView(QWidget):
         self._refresh_motion_preference(now)
         announcement = None
         if command == "prepare_recording":
+            self.frame_intervals_ms.clear()
+            self.paint_durations_ms.clear()
+            self._last_recording_paint = None
             self.state.prepare_recording(*args)
             self._width = self._width_start = self._target_width = self.MIN_WIDTH
             self._width_changed_at = now
@@ -227,7 +233,9 @@ class NativeCapsuleView(QWidget):
 
     def _retarget_width(self, now):
         text_width = QFontMetricsF(self.font()).horizontalAdvance(self.state.text)
-        target = min(self.MAX_WIDTH, max(self.MIN_WIDTH, 62.0 + text_width)) if self.state.text else self.MIN_WIDTH
+        # Reserve room in small steps so each new glyph does not restart growth.
+        required = 62.0 + text_width
+        target = min(self.MAX_WIDTH, max(self.MIN_WIDTH, 96.0 + max(0, math.ceil((required - 96.0) / 48.0)) * 48.0)) if self.state.text else self.MIN_WIDTH
         if self.state.mode == "streaming":
             target = max(self._target_width, target, 96.0)
         if target != self._target_width:
@@ -293,6 +301,7 @@ class NativeCapsuleView(QWidget):
     def paintEvent(self, _event):
         if self.state.mode == "idle":
             return
+        paint_started = time.perf_counter()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         high_contrast = self._high_contrast_active
@@ -339,12 +348,20 @@ class NativeCapsuleView(QWidget):
         text = self.state.text
         metrics = QFontMetricsF(self.font())
         graphemes = split_graphemes(text)
-        while graphemes and metrics.horizontalAdvance("".join(graphemes)) > text_rect.width():
+        # Crop against the fixed capacity, never the in-flight animated width.
+        # Growing the pill must not replay a previously hidden prefix.
+        while graphemes and metrics.horizontalAdvance("".join(graphemes)) > self.MAX_WIDTH - 50:
             graphemes.pop(0)
         painter.setFont(self.font())
         painter.setPen(foreground)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "".join(graphemes))
+        painter.setClipRect(text_rect)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "".join(graphemes))
         painter.end()
+        if self.state.mode in {"listening", "streaming"}:
+            if self._last_recording_paint is not None:
+                self.frame_intervals_ms.append((paint_started - self._last_recording_paint) * 1000)
+            self._last_recording_paint = paint_started
+            self.paint_durations_ms.append((time.perf_counter() - paint_started) * 1000)
         generation = self.state.generation
         if self.state.mode == "streaming" and text and self._painted_generation != generation:
             self._painted_generation = generation
