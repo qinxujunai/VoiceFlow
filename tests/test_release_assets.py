@@ -42,6 +42,17 @@ def frozen_build(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
     monkeypatch.setattr("generate_release_assets._checked_asr_runtime", lambda path: ([], {}))
+    # This installer fixture contains the ordinary ASR models, not optional
+    # punctuation weights. It must not depend on downloading that extra asset.
+    import generate_release_assets as release_assets
+    manifest = json.loads((PROJECT_ROOT / "model-manifest.json").read_text(encoding="utf-8"))
+    manifest["models"] = {key: value for key, value in manifest["models"].items()
+                          if value.get("role") != "final_punctuation"}
+    fixture_manifest = tmp_path / "model-manifest.json"
+    fixture_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+    model_components = release_assets._model_components
+    monkeypatch.setattr(release_assets, "_model_components",
+                        lambda path: model_components(fixture_manifest))
 
     package = tmp_path / "package"
     package.mkdir()
