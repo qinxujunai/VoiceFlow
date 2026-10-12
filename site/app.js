@@ -1,7 +1,7 @@
 const copy = {
   zh: {
     title: "VoiceFlow — 让想法成文",
-    description: "让想法成文。VoiceFlow 是 Windows 上的离线语音输入工具，陪你写邮件、记灵感、回消息。",
+    description: "VoiceFlow：Windows 离线语音输入。在当前输入框听写，与 AI 对话、写邮件、回消息。完整终稿保留在剪贴板和本地历史，无需登录。",
     brandHome: "VoiceFlow 首页",
     primaryNav: "主要导航",
     languageSwitch: "语言",
@@ -12,61 +12,61 @@ const copy = {
     navDownload: "下载",
     navPrivacy: "体验",
     navGithub: "GitHub",
-    heroEyebrow: "VoiceFlow · 为你的表达而来",
-    heroTitle: "开口。",
-    heroTitleSecond: "让想法成文。",
-    heroLede: "把邮件、消息和灵感说出来。声音化为文字，你继续眼前的事。",
+    heroEyebrow: "Windows 离线语音输入",
+    heroTitle: "让想法成文。",
+    heroTitleSecond: "按一下，说出你的话。",
+    heroLede: "与 AI 对话、写邮件、回消息，文字回到你正在使用的输入框。无需切换应用，无需登录。",
     downloadVoiceFlow: "下载 VoiceFlow",
     watchDemo: "看看它如何工作",
     viewGithub: "查看 GitHub",
     compatibility: "Windows 10 / 11 · x64 · v__VOICEFLOW_VERSION__",
     releaseStatus: "为 Windows 而设计 · 离线使用 · 无需登录",
-    filmCaption: "一枚小胶囊。从开口，到落笔。",
-    filmTag: "产品演示",
-    flowEyebrow: "跟得上表达，也容得下思路。",
-    flowTitleSecond: "继续你的事。",
-    demoAlt: "VoiceFlow 听写时显示文字，完成后收起",
+    filmCaption: "按 F2 开始 → 说话 → 再按 F2 完成",
+    filmTag: "流程示意",
+    flowEyebrow: "少打字，少切换",
+    flowTitleSecond: "直接说下去。",
+    demoAlt: "VoiceFlow 在当前输入框听写的流程示意",
     demoSrc: "assets/voiceflow-demo.svg",
     privacyHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/docs/help.zh-CN.md#隐私与联网",
     helpHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/docs/help.zh-CN.md",
-    valueOfflineLabel: "表达，属于你。",
+    valueOfflineLabel: "本机处理，无需账户",
     valueOffline: "完全离线",
     valueOfflineBody: "安装后即可离线听写。录音和识别都在你的电脑上完成，不需要账户，也不上传录音。",
     valueEverywhereLabel: "思路不中断",
-    valueEverywhere: "说出你的想法。",
-    valueEverywhereBody: "光标在哪里，表达就从哪里开始。按一下 F2 开口，再按一下完成。",
-    valueRecoveryLabel: "表达，自有你的习惯。",
-    valueRecovery: "连句末，",
-    personalTitleSecond: "也由你决定。",
-    valueRecoveryBody: "聊天时省略句号，写作时保留标点。选好自己的习惯，下一次开口就照着来。",
-    personalNote: "保留标点、省略最后一个句号，或补全句末句号。问号和感叹号仍会保留。",
+    valueEverywhere: "你正在做的事，",
+    valueEverywhereBody: "用快捷键在当前输入框听写。说完继续工作，不用打开另一款转写工具再搬运文字。",
+    valueRecoveryLabel: "专有词与文字习惯",
+    valueRecovery: "你的词，",
+    personalTitleSecond: "按你的习惯。",
+    valueRecoveryBody: "添加人名、品牌和项目名，规范英文术语大小写。用纠错词对指定容易识别错的词该怎么写。",
+    personalNote: "词典在本地维护。句末标点可按应用设置；代码编辑器和终端默认保留格式。",
     privacyEyebrow: "为安静的工作流而设计",
-    privacyTitle: "你的话。",
-    privacyTitleSecond: "留在你的电脑。",
+    privacyTitle: "录音与识别，",
+    privacyTitleSecond: "都在你的电脑。",
     privacyBody: "录音时，小胶囊伴随你的表达。听写留在本地历史，随时可以回看、复制，接着写。",
     privacyLink: "了解隐私",
-    sceneNotes: "记灵感",
-    noteDate: "一个想法",
-    noteTitle: "先把灵感留下。",
-    noteBody: "做一个更安静的工具，让人专注在想说的话上。",
-    noteCaption: "想法刚来，先说下来。",
+    sceneNotes: "与 AI 对话",
+    noteDate: "一个完整的需求",
+    noteTitle: "把上下文一起说清楚。",
+    noteBody: "请比较这两份方案的成本与风险，列出差异，再给出你的建议。",
+    noteCaption: "适合高频追问、补充上下文和描述复杂需求。",
     sceneMail: "写邮件",
     mailLabel: "项目近况",
     mailBody: "这周的方案已经整理好了。明天一起看看，再把细节往前推一步。",
-    mailCaption: "把一段思路，说清楚。",
+    mailCaption: "把完整思路输入邮件，不用一句句敲出来。",
     sceneChat: "回消息",
     chatIncoming: "周末一起吃饭？",
     chatOutgoing: "好呀，那家店我也想去",
     chatCompose: "接着聊…",
-    chatCaption: "像说话一样，回一句。",
+    chatCaption: "在聊天输入框听写，说完就接着聊。",
     sceneArtNote: "使用场景示意。部分应用需要手动粘贴。",
-    quietEyebrow: "小一点。专注，多一点。",
-    quietTitle: "只占一点目光。",
-    quietTitleSecond: "留出整片思路。",
-    quietBody: "开始说话，一枚小胶囊陪你表达。你看到文字，把注意力留给想法。",
+    quietEyebrow: "输入受限，也有下一步",
+    quietTitle: "说完的话，",
+    quietTitleSecond: "有地方找回。",
+    quietBody: "先把终稿复制到剪贴板，再尝试粘贴到目标应用。未确认输入时，明确提示手动粘贴。",
     capsuleAria: "黑色听写胶囊与红色录音指示",
-    capsuleText: "把这个想法，记下来。",
-    capsuleArtNote: "听写界面示意",
+    capsuleText: "已复制到剪贴板",
+    capsuleArtNote: "自动输入受限时的恢复提示示意",
     endingChat: "一句日常",
     endingChatText: "我到楼下啦",
     endingChatMode: "省略句号",
@@ -79,8 +79,8 @@ const copy = {
     historyEarlier: "之前",
     historyEarlierText: "记得给这个周末留一点空白。",
     historyNote: "留在本机。随时回看、复制。",
-    downloadTitle: "下一句话。",
-    downloadTitleSecond: "从开口开始。",
+    downloadTitle: "用说话代替打字。",
+    downloadTitleSecond: "从下一次输入开始。",
     releaseLink: "看看这次的更新 ↗",
     faqStart: "怎样开始？",
     faqStartBody: "把光标放进输入框，按 F2 开始，说完再按 F2。也可以使用右 Ctrl 或鼠标侧键；Esc 取消。",
@@ -94,11 +94,26 @@ const copy = {
     footerHelp: "使用帮助",
     footerSource: "GitHub",
     footerLicenses: "许可",
-    footerIssues: "反馈"
+    footerIssues: "反馈",
+    demoApp: "与 AI 对话",
+    demoContext: "说清楚你的需求，不用先把整段话打出来。",
+    demoPlaceholder: "在这里输入你的问题…",
+    demoReplay: "重播",
+    demoPause: "暂停",
+    demoResume: "继续",
+    demoText: "请比较这两份方案的成本与风险，再给出你的建议。",
+    demoStart: "按 F2 · 开始录音",
+    demoSpeaking: "正在说话 · 文字预览",
+    demoFinish: "再按 F2 · 完成识别",
+    demoDone: "终稿回到输入框 · 演示结束",
+    safeClipboard: "先复制，再输入。",
+    safeClipboardBody: "自动粘贴受限时，在目标输入框按 Ctrl+V。听写完成后的文字保留在剪贴板，不恢复成之前的内容。",
+    safeHistory: "完整终稿，可以找回。",
+    safeHistoryBody: "停止后处理完整录音，预览不会覆盖终稿。结果保存到本地历史，可回看和复制；未交付录音有本地恢复入口。",
   },
   en: {
     title: "VoiceFlow — Let ideas take shape",
-    description: "Let ideas take shape. Offline dictation for Windows, for the emails, messages and ideas you want to put into words.",
+    description: "VoiceFlow is offline voice typing for Windows. Dictate at your cursor for AI conversations, email and messages. Final text stays in your clipboard and local history. No account required.",
     brandHome: "VoiceFlow home",
     primaryNav: "Primary navigation",
     languageSwitch: "Language",
@@ -109,61 +124,61 @@ const copy = {
     navDownload: "Download",
     navPrivacy: "Experience",
     navGithub: "GitHub",
-    heroEyebrow: "VoiceFlow · Made for your words",
-    heroTitle: "Speak.",
-    heroTitleSecond: "Let ideas take shape.",
-    heroLede: "Say the email. The message. The idea. Turn your voice into words and stay with what you are doing.",
+    heroEyebrow: "Offline voice typing for Windows",
+    heroTitle: "Let ideas take shape.",
+    heroTitleSecond: "Press once. Say what you mean.",
+    heroLede: "Talk to AI, write email and reply to messages. Your words go to the text field you are already using. No app switching. No account.",
     downloadVoiceFlow: "Download VoiceFlow",
     watchDemo: "See it in action",
     viewGithub: "View on GitHub",
     compatibility: "Windows 10 / 11 · x64 · v__VOICEFLOW_VERSION__",
     releaseStatus: "Made for Windows · Works offline · No sign-in",
-    filmCaption: "One small capsule. From a thought to a word.",
-    filmTag: "Product demo",
-    flowEyebrow: "Room for your words. Room for your thoughts.",
-    flowTitleSecond: "Stay with your work.",
-    demoAlt: "The VoiceFlow capsule shows words during dictation and disappears when you finish",
+    filmCaption: "Press F2 → Speak → Press F2 to finish",
+    filmTag: "Illustrated workflow",
+    flowEyebrow: "Less typing. Less switching.",
+    flowTitleSecond: "Just say it.",
+    demoAlt: "Illustrated VoiceFlow dictation workflow at the current cursor",
     demoSrc: "assets/voiceflow-demo.en.svg",
     privacyHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/docs/help.en.md#privacy-and-networking",
     helpHref: "https://github.com/qinxujunai/VoiceFlow/blob/master/docs/help.en.md",
-    valueOfflineLabel: "Your words belong to you.",
+    valueOfflineLabel: "On your PC. No account.",
     valueOffline: "Entirely offline",
     valueOfflineBody: "Dictate offline after installation. Recording and recognition stay on your PC. No account. No audio upload.",
     valueEverywhereLabel: "Stay in your flow",
-    valueEverywhere: "Say what is on your mind.",
-    valueEverywhereBody: "Start where your cursor is. Press F2 to speak, then press again to finish.",
-    valueRecoveryLabel: "Your words. Your habits.",
-    valueRecovery: "Even the ending.",
-    personalTitleSecond: "Your choice.",
-    valueRecoveryBody: "Skip the final period in a chat. Keep punctuation when writing. Choose once, and bring your preference to the next dictation.",
-    personalNote: "Keep punctuation, omit the final period, or add a final period. Question marks and exclamation marks stay.",
+    valueEverywhere: "Keep working.",
+    valueEverywhereBody: "Dictate at your cursor with a shortcut. Continue in the same app without transferring text from a separate transcription tool.",
+    valueRecoveryLabel: "Your vocabulary and writing preferences",
+    valueRecovery: "Your words.",
+    personalTitleSecond: "Your preferences.",
+    valueRecoveryBody: "Add names, brands and project terms. Normalize English terminology and specify correction pairs for frequently misrecognized words.",
+    personalNote: "Maintain vocabulary locally. Set final punctuation per app; code editors and terminals preserve formatting by default.",
     privacyEyebrow: "Designed for a quiet workflow",
-    privacyTitle: "Your voice.",
-    privacyTitleSecond: "Your computer.",
+    privacyTitle: "Recording and recognition.",
+    privacyTitleSecond: "On your own computer.",
     privacyBody: "A small capsule follows your words as you speak. Your dictation stays in local history, ready to revisit, copy and keep writing.",
     privacyLink: "About privacy",
-    sceneNotes: "Capture an idea",
-    noteDate: "A thought",
-    noteTitle: "Keep the spark.",
-    noteBody: "Make a quieter tool. Give people room to focus on what they want to say.",
-    noteCaption: "When an idea comes, say it.",
+    sceneNotes: "Talk to AI",
+    noteDate: "A complete request",
+    noteTitle: "Give the full context.",
+    noteBody: "Compare the costs and risks of these two proposals. List the differences and recommend an approach.",
+    noteCaption: "For frequent follow-ups, added context and detailed requests.",
     sceneMail: "Write an email",
     mailLabel: "A project update",
     mailBody: "The proposal is ready. Let us take a look tomorrow and work through the next steps.",
-    mailCaption: "Give a thought a little more room.",
+    mailCaption: "Put a complete thought into an email without typing each sentence.",
     sceneChat: "Send a reply",
     chatIncoming: "Dinner this weekend?",
     chatOutgoing: "Yes! I have wanted to try that place",
     chatCompose: "Keep the conversation going…",
-    chatCaption: "A reply, just as you would say it.",
+    chatCaption: "Dictate in the chat field and keep the conversation going.",
     sceneArtNote: "Illustrative use cases. Some apps require manual paste.",
-    quietEyebrow: "A little less interface. A little more focus.",
-    quietTitle: "A small presence.",
-    quietTitleSecond: "Space to think.",
-    quietBody: "A small capsule follows your words as you speak. See the text and keep your attention on the thought.",
+    quietEyebrow: "A fallback when input is restricted",
+    quietTitle: "Your final text.",
+    quietTitleSecond: "Ready to recover.",
+    quietBody: "Final text is copied before a paste is attempted. If insertion is unconfirmed, the app tells you to paste manually.",
     capsuleAria: "Black dictation capsule with a red recording indicator",
-    capsuleText: "Keep that thought.",
-    capsuleArtNote: "Dictation interface illustration",
+    capsuleText: "Copied to clipboard",
+    capsuleArtNote: "Illustrated fallback when automatic input is restricted",
     endingChat: "An everyday reply",
     endingChatText: "I am downstairs",
     endingChatMode: "No final period",
@@ -176,8 +191,8 @@ const copy = {
     historyEarlier: "Earlier",
     historyEarlierText: "Leave a little room in the weekend.",
     historyNote: "Saved on your PC. Ready to revisit and copy.",
-    downloadTitle: "Your next thought.",
-    downloadTitleSecond: "Start by speaking.",
+    downloadTitle: "Speak instead of typing.",
+    downloadTitleSecond: "Start with your next input.",
     releaseLink: "See what is new ↗",
     faqStart: "How do I start?",
     faqStartBody: "Place your cursor in a text field. Press F2 to start and again to finish. Right Ctrl and mouse side buttons also work. Press Esc to cancel.",
@@ -191,7 +206,22 @@ const copy = {
     footerHelp: "Help",
     footerSource: "GitHub",
     footerLicenses: "Licenses",
-    footerIssues: "Feedback"
+    footerIssues: "Feedback",
+    demoApp: "Talk to AI",
+    demoContext: "Explain your request without typing every word.",
+    demoPlaceholder: "Type your question here…",
+    demoReplay: "Replay",
+    demoPause: "Pause",
+    demoResume: "Resume",
+    demoText: "Compare the costs and risks of these two proposals, then recommend an approach.",
+    demoStart: "Press F2 · Start recording",
+    demoSpeaking: "Speaking · Text preview",
+    demoFinish: "Press F2 again · Finish recognition",
+    demoDone: "Final text in the field · Demo complete",
+    safeClipboard: "Copy first. Then paste.",
+    safeClipboardBody: "If automatic paste is restricted, press Ctrl+V in the target field. Your final text stays in the clipboard; the previous clipboard is not restored.",
+    safeHistory: "The complete final text, kept locally.",
+    safeHistoryBody: "The complete stopped recording is processed; preview never overwrites the final result. Revisit and copy results in local history, or recover an undelivered local recording.",
   }
 };
 
@@ -208,6 +238,10 @@ function setLanguage(language) {
   document.title = copy[selected].title;
   document.querySelector('meta[name="description"]').content =
     copy[selected].description;
+  const socialDescription = document.querySelector('meta[property="og:description"]');
+  if (socialDescription) socialDescription.content = copy[selected].description;
+  const socialTitle = document.querySelector('meta[property="og:title"]');
+  if (socialTitle) socialTitle.content = copy[selected].title;
 
   translatable.forEach((element) => {
     const key = element.dataset.i18n;
@@ -250,6 +284,7 @@ function setLanguage(language) {
       String(button.dataset.language === selected)
     );
   });
+  if (typeof resetDemo === "function") resetDemo();
 
   const url = new URL(window.location.href);
   if (selected === "en") {
@@ -265,4 +300,44 @@ languageButtons.forEach((button) => {
 });
 
 const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
+
+const demo = document.querySelector(".live-demo");
+const transcript = document.querySelector("#demo-transcript");
+const output = document.querySelector("#demo-output");
+const status = document.querySelector("#demo-status");
+const pause = document.querySelector("#demo-pause");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+let demoTimer;
+let demoStep = 0;
+let demoPaused = false;
+function demoCopy() { return copy[document.documentElement.lang === "en" ? "en" : "zh"]; }
+function renderDemo() {
+  const words = demoCopy();
+  const count = Math.max(0, Math.floor((demoStep - 10) / 2));
+  const finished = demoStep >= 14 + words.demoText.length * 2;
+  demo.dataset.state = finished ? "done" : demoStep < 10 ? "ready" : count >= words.demoText.length ? "finishing" : "speaking";
+  transcript.textContent = demoStep < 10 ? "F2" : words.demoText.slice(0, count);
+  output.textContent = finished ? words.demoText : words.demoPlaceholder;
+  status.textContent = finished ? words.demoDone : demoStep < 10 ? words.demoStart : count >= words.demoText.length ? words.demoFinish : words.demoSpeaking;
+  pause.textContent = demoPaused ? words.demoResume : words.demoPause;
+  pause.setAttribute("aria-pressed", String(demoPaused));
+  if (finished) clearInterval(demoTimer);
+}
+function resetDemo() {
+  clearInterval(demoTimer);
+  if (!demo) return;
+  demoPaused = reducedMotion.matches;
+  demoStep = reducedMotion.matches ? 14 + demoCopy().demoText.length * 2 : 0;
+  renderDemo();
+  if (!reducedMotion.matches) demoTimer = setInterval(() => {
+    if (!demoPaused && !document.hidden) { demoStep += 1; renderDemo(); }
+  }, 80);
+}
+pause?.addEventListener("click", () => {
+  const finished = demoStep >= 14 + demoCopy().demoText.length * 2;
+  if (finished) { resetDemo(); return; }
+  demoPaused = !demoPaused; renderDemo();
+});
+document.querySelector("#demo-replay")?.addEventListener("click", resetDemo);
+reducedMotion.addEventListener("change", resetDemo);
 setLanguage(requestedLanguage || "zh");

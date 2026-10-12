@@ -244,8 +244,8 @@ def test_product_site_has_complete_bilingual_copy_and_truthful_social_image():
 
     assert html_keys <= zh_keys
     assert html_keys <= en_keys
-    assert 'property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-demo.svg"' in index
-    assert "voiceflow-demo.svg" in index
+    assert 'property="og:image" content="https://qinxujunai.github.io/VoiceFlow/assets/voiceflow-share.png"' in index
+    assert 'id="demo-transcript"' in index
     assert "voiceflow-app-home" not in index
     assert "voiceflow-ambient" not in index
 
@@ -259,7 +259,7 @@ def test_product_site_localizes_demo_links_and_accessibility_labels():
 
     for key in ("brandHome", "primaryNav", "languageSwitch", "valuesAria"):
         assert f'data-i18n-aria="{key}"' in index
-    assert 'data-i18n-src="demoSrc"' in index
+    assert 'data-i18n-aria="demoAlt"' in index
     assert 'data-i18n-href="privacyHref"' in index
     assert 'demoSrc: "assets/voiceflow-demo.en.svg"' in copy
     assert "docs/help.en.md#privacy-and-networking" in copy
