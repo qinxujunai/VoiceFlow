@@ -98,14 +98,13 @@ const copy = {
     demoApp: "与 AI 对话",
     demoContext: "说清楚你的需求，不用先把整段话打出来。",
     demoPlaceholder: "在这里输入你的问题…",
-    demoReplay: "重播",
     demoPause: "暂停",
     demoResume: "继续",
     demoText: "请比较这两份方案的成本与风险，再给出你的建议。",
     demoStart: "按 F2 · 开始录音",
     demoSpeaking: "正在说话 · 文字预览",
     demoFinish: "再按 F2 · 完成识别",
-    demoDone: "终稿回到输入框 · 演示结束",
+    demoDone: "终稿回到输入框",
     safeClipboard: "先复制，再输入。",
     safeClipboardBody: "自动粘贴受限时，在目标输入框按 Ctrl+V。听写完成后的文字保留在剪贴板，不恢复成之前的内容。",
     safeHistory: "完整终稿，可以找回。",
@@ -210,14 +209,13 @@ const copy = {
     demoApp: "Talk to AI",
     demoContext: "Explain your request without typing every word.",
     demoPlaceholder: "Type your question here…",
-    demoReplay: "Replay",
     demoPause: "Pause",
     demoResume: "Resume",
     demoText: "Compare the costs and risks of these two proposals, then recommend an approach.",
     demoStart: "Press F2 · Start recording",
     demoSpeaking: "Speaking · Text preview",
     demoFinish: "Press F2 again · Finish recognition",
-    demoDone: "Final text in the field · Demo complete",
+    demoDone: "Final text in the field",
     safeClipboard: "Copy first. Then paste.",
     safeClipboardBody: "If automatic paste is restricted, press Ctrl+V in the target field. Your final text stays in the clipboard; the previous clipboard is not restored.",
     safeHistory: "The complete final text, kept locally.",
@@ -340,7 +338,7 @@ function renderDemo() {
   demo.dataset.paused = String(demoPaused || document.hidden || !demoVisible);
   pause.textContent = demoPaused ? words.demoResume : words.demoPause;
   pause.setAttribute("aria-pressed", String(demoPaused));
-  pause.disabled = finished;
+  pause.disabled = reducedMotion.matches;
   return finished;
 }
 function animateDemo(timestamp) {
@@ -348,15 +346,20 @@ function animateDemo(timestamp) {
   const elapsed = demoLastFrame === undefined ? 0 : timestamp - demoLastFrame;
   demoLastFrame = timestamp;
   demoElapsed += Math.min(elapsed, 64);
-  const finished = renderDemo();
+  // Leave the completed text readable before beginning the next recording.
+  if (demoElapsed >= demoDuration() + 1600) {
+    demoElapsed = 0;
+    demoWidth = demoTargetWidth = 96;
+  }
+  renderDemo();
   // Background geometry moves; the text is never scaled or filtered.
   demoWidth += (demoTargetWidth - demoWidth) * (1 - Math.exp(-elapsed / 85));
   if (Math.abs(demoTargetWidth - demoWidth) < .1) demoWidth = demoTargetWidth;
   capsule.style.width = `${demoWidth}px`;
-  if (!finished) scheduleDemo();
+  scheduleDemo();
 }
 function scheduleDemo() {
-  if (demo && !demoPaused && !document.hidden && demoVisible && demoElapsed < demoDuration() && demoFrame === undefined) {
+  if (demo && !reducedMotion.matches && !demoPaused && !document.hidden && demoVisible && demoFrame === undefined) {
     demoFrame = requestAnimationFrame(animateDemo);
   }
 }
@@ -382,11 +385,9 @@ function resetDemo() {
   scheduleDemo();
 }
 pause?.addEventListener("click", () => {
-  if (demoElapsed >= demoDuration()) { resetDemo(); return; }
   demoPaused = !demoPaused;
   syncDemoPlayback();
 });
-document.querySelector("#demo-replay")?.addEventListener("click", resetDemo);
 document.addEventListener?.("visibilitychange", syncDemoPlayback);
 window.addEventListener?.("resize", () => {
   if (!demo) return;
