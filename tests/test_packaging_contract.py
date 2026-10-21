@@ -91,7 +91,13 @@ def test_windows_ci_forces_utf8_for_chinese_diagnostics():
     assert "scripts/benchmark_models.py --limit 5 --strict-output" in workflow
     assert "permissions:" in workflow
     assert "contents: read" in workflow
-    assert workflow.count("persist-credentials: false") == 3
+    import yaml
+
+    jobs = yaml.safe_load(workflow)["jobs"]
+    checkouts = [step for job in jobs.values() for step in job["steps"]
+                 if step.get("uses", "").startswith("actions/checkout@")]
+    assert checkouts
+    assert all(step["with"]["persist-credentials"] is False for step in checkouts)
 
 
 def test_installer_smoke_derives_the_artifact_from_the_source_version():
