@@ -21,7 +21,13 @@ Your voice becomes text on your computer. Recording and recognition stay local.
 
 ## Why VoiceFlow
 
-Frequent AI conversations involve context and follow-up questions, not just short commands. VoiceFlow puts dictation at your current cursor so you can stay in the same app.
+I talk to AI by voice while I chat and build, often for five or ten minutes at a time. The voice input tools I tried each had strengths, but I kept hitting three problems:
+
+1. **When I stopped, one network hiccup and the whole passage was gone.**
+2. **The last few sentences often never appeared.** I wanted all of it: the last word I say should be the last word on screen.
+3. **If the cursor wasn’t in a text box, everything I said simply vanished.**
+
+So VoiceFlow runs entirely on your computer: no network delay; the final pass covers the whole recording; the text goes to the clipboard before it is typed, so nothing is lost even without a text box. If these have bothered you too, it was built for you.
 
 | What matters during use | How VoiceFlow handles it |
 | --- | --- |
