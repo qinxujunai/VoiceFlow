@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-21",
+  "app_version": "0.3.9",
+  "build_id": "261021.6",
+  "source_commit": "4f9ab9c7c980f64c27283a2edb38fb716b537f40",
+  "verification_workflow_commit": "092afce9a9a72facfab173bee84bf73606580ea2",
+  "source_inputs_sha256": "60748cedff3a4b3b524f7fb68cd7a3e7056efddcd098443f02cb86be4e93fef0",
+  "installer": {
+    "name": "VoiceFlow-0.3.9-Windows-x64.exe",
+    "bytes": 306692767,
+    "sha256": "73772f0ad71609c44c26357768ab5d42fbe4b926ed897ddcf583b937f13f19b5",
+    "pe_identity": {
+      "file_version": "0.3.9.6",
+      "product_version": "0.3.9",
+      "text_file_version": "0.3.9+261021.6"
+    }
+  },
+  "application": {
+    "sha256": "402b00a77b1244f6b6a521df8b531a2aa1bbe218d713c93d1898aa25f5ccab47",
+    "pe_identity": {
+      "file_version": "0.3.9.6",
+      "product_version": "0.3.9+261021.6",
+      "text_file_version": "0.3.9.6"
+    }
+  },
+  "native_asr": {
+    "extension_sha256": "e9adfb09dd79d8ed341ba4534e91cd4580370d2166206472c3d27ce88390e588",
+    "onnxruntime_sha256": "756c938b0f2d14c45c7ad469c6429041d7e905ee6c6ad6049aa67ce937567e97"
+  },
+  "model_manifest_sha256": "3082ae7bd67a55382b3d99fbb6ed4f2a07fc8e9e17d10a76b94a31ffd5fe5049",
+  "license_review_record_sha256": "1b6309eb48525c6d60d8e49577d796a8787d69e620b3a09236770c5a7525557f",
+  "provenance_sha256": "f6ff7a2c2024e3a5d89afadabdbfa6cf5eb75566d314f46009a797842f212de7",
+  "sbom_sha256": "407cb469a26ac1ada63fbf164570928a4e998802d9b4d6c5c9cffca12f73550a",
+  "notices_sha256": "19c3daf6d175ac29019bf3ae6400cc08135011643c6cba4a68a3987265f77038",
+  "lgpl_sources_sha256": "5137f59bab8df5002446cf2a8910b2105eb3eed6876574c09769857f7160e816",
+  "build_inputs_sha256": "c370a6c9caa082c211bd9874c2ab2ffaf40e0c85008fbf092f4e192b9165d4c1",
+  "verification_bundle_sha256": "e624adc347da35ae5dd2025a81bb1a3dfeebc1d9f29ab5dd704cd6a3d4f1def4",
+  "exact_installer_ci_url": "https://github.com/qinxujunai/VoiceFlow/actions/runs/39557909782",
+  "checks": {
+    "local_full_suite": 822,
+    "first_single_install_start": true,
+    "previous_038_upgrade": true,
+    "uninstall_preserves_user_data": true,
+    "runtime_vc_dlls_loaded_from_installer": true,
+    "native_import_closure_missing": 0,
+    "qt_and_pynput_replacement": true
+  },
+  "limits": [
+    "Hosted windows-latest contains development runtimes; this verifies an isolated install directory and actual bundled VC DLL loading, not a pristine consumer OS image.",
+    "Natural authorized speech holdout incomplete; weights unchanged and no accuracy superiority claim.",
+    "Unsigned installer.",
+    "macOS is not a public release target of this sign-off.",
+    "Historical development manifests retain their original incomplete review flags; this review applies only to the exact hashes identified here."
+  ],
+  "installed_machine_verification": {
+    "file_version": "0.3.9.6",
+    "build_id": "261021.6",
+    "exe_sha256": "402b00a77b1244f6b6a521df8b531a2aa1bbe218d713c93d1898aa25f5ccab47",
+    "payload_files_verified": 492,
+    "protected_data_files_unchanged": 7,
+    "ready": true,
+    "actual_settings_window_version_verified": true,
+    "close_hides_window_without_stopping_runtime": true,
+    "normal_launch_restores_same_instance": true
+  }
+}
