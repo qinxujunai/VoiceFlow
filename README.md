@@ -40,7 +40,7 @@ VoiceFlow 专注于快捷键触发的日常输入，不提供会议说话人区�
 词典维护常用术语和明确纠错；文字习惯可以按应用设置。
 中文、英文和混说的准确性应分别评测；当前没有完整自然语音对照证据，不宣称优于其他产品。[验证与限制](docs/product-quality-standard.md)
 
-[0.3.8 有什么新变化？](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.8)
+[0.3.9 有什么新变化？](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.9)
 
 ---
 

@@ -8,6 +8,11 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Optional draft release containing the exact installer to verify
+        required: false
+        type: string
   schedule:
     - cron: "20 3 * * 0"
 
@@ -144,3 +149,72 @@ jobs:
         with:
           name: weekly-model-smoke
           path: model-smoke.txt
+
+  installed-candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.candidate_tag != ''
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify and exercise the uploaded installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:CANDIDATE_TAG -notmatch '^v\d+\.\d+\.\d+(?:-candidate\.\d+\.\d+)?$') {
+            throw 'Invalid candidate tag'
+          }
+          $evidence = Join-Path $env:RUNNER_TEMP 'candidate-evidence'
+          $candidate = Join-Path $env:RUNNER_TEMP 'exact-candidate'
+          New-Item -ItemType Directory $evidence,$candidate | Out-Null
+          $releaseJson = gh release view $env:CANDIDATE_TAG --repo $env:GITHUB_REPOSITORY --json tagName,assets,isDraft
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect candidate release' }
+          $releaseJson | Set-Content (Join-Path $evidence 'release.json')
+          $release = $releaseJson | ConvertFrom-Json
+          $assets = @($release.assets | Where-Object {$_.name -match '^VoiceFlow-\d+\.\d+\.\d+-Windows-x64\.exe$'})
+          if ($assets.Count -ne 1) { throw 'Candidate installer is not unique' }
+          $asset = $assets[0]
+          $expectedVersion = ($env:CANDIDATE_TAG -replace '^v','') -replace '-candidate.*$',''
+          if ($asset.name -ne "VoiceFlow-$expectedVersion-Windows-x64.exe") { throw 'Installer version differs from tag' }
+          gh release download $env:CANDIDATE_TAG --repo $env:GITHUB_REPOSITORY --dir $candidate --pattern $asset.name --pattern SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Candidate download failed' }
+          $installer = Join-Path $candidate $asset.name
+          $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $lines = @(Get-Content (Join-Path $candidate 'SHA256SUMS.txt') | Where-Object {
+            $_ -match ('^([0-9a-fA-F]{64})\s+[* ]?' + [regex]::Escape($asset.name) + '\s*$')
+          })
+          if ($lines.Count -ne 1 -or ($lines[0] -split '\s+')[0].ToLowerInvariant() -ne $actual -or $asset.digest -ne "sha256:$actual") {
+            throw 'Candidate checksum or GitHub digest mismatch'
+          }
+          if ((Get-Item $installer).Length -ne $asset.size) { throw 'Candidate size mismatch' }
+          $previous = Join-Path $env:RUNNER_TEMP 'previous-release'
+          New-Item -ItemType Directory $previous | Out-Null
+          gh release download v0.3.8 --repo $env:GITHUB_REPOSITORY --dir $previous --pattern 'VoiceFlow-0.3.8-Windows-x64.exe' --pattern SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Previous release download failed' }
+          $previousInstaller = Join-Path $previous 'VoiceFlow-0.3.8-Windows-x64.exe'
+          $previousHash = (Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+          $previousLines = @(Get-Content (Join-Path $previous 'SHA256SUMS.txt') | Where-Object {
+            $_ -match '^([0-9a-fA-F]{64})\s+[* ]?VoiceFlow-0\.3\.8-Windows-x64\.exe\s*$'
+          })
+          if ($previousLines.Count -ne 1 -or ($previousLines[0] -split '\s+')[0].ToLowerInvariant() -ne $previousHash) {
+            throw 'Previous installer checksum mismatch'
+          }
+          Start-Transcript (Join-Path $evidence 'installer-smoke.log')
+          try {
+            ./scripts/smoke_installer.ps1 -InstallerPath $installer -FreshInstall -RequireStreamingPreview -RequirePunctuation
+            ./scripts/smoke_installer.ps1 -InstallerPath $installer -PreviousInstallerPath $previousInstaller -RequireStreamingPreview -RequirePunctuation
+          } finally {
+            Stop-Transcript
+          }
+          @{tag=$release.tagName; installer=$asset.name; sha256=$actual; bytes=$asset.size; installed_upgrade_uninstall_passed=$true} |
+            ConvertTo-Json | Set-Content (Join-Path $evidence 'result.json')
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: exact-candidate-evidence
+          path: ${{ runner.temp }}/candidate-evidence
+          if-no-files-found: error
