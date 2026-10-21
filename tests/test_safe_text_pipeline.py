@@ -17,12 +17,18 @@ def test_default_cleaner_does_not_delete_semantic_fillers():
     assert cleaner.clean("我的意思就是说不能丢字") == "我的意思就是说不能丢字"
 
 
-def test_repeated_then_is_the_only_default_filler_cleanup():
+def test_repeated_then_is_preserved_in_faithful_cleanup():
     from text_cleaner import TextCleaner
 
     cleaner = TextCleaner({"cleaner": {"fix_mistakes": False}})
 
-    assert cleaner.clean("然后然后我们继续") == "然后我们继续"
+    assert cleaner.clean("然后然后我们继续") == "然后然后我们继续"
+
+
+def test_faithful_cleanup_uses_explicit_dictionary_not_hidden_guesses():
+    from text_cleaner import TextCleaner
+    cleaner = TextCleaner()
+    assert cleaner.clean("okay coach 拜拜 嗯嗯 好嘞") == "okay coach 拜拜 嗯嗯 好嘞"
 
 
 def test_legacy_remove_fillers_flag_cannot_silently_delete_semantic_words():

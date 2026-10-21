@@ -1,8 +1,27 @@
 """Source guards complement actual compiled installer acceptance."""
 
 from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_fresh_installer_smoke_rejects_an_upgrade_before_touching_files(tmp_path):
+    powershell = shutil.which("pwsh") or shutil.which("powershell")
+    if not powershell:
+        pytest.skip("PowerShell is required for the installer smoke entry point")
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-File", str(ROOT / "scripts/smoke_installer.ps1"),
+         "-FreshInstall", "-PreviousInstallerPath", "missing-old.exe",
+         "-InstallerPath", "missing-new.exe"],
+        cwd=tmp_path, capture_output=True,
+    )
+    assert result.returncode != 0
+    assert b"FreshInstall cannot be combined with PreviousInstallerPath" in result.stderr
+    assert not list(tmp_path.iterdir())
 
 
 def test_installer_never_kills_all_named_instances_or_closes_apps_implicitly():

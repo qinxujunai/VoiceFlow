@@ -1,11 +1,17 @@
 param(
     [string]$InstallerPath = "",
     [string]$PreviousInstallerPath = "",
+    [switch]$FreshInstall,
     [int]$StartupSeconds = 30,
-    [switch]$RequireStreamingPreview
+    [switch]$RequireStreamingPreview,
+    [switch]$RequirePunctuation,
+    [switch]$DisableHotkeys
 )
 
 $ErrorActionPreference = "Stop"
+if ($FreshInstall -and $PreviousInstallerPath) {
+    throw "FreshInstall cannot be combined with PreviousInstallerPath"
+}
 if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
     $versionSource = Get-Content -LiteralPath "src\version.py" -Raw
     $versionMatch = [regex]::Match(
@@ -41,6 +47,12 @@ $appProcess = $null
 function Remove-SmokeRoot {
     if (-not (Test-Path -LiteralPath $smokeRoot)) {
         return
+    }
+    $resolvedSmokeRoot = (Resolve-Path -LiteralPath $smokeRoot).Path
+    $resolvedTemporaryRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path.TrimEnd('\') + '\'
+    if (-not $resolvedSmokeRoot.StartsWith($resolvedTemporaryRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $resolvedSmokeRoot) -notmatch '^VoiceFlow-installer-smoke-[a-f0-9]{32}$') {
+        throw "Refusing cleanup outside the owned installer smoke directory"
     }
     for ($attempt = 1; $attempt -le 8; $attempt++) {
         try {
@@ -90,20 +102,22 @@ try {
     $untrackedFile = Join-Path $installRoot "user-notes.txt"
     Set-Content -LiteralPath $untrackedFile -Value "Untracked upgrade sentinel" -Encoding utf8
     $untrackedHash = (Get-FileHash -LiteralPath $untrackedFile -Algorithm SHA256).Hash
-    $install = Start-Process `
-        -FilePath $resolvedInstaller `
-        -ArgumentList @(
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART",
-            "/NOICONS",
-            "/DIR=$installRoot"
-        ) `
-        -WindowStyle Hidden `
-        -Wait `
-        -PassThru
-    if ($install.ExitCode -ne 0) {
-        throw "Installer exited with code $($install.ExitCode)"
+    if (-not $FreshInstall) {
+        $install = Start-Process `
+            -FilePath $resolvedInstaller `
+            -ArgumentList @(
+                "/VERYSILENT",
+                "/SUPPRESSMSGBOXES",
+                "/NORESTART",
+                "/NOICONS",
+                "/DIR=$installRoot"
+            ) `
+            -WindowStyle Hidden `
+            -Wait `
+            -PassThru
+        if ($install.ExitCode -ne 0) {
+            throw "Installer exited with code $($install.ExitCode)"
+        }
     }
     foreach ($relative in $preservedHashes.Keys) {
         $actual = (Get-FileHash -LiteralPath (Join-Path $smokeDataDir $relative) -Algorithm SHA256).Hash
@@ -177,6 +191,9 @@ try {
         Join-Path $installRoot "model-manifest.json"
     ) | ConvertFrom-Json
     $modelIds = @("sensevoice-small-int8")
+    if ($RequirePunctuation) {
+        $modelIds += "ct-transformer-punctuation-int8"
+    }
     if ($RequireStreamingPreview) {
         $modelIds += "streaming-zipformer-small-bilingual-zh-en-int8"
     }
@@ -209,12 +226,11 @@ try {
     $env:LOCALAPPDATA = $localAppData
     $smokeDataDir = Join-Path $localAppData "VoiceFlow"
     $instanceId = "installer-smoke-" + [guid]::NewGuid().ToString("N")
+    $appArguments = @("--instance-id", $instanceId, "--data-dir", $smokeDataDir)
+    if ($DisableHotkeys) { $appArguments += "--no-hotkeys" }
     $appProcess = Start-Process `
         -FilePath (Join-Path $installRoot "VoiceFlow.exe") `
-        -ArgumentList @(
-            "--instance-id", $instanceId,
-            "--data-dir", $smokeDataDir
-        ) `
+        -ArgumentList $appArguments `
         -WorkingDirectory $installRoot `
         -WindowStyle Hidden `
         -PassThru
@@ -231,7 +247,7 @@ try {
                 $candidate = Get-Content -Raw $runtimeState | ConvertFrom-Json
                 if (
                     $candidate.phase -eq "ready" -and
-                    $candidate.hotkeys -eq "ready" -and
+                    ($candidate.hotkeys -eq "ready" -or ($DisableHotkeys -and $candidate.hotkeys -eq "disabled_for_diagnostics")) -and
                     $candidate.worker -eq "ready" -and
                     $candidate.final_asr -eq "ready"
                 ) {
@@ -270,11 +286,35 @@ try {
         throw "First startup lost preserved vocabulary"
     }
 
+    # Hosted Windows runners have VC development tools preinstalled. Record the
+    # actual UI/worker imports and require the redistributable DLLs to come from
+    # this installer, rather than claiming a pristine operating-system image.
+    $workerIds = @($state.worker_pids.PSObject.Properties | ForEach-Object { [int]$_.Value })
+    $modulePaths = @(@($appProcess.Id) + $workerIds | ForEach-Object {
+        (Get-Process -Id $_ -ErrorAction Stop).Modules | ForEach-Object { $_.FileName }
+    } | Sort-Object -Unique)
+    $runtimeModules = @($modulePaths | Where-Object {
+        (Split-Path -Leaf $_) -match '^(msvcp140|vcruntime140).*\.dll$'
+    })
+    if ($runtimeModules.Count -eq 0) { throw "VC runtime module evidence is missing" }
+    foreach ($modulePath in $runtimeModules) {
+        if (-not $modulePath.StartsWith($installRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw "VC runtime loaded outside the installed payload: $modulePath"
+        }
+    }
+    Write-Output ("Installed runtime evidence: " + (@{
+        fresh_install = [bool]$FreshInstall
+        file_version = (Get-Item (Join-Path $installRoot "VoiceFlow.exe")).VersionInfo.FileVersion
+        exe_sha256 = (Get-FileHash (Join-Path $installRoot "VoiceFlow.exe") -Algorithm SHA256).Hash
+        non_system_modules = @($modulePaths | Where-Object {
+            -not $_.StartsWith($env:WINDIR + '\', [StringComparison]::OrdinalIgnoreCase)
+        })
+    } | ConvertTo-Json -Compress -Depth 4))
+
     Stop-Process -Id $appProcess.Id -Force
     Wait-Process -Id $appProcess.Id -Timeout 10 -ErrorAction SilentlyContinue
     $appProcess = $null
 
-    $workerIds = @($state.worker_pids.PSObject.Properties | ForEach-Object { [int]$_.Value })
     $workerDeadline = [DateTime]::UtcNow.AddSeconds(5)
     do {
         $remainingWorkers = @($workerIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })

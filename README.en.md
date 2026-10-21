@@ -38,7 +38,7 @@ VoiceFlow focuses on everyday shortcut-driven input, without meeting speaker ide
 A black capsule shows recording and text preview. The tray provides dictation, recovery and exit actions. Maintain your terms and explicit corrections in the vocabulary, and choose text preferences per application.
 Chinese, English and code-switching quality must be measured separately. A complete natural-speech comparison is not available, so no claim of superior accuracy is made. [Quality and limits](docs/product-quality-standard.md)
 
-[What is new in 0.3.8?](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.8)
+[What is new in 0.3.9?](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.9)
 
 ---
 

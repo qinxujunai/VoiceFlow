@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import threading
+import copy
 from datetime import datetime
 from pathlib import Path
 
@@ -16,9 +17,11 @@ from qt_compat import (
     QSystemTrayIcon, QMenu, QLabel, QPushButton,
     QGridLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QStackedWidget,
+    QListView, QAbstractItemView,
     QCheckBox, QComboBox, QMessageBox, QScrollArea,
     Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket, QEvent,
+    QIcon, QPixmap, QPainter, QPen, QColor, QRectF,
 )
 
 from tray_icon import (
@@ -154,8 +157,8 @@ class _SettingsWindow(QMainWindow):
     history_action_finished = Signal(object)
     history_mutation_finished = Signal(object)
     update_finished = Signal(object)
-    dictation_preferences_finished = Signal(object)
     onboarding_finished = Signal(object)
+    dictionary_finished = Signal(object)
 
     def __init__(
         self,
@@ -208,9 +211,21 @@ class _SettingsWindow(QMainWindow):
         self._onboarding_save_in_progress = False
         self._onboarding_confirmed = False
         self._dictation_preferences_snapshot = {}
+        self._preferences_draft = {}
+        self._settings_baseline = None
+        self._loading_settings = False
+        self._dictionary_dirty = False
+        self._dictionary_save_in_progress = False
+        self._dictionary_undo = None
+        self._dictionary_generation = 0
         self._history_render_generation = 0
         self.setWindowTitle("VoiceFlow")
-        self.setMinimumSize(980, 660)
+        self.setMinimumSize(600, 460)
+        screen = QApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            self.setMinimumSize(min(600, available.width()), min(460, available.height()))
+            self.resize(min(1040, available.width()), min(760, available.height()))
 
         shell = QWidget()
         shell.setObjectName("appShell")
@@ -222,6 +237,7 @@ class _SettingsWindow(QMainWindow):
         body.setSpacing(0)
 
         sidebar_panel = QWidget()
+        self.sidebar_panel = sidebar_panel
         sidebar_panel.setObjectName("sidebarPanel")
         sidebar_layout = QVBoxLayout(sidebar_panel)
         sidebar_layout.setContentsMargins(16, 20, 16, 16)
@@ -240,8 +256,10 @@ class _SettingsWindow(QMainWindow):
         brand_copy = QVBoxLayout()
         brand_copy.setSpacing(0)
         title = QLabel("VoiceFlow")
+        self.brand_title = title
         title.setObjectName("appTitle")
         subtitle = QLabel("离线语音输入")
+        self.brand_subtitle = subtitle
         subtitle.setObjectName("appSubtitle")
         brand_copy.addWidget(title)
         brand_copy.addWidget(subtitle)
@@ -253,7 +271,10 @@ class _SettingsWindow(QMainWindow):
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
         for label in ("听写", "词典", "历史"):
-            self.sidebar.addItem(QListWidgetItem(label))
+            item = QListWidgetItem(label)
+            item.setIcon(self._navigation_icon(self.sidebar.count()))
+            self.sidebar.addItem(item)
+        self.sidebar.setIconSize(QSize(20, 20))
         self.sidebar.setCurrentRow(0)
         self.sidebar.setAccessibleName("主要导航")
         sidebar_layout.addWidget(self.sidebar, 1)
@@ -261,6 +282,7 @@ class _SettingsWindow(QMainWindow):
         self.status_badge = QLabel("准备中")
         self.status_badge.setObjectName("statusBadge")
         self.status_badge.setAccessibleName("VoiceFlow 状态")
+        self.status_badge.setWordWrap(True)
         sidebar_layout.addWidget(self.status_badge)
         help_menu = QMenu(self)
         self.diagnostics_action = help_menu.addAction("运行检查")
@@ -272,6 +294,7 @@ class _SettingsWindow(QMainWindow):
         self.help_button.setAccessibleName("帮助、诊断与关于")
         sidebar_layout.addWidget(self.help_button)
         build_label = QLabel(f"{display_version()}\n{platform_label()}")
+        self.build_label = build_label
         build_label.setObjectName("sidebarVersion")
         build_label.setToolTip(f"{display_version()} · {platform_label()}")
         sidebar_layout.addWidget(build_label)
@@ -287,8 +310,25 @@ class _SettingsWindow(QMainWindow):
         self.sidebar.currentRowChanged.connect(self._show_primary_page)
 
         body.addWidget(sidebar_panel)
-        body.addWidget(self.stack, 1)
+        content_container = QWidget()
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+        content_layout.addWidget(self.stack, 1)
+        body.addWidget(content_container, 1)
         root.addLayout(body, 1)
+        self.operation_feedback = QLabel()
+        self.operation_feedback.setObjectName("operationFeedback")
+        self.operation_feedback.setWordWrap(True)
+        self.operation_feedback.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.operation_feedback.setContentsMargins(24, 8, 24, 12)
+        self.operation_feedback.setAccessibleName("操作结果")
+        self.operation_feedback.hide()
+        content_layout.addWidget(self.operation_feedback)
+        self.operation_details_button = QPushButton("查看错误详情")
+        self.operation_details_button.hide()
+        self.operation_details_button.clicked.connect(self._show_operation_details)
+        content_layout.addWidget(self.operation_details_button)
         self.setCentralWidget(shell)
         self._system_style_ready = True
         self._high_contrast_active = None
@@ -301,8 +341,8 @@ class _SettingsWindow(QMainWindow):
         self.history_action_finished.connect(self._finish_history_action)
         self.history_mutation_finished.connect(self._finish_history_mutation)
         self.update_finished.connect(self._finish_update_check)
-        self.dictation_preferences_finished.connect(self._finish_dictation_preferences)
         self.onboarding_finished.connect(self._finish_onboarding)
+        self.dictionary_finished.connect(self._finish_dictionary_save)
         self._last_runtime_phase = None
         self._runtime_status_timer = QTimer(self)
         self._runtime_status_timer.setInterval(500)
@@ -343,21 +383,46 @@ class _SettingsWindow(QMainWindow):
         label = QLabel(title)
         label.setObjectName("sectionTitle")
         sub = QLabel(subtitle)
+        sub.setWordWrap(True)
         sub.setObjectName("sectionSubtitle")
         block.addWidget(label)
         block.addWidget(sub)
         return block
 
+    def _navigation_icon(self, index):
+        image = QPixmap(40, 40)
+        image.setDevicePixelRatio(2)
+        image.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(image)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#c8c8d0"), 1.5))
+        if index == 0:
+            for x, height in ((5, 7), (10, 14), (15, 10)):
+                painter.drawLine(x, int(10 - height / 2), x, int(10 + height / 2))
+        elif index == 1:
+            painter.drawRoundedRect(QRectF(3, 3, 14, 14), 2, 2)
+            painter.drawLine(7, 3, 7, 17)
+            painter.drawLine(10, 7, 14, 7)
+            painter.drawLine(10, 11, 14, 11)
+        else:
+            painter.drawEllipse(QRectF(3, 3, 14, 14))
+            painter.drawLine(10, 6, 10, 10)
+            painter.drawLine(10, 10, 14, 12)
+        painter.end()
+        return QIcon(image)
+
     def _home_page(self):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
+        self._home_layout = layout
         layout.setContentsMargins(40, 32, 40, 32)
         layout.setSpacing(20)
 
         intro = QVBoxLayout()
         intro.setSpacing(8)
         self.home_ready_title = QLabel("开口，文字就位。")
+        self.home_ready_title.setWordWrap(True)
         self.home_ready_title.setObjectName("commandTitle")
         self.home_ready_subtitle = QLabel(
             f"按 {trigger_summary()} 开始说话，再按一次停止。录音与识别在本机完成。"
@@ -366,6 +431,14 @@ class _SettingsWindow(QMainWindow):
         self.home_ready_subtitle.setWordWrap(True)
         intro.addWidget(self.home_ready_title)
         intro.addWidget(self.home_ready_subtitle)
+        shortcuts = QHBoxLayout()
+        shortcuts.setSpacing(8)
+        for text in ("F2", "右 Ctrl", "鼠标侧键"):
+            key = QLabel(text)
+            key.setObjectName("shortcutKey")
+            shortcuts.addWidget(key)
+        shortcuts.addStretch(1)
+        intro.addLayout(shortcuts)
         layout.addLayout(intro)
 
         self.onboarding_panel = QWidget()
@@ -377,7 +450,7 @@ class _SettingsWindow(QMainWindow):
         )
         onboarding_help.setWordWrap(True)
         onboarding_layout.addWidget(onboarding_help)
-        self.onboarding_confirm_check = QCheckBox("我已在目标应用看到正确的文字")
+        self.onboarding_confirm_check = QCheckBox("已确认目标应用输入正确")
         onboarding_layout.addWidget(self.onboarding_confirm_check)
         self.confirm_onboarding_button = QPushButton("完成首次使用")
         self.confirm_onboarding_button.setEnabled(False)
@@ -393,6 +466,7 @@ class _SettingsWindow(QMainWindow):
         settings_panel = QWidget()
         settings_panel.setObjectName("dictationSettingsPanel")
         settings_layout = QVBoxLayout(settings_panel)
+        self._settings_panel_layout = settings_layout
         settings_layout.setContentsMargins(20, 18, 20, 18)
         settings_layout.setSpacing(14)
         settings_title = QLabel("听写设置")
@@ -430,7 +504,7 @@ class _SettingsWindow(QMainWindow):
         fields.addWidget(self.dictation_scope_combo, 2, 1)
         fields.addWidget(QLabel("句末标点"), 3, 0)
         fields.addWidget(self.sentence_end_combo, 3, 1)
-        self.preserve_format_check = QCheckBox("保留格式，不调整空格、换行和标点")
+        self.preserve_format_check = QCheckBox("保留格式")
         self.preserve_format_check.setAccessibleName("保留输入格式")
         settings_layout.addWidget(self.preserve_format_check)
         self.sentence_end_sample = QLabel()
@@ -442,15 +516,11 @@ class _SettingsWindow(QMainWindow):
         settings_layout.addWidget(self.sentence_end_sample)
         settings_layout.addWidget(self.dictation_scope_note)
         sentence_actions = QHBoxLayout()
-        self.save_dictation_preferences_button = QPushButton("保存标点与格式")
-        self.save_dictation_preferences_button.clicked.connect(self._save_dictation_preferences)
-        sentence_actions.addWidget(self.save_dictation_preferences_button)
         self.follow_default_button = QPushButton("跟随默认值")
         self.follow_default_button.setAccessibleName("移除此应用的标点与格式设置，跟随默认值")
         self.follow_default_button.setEnabled(False)
-        self.follow_default_button.clicked.connect(lambda: self._save_dictation_preferences(follow_default=True))
+        self.follow_default_button.clicked.connect(self._draft_follow_default)
         sentence_actions.addWidget(self.follow_default_button)
-        sentence_actions.addWidget(QLabel("下一次听写生效"))
         sentence_actions.addStretch(1)
         settings_layout.addLayout(sentence_actions)
         self.dictation_scope_combo.currentIndexChanged.connect(self._change_dictation_scope)
@@ -465,16 +535,21 @@ class _SettingsWindow(QMainWindow):
         settings_layout.addWidget(self.autostart_check)
 
         actions = QHBoxLayout()
-        self.save_settings_button = QPushButton("保存设置")
+        self.save_settings_button = QPushButton("保存更改")
+        self._settings_actions = actions
         self.save_settings_button.setObjectName("primaryButton")
         self.save_settings_button.setAccessibleName("保存听写设置")
         self.save_settings_button.clicked.connect(self._save_settings)
         actions.addWidget(self.save_settings_button)
-        save_note = QLabel("语言和麦克风更改需重启")
+        self.reload_settings_button = QPushButton("重新载入")
+        self.reload_settings_button.clicked.connect(self._reload_settings)
+        self.reload_settings_button.hide()
+        actions.addWidget(self.reload_settings_button)
+        save_note = QLabel("文字习惯下次听写生效；语言和麦克风更改需重启")
+        save_note.setWordWrap(True)
         save_note.setObjectName("sectionSubtitle")
         actions.addWidget(save_note)
         actions.addStretch(1)
-        settings_layout.addLayout(actions)
         layout.addWidget(settings_panel)
 
         status_row = QHBoxLayout()
@@ -498,7 +573,63 @@ class _SettingsWindow(QMainWindow):
         self.dictation_scroll.setWidgetResizable(True)
         self.dictation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.dictation_scroll.setWidget(page)
-        return self.dictation_scroll
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self.dictation_scroll, 1)
+        footer = QWidget()
+        footer.setContentsMargins(24, 8, 24, 16)
+        footer.setLayout(actions)
+        outer.addWidget(footer)
+        self._settings_fields = fields
+        self._field_labels = [fields.itemAtPosition(row, 0).widget() for row in range(4)]
+        for widget in (self.language_combo, self.microphone_combo):
+            widget.currentIndexChanged.connect(self._settings_changed)
+        for widget in (self.autostart_check, self.preserve_format_check):
+            widget.toggled.connect(self._settings_changed)
+        self.sentence_end_combo.currentIndexChanged.connect(self._settings_changed)
+        self.save_settings_button.setEnabled(False)
+        return container
+
+    def resizeEvent(self, event):
+        compact = self.width() < 620
+        if hasattr(self, "sidebar_panel"):
+            self.sidebar_panel.setFixedWidth(96 if compact else 176)
+            self.sidebar_panel.layout().setContentsMargins(10 if compact else 16, 20, 10 if compact else 16, 16)
+            self.brand_title.setVisible(not compact)
+            self.brand_subtitle.setVisible(not compact)
+            self.build_label.setVisible(not compact)
+        if hasattr(self, "_settings_fields"):
+            self._home_layout.setContentsMargins(16 if compact else 40, 24, 16 if compact else 40, 24)
+            self._settings_panel_layout.setContentsMargins(12 if compact else 20, 18, 12 if compact else 20, 18)
+            self._settings_actions.setDirection(QHBoxLayout.Direction.TopToBottom if compact else QHBoxLayout.Direction.LeftToRight)
+            narrow = self.width() < 820
+            self._settings_fields.setColumnStretch(0, 1 if narrow else 0)
+            self._settings_fields.setColumnStretch(1, 0 if narrow else 1)
+            for row, (label, control) in enumerate(zip(self._field_labels, (
+                    self.language_combo, self.microphone_combo, self.dictation_scope_combo, self.sentence_end_combo))):
+                self._settings_fields.removeWidget(label)
+                self._settings_fields.removeWidget(control)
+                self._settings_fields.addWidget(label, row * 2 if narrow else row, 0)
+                self._settings_fields.addWidget(control, row * 2 + 1 if narrow else row, 0 if narrow else 1)
+                control.setMinimumContentsLength(8)
+                control.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        super().resizeEvent(event)
+        if hasattr(self, "history_list"):
+            QTimer.singleShot(0, self._resize_history_cards)
+        if hasattr(self, "_dictionary_actions"):
+            for row in (self._dictionary_actions, self._dictionary_selection_actions, self._dictionary_add_row):
+                row.setDirection(QHBoxLayout.Direction.TopToBottom if compact else QHBoxLayout.Direction.LeftToRight)
+        if hasattr(self, "_history_toolbar"):
+            for row in (self._history_toolbar, self._recovery_actions):
+                row.setDirection(QHBoxLayout.Direction.TopToBottom if compact else QHBoxLayout.Direction.LeftToRight)
+
+    def closeEvent(self, event):
+        event.ignore()
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.hide()
+        else:
+            self.showMinimized()
 
     def _recent_page(self):
         page = QWidget()
@@ -521,6 +652,7 @@ class _SettingsWindow(QMainWindow):
         self.recovery_combo = QComboBox()
         self.recovery_combo.setAccessibleName("可恢复录音")
         recovery_actions = QHBoxLayout()
+        self._recovery_actions = recovery_actions
         self.recover_button = QPushButton("重新识别并复制")
         self.recover_button.setObjectName("primaryButton")
         self.recover_button.clicked.connect(self._recover_selected_session)
@@ -540,6 +672,7 @@ class _SettingsWindow(QMainWindow):
         layout.addWidget(self.recovery_panel)
 
         toolbar = QHBoxLayout()
+        self._history_toolbar = toolbar
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("搜索最近转录")
         self.search_box.setAccessibleName("搜索历史转录")
@@ -576,7 +709,7 @@ class _SettingsWindow(QMainWindow):
         self.history_list.itemDoubleClicked.connect(lambda item: self._copy_text(item.data(Qt.ItemDataRole.UserRole)))
         layout.addWidget(self.history_list, 1)
 
-        return page
+        return self._scrollable_page(page)
 
     def _dictionary_page(self):
         page = QWidget()
@@ -598,26 +731,44 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_section.addItem("常用短语", "phrases.txt")
         self.dictionary_section.addItem("确定性纠错", "corrections.txt")
         layout.addWidget(self.dictionary_section)
+        self.dictionary_search = QLineEdit()
+        self.dictionary_search.setPlaceholderText("搜索当前分类")
+        self.dictionary_search.setAccessibleName("搜索词典")
+        self.dictionary_search.textChanged.connect(self._filter_dictionary)
+        layout.addWidget(self.dictionary_search)
 
         add_row = QHBoxLayout()
+        self._dictionary_add_row = add_row
         self.dictionary_input = QLineEdit()
         self.dictionary_input.setAccessibleName("新增词典条目")
         self.dictionary_input.setPlaceholderText("添加专有词")
         self.dictionary_input.returnPressed.connect(self._add_dictionary_entry)
+        self.dictionary_correct_input = QLineEdit()
+        self.dictionary_correct_input.setPlaceholderText("应改为")
+        self.dictionary_correct_input.setAccessibleName("正确词")
+        self.dictionary_correct_input.returnPressed.connect(self._add_dictionary_entry)
+        self.dictionary_correct_input.hide()
         self.dictionary_add_button = QPushButton("添加")
         self.dictionary_add_button.setObjectName("primaryButton")
         self.dictionary_add_button.clicked.connect(self._add_dictionary_entry)
         add_row.addWidget(self.dictionary_input, 1)
+        add_row.addWidget(self.dictionary_correct_input, 1)
         add_row.addWidget(self.dictionary_add_button)
         layout.addLayout(add_row)
 
         self.dictionary_hint = QLabel("每项单独一行，双击可以修改。")
         self.dictionary_hint.setObjectName("sectionSubtitle")
+        self.dictionary_hint.setWordWrap(True)
         layout.addWidget(self.dictionary_hint)
 
         self.dictionary_list = QListWidget()
         self.dictionary_list.setObjectName("dictionaryList")
         self.dictionary_list.setAccessibleName("词典条目")
+        self.dictionary_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.dictionary_list.setResizeMode(QListView.ResizeMode.Adjust)
+        self.dictionary_list.setWrapping(True)
+        self.dictionary_list.setSpacing(8)
+        self.dictionary_list.setMinimumHeight(180)
         self.dictionary_list.itemChanged.connect(self._dictionary_item_changed)
         layout.addWidget(self.dictionary_list, 1)
 
@@ -631,18 +782,18 @@ class _SettingsWindow(QMainWindow):
         self._active_dictionary_filename = self.dictionary_section.currentData()
 
         note = QLabel(
-            "全部内容只保存在这台电脑。纠错只执行明确的“错误词=正确词”替换，"
-            "不会调用生成模型改写意思。"
+            "词典只保存在这台电脑。纠错只按你指定的两个词替换，不改写你的意思。"
         )
         note.setObjectName("privacyNote")
         note.setWordWrap(True)
         layout.addWidget(note)
         actions = QHBoxLayout()
         self.dictionary_remove_button = QPushButton("删除所选")
+        self._dictionary_actions = actions
         self.dictionary_remove_button.clicked.connect(
             self._remove_dictionary_entries
         )
-        save = QPushButton("保存词典")
+        save = self.dictionary_save_button = QPushButton("保存词典")
         save.setObjectName("primaryButton")
         save.clicked.connect(self._save_dictionary)
         open_folder = QPushButton("打开词典目录")
@@ -650,11 +801,35 @@ class _SettingsWindow(QMainWindow):
             lambda: open_path(self.paths.knowledge_dir)
         )
         actions.addWidget(self.dictionary_remove_button)
+        self.dictionary_undo_button = QPushButton("撤销删除")
+        self.dictionary_undo_button.clicked.connect(self._undo_dictionary_delete)
+        self.dictionary_undo_button.hide()
+        actions.addWidget(self.dictionary_undo_button)
         actions.addWidget(save)
         actions.addWidget(open_folder)
         actions.addStretch(1)
         layout.addLayout(actions)
-        return page
+        selection_actions = QHBoxLayout()
+        self._dictionary_selection_actions = selection_actions
+        self.dictionary_select_button = QPushButton("全选搜索结果")
+        self.dictionary_select_button.clicked.connect(self._select_dictionary_results)
+        self.dictionary_clear_button = QPushButton("清空当前分类")
+        self.dictionary_clear_button.clicked.connect(self._clear_dictionary)
+        selection_actions.addWidget(self.dictionary_select_button)
+        selection_actions.addWidget(self.dictionary_clear_button)
+        selection_actions.addStretch(1)
+        layout.addLayout(selection_actions)
+        return self._scrollable_page(page)
+
+    @staticmethod
+    def _scrollable_page(page):
+        scroll = QScrollArea()
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setObjectName("settingsPageScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(page)
+        return scroll
 
     def _diagnostics_page(self):
         page = QWidget()
@@ -816,18 +991,23 @@ class _SettingsWindow(QMainWindow):
             return
         self._refresh_in_progress = True
         self._set_status_badge("正在检查")
+        dictionary_generation = self._dictionary_generation
 
         def run():
             try:
-                config = self._load_config()
+                import yaml
+                config_text = self.paths.config_file.read_text(encoding="utf-8")
+                config = yaml.safe_load(config_text) or {}
                 active = config.get("engine", {}).get("active", "sensevoice")
                 payload = {
                     "ok": True,
                     "config": config,
+                    "config_text": config_text,
                     "ready": self._engine_ready(active, config),
                     "microphones": self._query_microphones(),
                     "history_rows": self._read_history_rows(),
                     "dictionary_entries": self._read_dictionary_entries(),
+                    "dictionary_generation": dictionary_generation,
                     "recovery_sessions": self.recovery_store.list_recoverable(),
                     "dictation_preferences": (
                         self.controller.query_dictation_preferences() if self.controller else {}),
@@ -853,13 +1033,23 @@ class _SettingsWindow(QMainWindow):
             return
         config = payload["config"]
         self._history_rows = payload["history_rows"]
-        self._dictionary_entries = payload["dictionary_entries"]
+        apply_dictionary = (not self._dictionary_dirty and not self._dictionary_save_in_progress
+                            and payload.get("dictionary_generation") == self._dictionary_generation)
+        if apply_dictionary:
+            self._dictionary_entries = payload["dictionary_entries"]
         self._active_dictionary_filename = self.dictionary_section.currentData()
-        self._refresh_settings_controls(config, payload["microphones"])
-        self._apply_dictation_preferences(payload.get("dictation_preferences", {}))
+        if not self._settings_dirty() and not self._switch_in_progress:
+            self._loading_settings = True
+            self._refresh_settings_controls(config, payload["microphones"])
+            self._apply_dictation_preferences(payload.get("dictation_preferences", {}))
+            self._config_snapshot = payload["config_text"]
+            self._settings_baseline = self._settings_values()
+            self._loading_settings = False
+            self._settings_changed()
         self._refresh_home(config)
         self._render_history()
-        self._render_dictionary_section()
+        if apply_dictionary:
+            self._render_dictionary_section()
         self._apply_recovery_sessions(payload["recovery_sessions"])
         self._set_status_badge("就绪" if payload["ready"] and self._microphone_detected else "需要设置")
         self._sync_runtime_status(force=True)
@@ -880,7 +1070,7 @@ class _SettingsWindow(QMainWindow):
         if not force and phase == self._last_runtime_phase:
             return
         self._last_runtime_phase = phase
-        labels = {"starting": "正在准备", "ready": "就绪", "recording": "聆听中",
+        labels = {"starting": "正在准备", "ready": "就绪", "recording": "录音中",
                   "finalizing": "正在完成", "delivering": "正在交付"}
         self._set_status_badge(labels.get(phase, "需要处理"), attention=phase in {"degraded", "error"})
         readiness = "正在准备" if phase == "starting" else (
@@ -909,11 +1099,18 @@ class _SettingsWindow(QMainWindow):
                 ]
             except FileNotFoundError:
                 entries[filename] = []
-            except Exception:
-                entries[filename] = []
         return entries
 
     def _set_status_badge(self, text, attention=None):
+        if str(text) not in {"正在检查", "正在准备", "就绪", "需要设置", "需要处理", "录音中", "正在完成", "正在交付"}:
+            self.operation_feedback.setText(str(text))
+            self.operation_details_button.hide()
+            self.operation_feedback.setProperty("attention", bool(attention))
+            style = self.operation_feedback.style()
+            style.unpolish(self.operation_feedback)
+            style.polish(self.operation_feedback)
+            self.operation_feedback.show()
+            return
         if attention is None:
             attention = any(
                 keyword in str(text)
@@ -924,6 +1121,13 @@ class _SettingsWindow(QMainWindow):
         style = self.status_badge.style()
         style.unpolish(self.status_badge)
         style.polish(self.status_badge)
+
+    def _show_operation_details(self):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("操作详情")
+        dialog.setText("更改尚未保存，当前草稿已保留。")
+        dialog.setDetailedText(getattr(self, "_operation_error", ""))
+        dialog.exec()
 
     def needs_onboarding(self):
         return not onboarding_completed(self.paths.config_file)
@@ -996,9 +1200,12 @@ class _SettingsWindow(QMainWindow):
             return
         entries = []
         for index in range(self.dictionary_list.count()):
-            value = self.dictionary_list.item(index).text().strip()
+            item = self.dictionary_list.item(index)
+            value = (item.data(Qt.ItemDataRole.UserRole) or item.text()).strip()
             if value and value not in entries:
                 entries.append(value)
+        if entries != self._dictionary_entries.get(filename, []):
+            self._dictionary_dirty = True
         self._dictionary_entries[filename] = entries
 
     def _render_dictionary_section(self):
@@ -1008,24 +1215,35 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_list.blockSignals(True)
         self.dictionary_list.clear()
         readonly = filename == "builtin-ai.txt"
+        corrections = filename == "corrections.txt"
+        self.dictionary_list.setViewMode(QListView.ViewMode.ListMode if corrections else QListView.ViewMode.IconMode)
         for value in self._dictionary_entries.get(filename, []):
-            item = QListWidgetItem(value)
+            item = QListWidgetItem(value.replace("=", "  →  ", 1) if corrections else value)
+            if corrections:
+                item.setData(Qt.ItemDataRole.UserRole, value)
             if not readonly:
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Unchecked)
+                if not corrections:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+            if not corrections:
+                item.setSizeHint(QSize(min(300, max(72, self.dictionary_list.fontMetrics().horizontalAdvance(value) + 46)), 40))
             self.dictionary_list.addItem(item)
         self.dictionary_list.blockSignals(False)
         self.dictionary_input.setEnabled(not readonly)
         self.dictionary_add_button.setEnabled(not readonly)
         self.dictionary_remove_button.setEnabled(not readonly)
-        corrections = filename == "corrections.txt"
+        self.dictionary_select_button.setEnabled(not readonly)
+        self.dictionary_clear_button.setEnabled(not readonly)
+        self.dictionary_correct_input.setVisible(corrections)
         if readonly:
             self.dictionary_input.setPlaceholderText("内置术语不可编辑")
             self.dictionary_hint.setText(
                 "内置术语随 VoiceFlow 更新；识别到相同英文时会规范大小写。"
             )
         elif corrections:
-            self.dictionary_input.setPlaceholderText("错误词=正确词")
-            self.dictionary_hint.setText("写成“错误词=正确词”，双击可以修改。")
+            self.dictionary_input.setPlaceholderText("识别成")
+            self.dictionary_hint.setText("明确指定应改为哪个词。修改时删除旧项，再添加新项。")
         elif filename == "phrases.txt":
             self.dictionary_input.setPlaceholderText("添加常用短语")
             self.dictionary_hint.setText("添加经常完整说出的短语，双击可以修改。")
@@ -1035,6 +1253,7 @@ class _SettingsWindow(QMainWindow):
                 "添加人名、品牌或项目名；英文会规范大小写，误识别请使用确定性纠错。"
             )
         self._update_dictionary_count()
+        self._filter_dictionary()
 
     def _change_dictionary_section(self, _index):
         self._store_dictionary_section()
@@ -1053,6 +1272,8 @@ class _SettingsWindow(QMainWindow):
 
     def _add_dictionary_entry(self):
         value = self.dictionary_input.text().strip()
+        if self._active_dictionary_filename == "corrections.txt" and self.dictionary_correct_input.text().strip():
+            value += "=" + self.dictionary_correct_input.text().strip()
         if not self._valid_dictionary_entry(value):
             message = (
                 "请使用“错误词=正确词”"
@@ -1062,16 +1283,18 @@ class _SettingsWindow(QMainWindow):
             self._set_status_badge(message, attention=True)
             return
         existing = {
-            self.dictionary_list.item(index).text().strip()
+            (self.dictionary_list.item(index).data(Qt.ItemDataRole.UserRole) or self.dictionary_list.item(index).text()).strip()
             for index in range(self.dictionary_list.count())
         }
         if value in existing:
             self._set_status_badge("词典中已有这一项")
             return
-        item = QListWidgetItem(value)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-        self.dictionary_list.addItem(item)
+        self._store_dictionary_section()
+        self._dictionary_entries[self._active_dictionary_filename].append(value)
+        self._dictionary_dirty = True
+        self._render_dictionary_section()
         self.dictionary_input.clear()
+        self.dictionary_correct_input.clear()
         self._store_dictionary_section()
         self._update_dictionary_count()
         self._set_status_badge("已添加，保存后生效")
@@ -1080,10 +1303,14 @@ class _SettingsWindow(QMainWindow):
         if self._active_dictionary_filename == "builtin-ai.txt":
             self._set_status_badge("内置术语不可删除")
             return
-        selected = self.dictionary_list.selectedItems()
+        selected = [self.dictionary_list.item(index) for index in range(self.dictionary_list.count())
+                    if self.dictionary_list.item(index).checkState() == Qt.CheckState.Checked]
+        if not selected:
+            selected = self.dictionary_list.selectedItems()
         if not selected:
             self._set_status_badge("请选择要删除的内容")
             return
+        self._remember_dictionary_delete()
         for item in selected:
             self.dictionary_list.takeItem(self.dictionary_list.row(item))
         self._store_dictionary_section()
@@ -1091,42 +1318,116 @@ class _SettingsWindow(QMainWindow):
         self._set_status_badge("已移除，保存后生效")
 
     def _dictionary_item_changed(self, item):
-        value = item.text().strip()
+        value = (item.data(Qt.ItemDataRole.UserRole) or item.text()).strip()
         if not self._valid_dictionary_entry(value):
             self._set_status_badge("这一项格式不正确", attention=True)
             return
         self.dictionary_list.blockSignals(True)
-        item.setText(value)
+        if self._active_dictionary_filename != "corrections.txt":
+            item.setText(value)
         self.dictionary_list.blockSignals(False)
         self._store_dictionary_section()
         self._update_dictionary_count()
 
     def _update_dictionary_count(self):
         if hasattr(self, "dictionary_count"):
-            self.dictionary_count.setText(f"{self.dictionary_list.count()} 项")
+            selected = sum(self.dictionary_list.item(index).checkState() == Qt.CheckState.Checked for index in range(self.dictionary_list.count()))
+            self.dictionary_count.setText(f"{self.dictionary_list.count()} 项 · 已选 {selected} 项")
+
+    def _filter_dictionary(self, *_args):
+        query = self.dictionary_search.text().casefold().strip()
+        for index in range(self.dictionary_list.count()):
+            item = self.dictionary_list.item(index)
+            item.setHidden(query not in item.text().casefold())
+
+    def _select_dictionary_results(self):
+        for index in range(self.dictionary_list.count()):
+            item = self.dictionary_list.item(index)
+            if not item.isHidden() and self._active_dictionary_filename != "builtin-ai.txt":
+                item.setCheckState(Qt.CheckState.Checked)
+
+    def _remember_dictionary_delete(self):
+        self._store_dictionary_section()
+        self._dictionary_undo = (self._active_dictionary_filename, list(self._dictionary_entries[self._active_dictionary_filename]))
+        self.dictionary_undo_button.show()
+
+    def _undo_dictionary_delete(self):
+        if self._dictionary_undo:
+            filename, entries = self._dictionary_undo
+            self._store_dictionary_section()
+            current = self._dictionary_entries[filename]
+            self._dictionary_entries[filename] = entries + [value for value in current if value not in entries]
+            self._dictionary_dirty = True
+            self._dictionary_undo = None
+            self.dictionary_undo_button.hide()
+            if filename == self._active_dictionary_filename:
+                self._render_dictionary_section()
+            self._set_status_badge("已撤销删除，保存词典后生效")
+
+    def _clear_dictionary(self):
+        if self._active_dictionary_filename == "builtin-ai.txt":
+            return
+        count = self.dictionary_list.count()
+        if not count or QMessageBox.question(self, "清空当前分类", f"清空“{self.dictionary_section.currentText()}”的 {count} 项？其他分类不受影响。") != QMessageBox.StandardButton.Yes:
+            return
+        self._remember_dictionary_delete()
+        self.dictionary_list.clear()
+        self._store_dictionary_section()
+        self._update_dictionary_count()
+        self._set_status_badge("已清空当前分类，可以撤销；保存词典后生效")
 
     def _save_dictionary(self):
-        try:
-            self._store_dictionary_section()
-            for filename, entries in self._dictionary_entries.items():
-                if filename == "builtin-ai.txt":
-                    continue
-                if filename == "corrections.txt" and any(
-                    not self._valid_correction(value) for value in entries
-                ):
-                    raise ValueError("纠错内容需要使用“错误词=正确词”")
-                path = self._dictionary_path(filename)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                text = "\n".join(entries).strip()
-                temporary = path.with_suffix(path.suffix + ".tmp")
-                temporary.write_text(
-                    f"{text}\n" if text else "",
-                    encoding="utf-8",
-                )
-                os.replace(temporary, path)
-            self._set_status_badge("词典已保存")
-        except Exception as error:
-            self._set_status_badge(f"词典保存失败: {error}")
+        if self._dictionary_save_in_progress:
+            return
+        self._store_dictionary_section()
+        self._dictionary_generation += 1
+        entries = copy.deepcopy(self._dictionary_entries)
+        self._dictionary_save_in_progress = True
+        self.dictionary_save_button.setEnabled(False)
+        self._set_status_badge("正在保存词典")
+
+        def run():
+            originals, written = {}, []
+            try:
+                if any(not self._valid_correction(value) for value in entries.get("corrections.txt", [])):
+                    raise ValueError("请检查纠错的两个词")
+                for filename, values in entries.items():
+                    if filename == "builtin-ai.txt":
+                        continue
+                    path = self._dictionary_path(filename)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    originals[path] = path.read_bytes() if path.exists() else None
+                    temporary = path.with_suffix(".tmp")
+                    temporary.write_text("\n".join(values) + ("\n" if values else ""), encoding="utf-8")
+                    os.replace(temporary, path)
+                    written.append(path)
+                result = {"ok": True, "entries": entries}
+            except Exception as error:
+                for path in reversed(written):
+                    try:
+                        if originals[path] is None:
+                            path.unlink()
+                        else:
+                            temporary = path.with_suffix(".rollback.tmp")
+                            temporary.write_bytes(originals[path])
+                            os.replace(temporary, path)
+                    except OSError:
+                        logger.exception("dictionary rollback failed")
+                result = {"ok": False, "error": str(error)}
+            self.dictionary_finished.emit(result)
+
+        threading.Thread(target=run, name="voiceflow-dictionary-save", daemon=True).start()
+
+    @Slot(object)
+    def _finish_dictionary_save(self, result):
+        self._dictionary_generation += 1
+        self._dictionary_save_in_progress = False
+        self.dictionary_save_button.setEnabled(True)
+        if result["ok"]:
+            self._dictionary_dirty = self._dictionary_entries != result["entries"]
+            self._set_status_badge("词典已保存" if not self._dictionary_dirty else "词典已保存；新的更改尚未保存")
+        else:
+            self._set_status_badge(f"词典保存失败，草稿已保留：{result['error']}", attention=True)
 
     @staticmethod
     def _valid_correction(value):
@@ -1145,6 +1446,7 @@ class _SettingsWindow(QMainWindow):
 
     def _apply_dictation_preferences(self, snapshot, *, selected_app=None):
         self._dictation_preferences_snapshot = snapshot or {}
+        self._preferences_draft = {key: copy.deepcopy(snapshot[key]) for key in ("schema_version", "global", "apps") if key in snapshot}
         current = selected_app if selected_app is not None else self.dictation_scope_combo.currentData()
         self.dictation_scope_combo.blockSignals(True)
         self.dictation_scope_combo.clear()
@@ -1163,11 +1465,12 @@ class _SettingsWindow(QMainWindow):
         self.dictation_scope_combo.setCurrentIndex(max(0, self.dictation_scope_combo.findData(current)))
         self.dictation_scope_combo.blockSignals(False)
         available = self.controller is not None and bool(snapshot)
-        self.save_dictation_preferences_button.setEnabled(available and not self._dictation_save_in_progress)
         self._change_dictation_scope()
 
     def _change_dictation_scope(self, *_args):
-        snapshot = self._dictation_preferences_snapshot
+        snapshot = self._preferences_draft or self._dictation_preferences_snapshot
+        loading = self._loading_settings
+        self._loading_settings = True
         app_id = self.dictation_scope_combo.currentData()
         self.follow_default_button.setVisible(bool(app_id))
         self.follow_default_button.setEnabled(
@@ -1190,6 +1493,39 @@ class _SettingsWindow(QMainWindow):
             note = "上次设置未能读取，暂用保留原样；重新保存可修复。 " + note
         self.dictation_scope_note.setText(note)
         self._update_sentence_end_sample()
+        self._loading_settings = loading
+
+    def _settings_values(self):
+        return (self.language_combo.currentData(), self.microphone_combo.currentData(), self.autostart_check.isChecked(),
+                copy.deepcopy(self._preferences_draft))
+
+    def _settings_dirty(self):
+        return self._settings_baseline is not None and self._settings_values() != self._settings_baseline
+
+    def _settings_changed(self, *_args):
+        if self._loading_settings or not hasattr(self, "save_settings_button"):
+            return
+        if self._preferences_draft and self.sender() in (self.sentence_end_combo, self.preserve_format_check):
+            options = {"sentence_end": self.sentence_end_combo.currentData(), "preserve_format": self.preserve_format_check.isChecked()}
+            identity = self.dictation_scope_combo.currentData()
+            if identity:
+                self._preferences_draft["apps"][identity] = options
+            else:
+                self._preferences_draft["global"] = options
+        self.save_settings_button.setEnabled(self._settings_dirty() and not self._switch_in_progress)
+
+    def _reload_settings(self):
+        if self._settings_dirty() and QMessageBox.question(self, "重新载入设置", "放弃当前未保存的更改，载入最新设置？") != QMessageBox.StandardButton.Yes:
+            return
+        self._settings_baseline = None
+        self.reload_settings_button.hide()
+        self.refresh()
+
+    def _draft_follow_default(self):
+        identity = self.dictation_scope_combo.currentData()
+        self._preferences_draft.get("apps", {}).pop(identity, None)
+        self._change_dictation_scope()
+        self._settings_changed()
 
     def _update_sentence_end_sample(self, *_args):
         mode = self.sentence_end_combo.currentData() or "preserve"
@@ -1198,63 +1534,6 @@ class _SettingsWindow(QMainWindow):
         sample = apply_sentence_end(source, mode, preserve_format=preserve)
         self.sentence_end_sample.setText(f"示例：{sample}　/　Hello!　/　真的吗？")
         self.sentence_end_combo.setEnabled(not preserve)
-
-    def _save_dictation_preferences(self, _checked=False, *, follow_default=False):
-        if self._dictation_save_in_progress or self.controller is None:
-            return
-        self._dictation_save_in_progress = True
-        self.save_dictation_preferences_button.setEnabled(False)
-        self.follow_default_button.setEnabled(False)
-        self.dictation_scope_combo.setEnabled(False)
-        self.sentence_end_combo.setEnabled(False)
-        self.preserve_format_check.setEnabled(False)
-        app_id = self.dictation_scope_combo.currentData()
-        options = {"sentence_end": self.sentence_end_combo.currentData(),
-                   "preserve_format": self.preserve_format_check.isChecked(),
-                   "app_id": app_id,
-                   "expected": (self._dictation_preferences_snapshot.get("global") if app_id is None
-                                else self._dictation_preferences_snapshot.get("apps", {}).get(app_id))}
-        if follow_default:
-            options = {"app_id": app_id, "follow_default": True, "expected": options["expected"]}
-
-        def run():
-            try:
-                snapshot = self.controller.update_dictation_preferences(options)
-                if not snapshot:
-                    raise RuntimeError("settings unavailable")
-                result = {"ok": True, "snapshot": self.controller.query_dictation_preferences(),
-                          "app_id": app_id, "follow_default": follow_default}
-            except PreferencesChangedError:
-                try:
-                    result = {"ok": False, "changed": True,
-                              "snapshot": self.controller.query_dictation_preferences(), "app_id": app_id}
-                except Exception:
-                    result = {"ok": False}
-            except Exception:
-                result = {"ok": False}
-            self.dictation_preferences_finished.emit(result)
-
-        threading.Thread(target=run, name="voiceflow-dictation-settings", daemon=True).start()
-
-    @Slot(object)
-    def _finish_dictation_preferences(self, result):
-        self._dictation_save_in_progress = False
-        self.save_dictation_preferences_button.setEnabled(True)
-        self.dictation_scope_combo.setEnabled(True)
-        self.preserve_format_check.setEnabled(True)
-        self._update_sentence_end_sample()
-        if result.get("ok"):
-            self._apply_dictation_preferences(result["snapshot"], selected_app=result.get("app_id"))
-            self._set_status_badge("已跟随默认值，下一次听写生效" if result.get("follow_default")
-                                   else "标点与格式已保存，下一次听写生效")
-        elif result.get("changed"):
-            self._apply_dictation_preferences(result["snapshot"], selected_app=result.get("app_id"))
-            self._set_status_badge("设置已在其他位置更改，已刷新。请确认后重新保存。", attention=True)
-        else:
-            app_id = self.dictation_scope_combo.currentData()
-            self.follow_default_button.setEnabled(
-                bool(app_id in self._dictation_preferences_snapshot.get("apps", {})))
-            self._set_status_badge("标点与格式未保存，请重试或检查磁盘空间", attention=True)
 
     def _engine_ready(self, engine, config):
         return self.model_manager.status(engine, config).state is ModelState.READY
@@ -1280,9 +1559,6 @@ class _SettingsWindow(QMainWindow):
         engine = config.get("engine", {}).get("active", "sensevoice")
         if self._switch_in_progress:
             return
-        if self.model_manager.status(engine, config).state is not ModelState.READY:
-            self._set_status_badge("本机识别能力不可用，请重新安装 VoiceFlow")
-            return
         self._switch_in_progress = True
         self.save_settings_button.setEnabled(False)
         self._set_status_badge("正在保存设置")
@@ -1291,24 +1567,22 @@ class _SettingsWindow(QMainWindow):
             "language": self.language_combo.currentData(),
             "device_index": self.microphone_combo.currentData(),
             "autostart": self.autostart_check.isChecked(),
+            "expected_config": self._config_snapshot,
+            "expected_preferences": {key: copy.deepcopy(self._dictation_preferences_snapshot[key]) for key in ("schema_version", "global", "apps")},
+            "preferences": copy.deepcopy(self._preferences_draft),
         }
 
         def run():
             try:
-                status = self.model_manager.status(engine, config, verify=True)
-                if status.state is not ModelState.READY:
-                    raise RuntimeError("模型 SHA-256 完整性校验未通过")
-                update_runtime_settings(
-                    self.paths.config_file,
-                    engine=engine,
-                    language=payload["language"],
-                    device_index=payload["device_index"],
-                )
-                set_autostart(self.paths, bool(payload.get("autostart")))
+                result = self.controller.save_settings(payload)
+                if not result:
+                    raise RuntimeError("设置服务不可用")
+                payload.update(result)
                 payload["ok"] = True
             except Exception as error:
                 payload["ok"] = False
                 payload["error"] = str(error)
+                payload["changed"] = isinstance(error, PreferencesChangedError)
             self.model_switch_finished.emit(payload)
 
         threading.Thread(target=run, daemon=True).start()
@@ -1316,11 +1590,19 @@ class _SettingsWindow(QMainWindow):
     @Slot(object)
     def _finish_model_switch(self, payload):
         self._switch_in_progress = False
-        self.save_settings_button.setEnabled(True)
         if not payload.get("ok"):
-            self._set_status_badge(f"设置保存失败：{payload.get('error', '未知错误')}")
+            self.reload_settings_button.setVisible(bool(payload.get("changed")))
+            self._set_status_badge("设置已在其他位置更改。当前草稿已保留，请重新载入后保存。" if payload.get("changed") else "设置保存失败。草稿已保留，请重试或检查磁盘空间。", attention=True)
+            self._operation_error = payload.get("error", "未知错误")
+            self.operation_details_button.show()
+            self._settings_changed()
             return
-        self._set_status_badge("设置已保存，重启后生效")
+        self._config_snapshot = payload["config_text"]
+        self._dictation_preferences_snapshot = copy.deepcopy(payload["preferences"])
+        # Keep any edits made while the save worker was running as a new draft.
+        self._settings_baseline = (payload["language"], payload["device_index"], payload["autostart"], copy.deepcopy(payload["preferences"]))
+        self._settings_changed()
+        self._set_status_badge("已保存。设备设置重启后生效。" if payload["restart_required"] else "已保存，下一次听写生效。")
 
     def _current_language_label(self):
         try:
@@ -1437,6 +1719,7 @@ class _SettingsWindow(QMainWindow):
                 item,
                 self._history_card(text, meta, entry_id),
             )
+        QTimer.singleShot(0, self._resize_history_cards)
         if self._pending_history_cards:
             QTimer.singleShot(
                 0,
@@ -1454,14 +1737,34 @@ class _SettingsWindow(QMainWindow):
         text_group.setSpacing(4)
         display_text = text if len(text) <= 180 else f"{text[:180]}…"
         body = QLabel(display_text)
+        body.setTextFormat(Qt.TextFormat.PlainText)
         body.setObjectName("historyText")
         body.setWordWrap(True)
         body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         body.setToolTip(text)
         info = QLabel(meta)
+        info.setTextFormat(Qt.TextFormat.PlainText)
         info.setObjectName("historyMeta")
         text_group.addWidget(body)
         text_group.addWidget(info)
+        record = next((record for record in self._history_rows if record.get("_entry_id") == entry_id), {})
+        if len(text) > 180 or record.get("raw_text") or record.get("output_status"):
+            details = QPushButton("查看详情")
+            details.setObjectName("inlineCopyButton")
+            detail_text = QLabel()
+            detail_text.setTextFormat(Qt.TextFormat.PlainText)
+            detail_text.setWordWrap(True)
+            detail_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            detail_text.setText("终稿：\n" + text + ("\n\n原始识别：\n" + record["raw_text"] if record.get("raw_text") else "")
+                                + "\n\n交付：" + self._output_status_label(record.get("output_status", "unknown")))
+            detail_text.hide()
+            def toggle_details():
+                detail_text.setVisible(detail_text.isHidden())
+                details.setText("收起详情" if detail_text.isVisible() else "查看详情")
+                QTimer.singleShot(0, self._resize_history_cards)
+            details.clicked.connect(toggle_details)
+            text_group.addWidget(details)
+            text_group.addWidget(detail_text)
         row.addLayout(text_group, 1)
 
         copy = QPushButton("复制")
@@ -1476,6 +1779,16 @@ class _SettingsWindow(QMainWindow):
         )
         row.addWidget(delete)
         return card
+
+    def _resize_history_cards(self):
+        for index in range(self.history_list.count()):
+            item = self.history_list.item(index)
+            widget = self.history_list.itemWidget(item)
+            if widget:
+                width = max(1, self.history_list.viewport().width())
+                layout = widget.layout()
+                height = max(widget.minimumSizeHint().height(), layout.heightForWidth(width))
+                item.setSizeHint(QSize(width, height))
 
     def _delete_history_entry(self, entry_id):
         if not entry_id or not self._on_delete_history:
@@ -1960,16 +2273,16 @@ class _SettingsWindow(QMainWindow):
     def _style(self):
         return """
         * {
-            font-size: 14px;
+            font-size: 13px;
         }
         QWidget#appShell {
             background: #f7f7f8;
             color: #1d1d1f;
         }
         QWidget#sidebarPanel {
-            background: #f0f0f2;
+            background: #17171b;
             border: none;
-            border-right: 1px solid #dedee3;
+            border-right: 1px solid #29292f;
             border-radius: 0px;
         }
         QLabel#brandIcon {
@@ -1977,27 +2290,32 @@ class _SettingsWindow(QMainWindow):
             min-height: 32px;
         }
         QLabel#appTitle {
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 650;
-            color: #1d1d1f;
+            color: #f5f5f7;
+        }
+        QScrollArea#settingsPageScroll {
+            background: #ffffff;
+            border: none;
         }
         QLabel#appSubtitle, QLabel#sectionSubtitle, QLabel#fieldName {
             color: #6e6e73;
         }
         QLabel#appSubtitle, QLabel#sidebarVersion {
-            font-size: 12px;
-            color: #6b6b70;
+            font-size: 11px;
+            color: #a7a7b1;
         }
         QLabel#statusBadge {
-            padding: 7px 2px;
-            background: transparent;
-            color: #6b6b70;
+            padding: 10px 12px;
+            background: #242429;
+            color: #b6dfc2;
+            border-radius: 10px;
             border: none;
             font-weight: 600;
         }
         QLabel#statusBadge[attention="true"] {
-            color: #9a5b00;
-            background: transparent;
+            color: #edbe78;
+            background: #242429;
         }
         QListWidget#sidebar {
             background: transparent;
@@ -2005,15 +2323,16 @@ class _SettingsWindow(QMainWindow):
             outline: none;
         }
         QListWidget#sidebar::item {
-            min-height: 38px;
+            min-height: 42px;
             padding-left: 12px;
-            border-radius: 9px;
-            color: #515154;
+            border-radius: 10px;
+            color: #b6b6c0;
         }
         QListWidget#sidebar::item:selected {
-            background: #e4e4e9;
-            color: #1d1d1f;
+            background: #303037;
+            color: #ffffff;
             border: none;
+            border-left: 3px solid #ff453a;
             font-weight: 600;
         }
         QStackedWidget#contentStack {
@@ -2035,7 +2354,7 @@ class _SettingsWindow(QMainWindow):
             color: #1d1d1f;
         }
         QLabel#commandTitle {
-            font-size: 27px;
+            font-size: 30px;
             font-weight: 650;
             color: #1d1d1f;
         }
@@ -2049,9 +2368,9 @@ class _SettingsWindow(QMainWindow):
             font-weight: 600;
         }
         QWidget#dictationSettingsPanel {
-            background: #fbfbfc;
-            border: 1px solid #e5e5e8;
-            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid #e7e7ec;
+            border-radius: 18px;
         }
         QLabel#systemStatusItem {
             color: #4d4d50;
@@ -2091,7 +2410,7 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#diagnosticSummary {
             color: #3a3a3c;
-            background: #f0f6ff;
+            background: #f6f6f8;
             border: 1px solid #ececf0;
             border-radius: 12px;
             padding: 13px;
@@ -2125,10 +2444,34 @@ class _SettingsWindow(QMainWindow):
         }
         QLabel#privacyNote {
             color: #515154;
-            background: #f0f6ff;
-            border: 1px solid #dce9fb;
+            background: #f6f6f8;
+            border: 1px solid #e4e4e9;
             border-radius: 11px;
             padding: 11px 13px;
+        }
+        QWidget#sidebarPanel QPushButton {
+            color: #d6d6de;
+            background: #232329;
+            border: 1px solid #34343c;
+        }
+        QWidget#sidebarPanel QPushButton:hover { background: #303037; }
+        QListWidget#sidebar::item:hover { background: #25252c; }
+        QLabel#shortcutKey {
+            color: #56565f;
+            background: #f3f3f6;
+            border: 1px solid #e7e7eb;
+            border-radius: 7px;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        QLabel#operationFeedback {
+            color: #285b3a;
+            background: #f1f7f3;
+            border-top: 1px solid #e0ebe3;
+        }
+        QLabel#operationFeedback[attention="true"] {
+            color: #874914;
+            background: #fff5ec;
         }
         QLabel#fieldValue {
             color: #1d1d1f;
@@ -2145,7 +2488,7 @@ class _SettingsWindow(QMainWindow):
             selection-color: #ffffff;
         }
         QComboBox {
-            min-height: 18px;
+            min-height: 24px;
             padding: 6px 11px;
         }
         QComboBox::drop-down {
@@ -2169,8 +2512,8 @@ class _SettingsWindow(QMainWindow):
         QListWidget#diagnosticList::item:selected,
         QListWidget#dictionaryList::item:selected {
             color: #1d1d1f;
-            background: #eef5ff;
-            border: 1px solid #c8dfff;
+            background: #fff3f1;
+            border: 1px solid #eec7c2;
         }
         QWidget#historyCard, QWidget#emptyCard,
         QWidget#diagnosticCard {
@@ -2346,6 +2689,7 @@ class OverlayWindow:
 
     def _run(self):
         app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)
         if self._notify_existing_instance():
             return
         self._start_single_instance_server()
@@ -2432,7 +2776,8 @@ class OverlayWindow:
                 if stall_ms is not None:
                     logger.warning(
                         "UI event loop stalled",
-                        extra={"event": "ui_stall", "duration_ms": stall_ms},
+                        extra={"event": "ui_stall", "duration_ms": stall_ms,
+                               "phase": self.controller.runtime_snapshot()["phase"] if self.controller else "unknown"},
                     )
 
         threading.Thread(
@@ -2678,7 +3023,7 @@ class OverlayWindow:
 
     def _show_startup(self):
         window = self._ensure_settings_window()
-        if window.needs_onboarding():
+        if window.needs_onboarding() or not QSystemTrayIcon.isSystemTrayAvailable():
             self._show_settings()
 
     def _complete_onboarding(self):

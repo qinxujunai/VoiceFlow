@@ -24,10 +24,13 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
-def verify_model_assets(model_dir: str | Path, model: dict[str, Any]) -> list[str]:
+def verify_model_assets(model_dir: str | Path, model: dict[str, Any], *, runtime_only=False) -> list[str]:
     base = Path(model_dir)
     errors: list[str] = []
     for asset in model.get("files", []):
+        if runtime_only and (asset.get("role") == "evaluation"
+                             or asset["path"].replace("\\", "/").startswith("test_wavs/")):
+            continue
         path = base / asset["path"]
         if not path.is_file():
             errors.append(f"missing: {asset['path']}")

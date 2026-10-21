@@ -91,7 +91,13 @@ def test_windows_ci_forces_utf8_for_chinese_diagnostics():
     assert "scripts/benchmark_models.py --limit 5 --strict-output" in workflow
     assert "permissions:" in workflow
     assert "contents: read" in workflow
-    assert workflow.count("persist-credentials: false") == 3
+    import yaml
+
+    jobs = yaml.safe_load(workflow)["jobs"]
+    checkouts = [step for job in jobs.values() for step in job["steps"]
+                 if step.get("uses", "").startswith("actions/checkout@")]
+    assert checkouts
+    assert all(step["with"]["persist-credentials"] is False for step in checkouts)
 
 
 def test_installer_smoke_derives_the_artifact_from_the_source_version():
@@ -337,7 +343,8 @@ def test_inno_installer_is_per_user_upgradeable_and_bundles_offline_default_mode
     ) in installer
     assert 'Source: "..\\models\\sensevoice\\*"' not in installer
     assert ".cache" not in installer
-    assert "AppId={{" in installer
+    assert 'AppId={#MyAppId}' in installer
+    assert '{{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}' in installer
     assert "Uninstallable=yes" in installer
     assert 'Name: "autostart"' not in installer
     assert r"Software\Microsoft\Windows\CurrentVersion\Run" not in installer

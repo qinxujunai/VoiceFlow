@@ -21,6 +21,7 @@ INPUT_FILES = (
     "docs/sensevoice-redistribution-decision.md", "docs/qt-lgpl-compliance.md",
     "docs/streaming-preview-model-review.md",
     "docs/asr-runtime-build.md",
+    "docs/punctuation-model-review.md",
 )
 INPUT_TREES = ("src", "scripts", "installer", "licenses", "knowledge-base", "vendor/windows")
 

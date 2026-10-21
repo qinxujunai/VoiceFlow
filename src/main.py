@@ -169,6 +169,7 @@ class VoiceInputSystem:
         self._speech_min_active_ms = int(vad_config.get("min_speech_ms", 90))
         self.history = HistoryStore(self.paths.history_file)
         self.punctuation = FinalPunctuationRestorer()
+        self.punctuation_worker = None
         self.dictation_preferences = DictationPreferencesStore(
             self.paths.dictation_preferences_file, legacy_output=self.config.get("output", {}))
         self._last_dictation_app = ""
@@ -189,6 +190,7 @@ class VoiceInputSystem:
             on_query_microphones=self._query_microphones,
             on_query_dictation_preferences=self._query_dictation_preferences,
             on_update_dictation_preferences=self._update_dictation_preferences,
+            on_save_settings=self._save_settings,
             on_delete_history=self._delete_history_entry,
             on_clear_history=self._clear_history,
             on_clear_local_data=self._clear_local_dictation_data,
@@ -326,6 +328,15 @@ class VoiceInputSystem:
             return
         print(f"[启动] {engine}", flush=True)
 
+        punctuation_model = self.paths.resolve_asset("models/punctuation/model.int8.onnx")
+        if punctuation_model.is_file():
+            from punctuation_worker import SupervisedPunctuation
+            self.punctuation_worker = SupervisedPunctuation(punctuation_model)
+            if self.punctuation_worker.load():
+                self.punctuation.backend = self.punctuation_worker.restore
+            else:
+                logger.warning("final punctuation unavailable; retaining recognition punctuation")
+
         try:
             self.preview_transcriber = SupervisedPreviewTranscriber(
                 self.config_path,
@@ -394,6 +405,10 @@ class VoiceInputSystem:
     def _update_dictation_preferences(self, options):
         return self.dictation_preferences.update(**options)
 
+    def _save_settings(self, draft):
+        from settings_store import save_settings_transaction
+        return save_settings_transaction(self.paths, self.dictation_preferences, draft)
+
     def _final_text_options(self, target=None):
         preferences = getattr(self, "dictation_preferences", None)
         if preferences is None:
@@ -412,7 +427,10 @@ class VoiceInputSystem:
             safe = self._safe_text.sanitize(raw_text)
             text = (safe.text if contains_technical_text(safe.text) else
                     self.cleaner.clean(safe.text) if safe.text else "")
-            text = self.punctuation.restore(text)
+            from punctuation import normalize_dictation_spacing
+            text = self.punctuation.restore(normalize_dictation_spacing(text))
+            if getattr(self.cleaner, "auto_space_en", False) and not contains_technical_text(text):
+                text = self.cleaner._add_cjk_en_space(text)
         return apply_sentence_end(text, options.sentence_end,
                                   preserve_format=options.preserve_format), safe
 
@@ -1717,6 +1735,7 @@ class VoiceInputSystem:
         for name, method in (
             ("hotkey_mgr", "stop"), ("transcriber", "shutdown"),
             ("preview_transcriber", "shutdown"), ("audio", "shutdown"),
+            ("punctuation_worker", "shutdown"),
             ("output_handler", "shutdown"),
         ):
             service = getattr(self, name, None)
