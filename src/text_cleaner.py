@@ -23,9 +23,6 @@ class TextCleaner:
         self.fix_mistakes = cfg.get("fix_mistakes", True)
         self.basic_punctuation = cfg.get("basic_punctuation", cfg.get("basic_punctuation", False))
 
-        # 只压缩完全重复的“然后”，不猜测并删除用户语义。
-        self.then_dedup = re.compile(r"然后(然后)+")
-
         # --- 中英空格 ---
         self.cjk_en_boundary = re.compile(
             r"(?<=[\u4e00-\u9fff\u3400-\u4dbf])(?=[a-zA-Z0-9])|"
@@ -55,85 +52,8 @@ class TextCleaner:
         self._ctrl_re = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
     def _build_corrections(self, base_dir):
-        """构建修正词表：内置映射 + knowledge-base 自定义文件"""
-        # --- 内置：常见 SenseVoice 音近误识别 ---
-        corrections = {
-            # 开发工具 / AI 产品
-            "科瑟": "Cursor", "扣瑟": "Cursor", "克瑟": "Cursor",
-            "coach": "Cursor",
-            "云代码": "Cloud Code", "cloud code": "Cloud Code", "cloudcode": "Cloud Code",
-            "克劳德": "Claude",
-            "开放代码": "OpenCode", "open code": "OpenCode", "opencode": "OpenCode",
-            "coach code": "Codex", "扣dex": "Codex", "扣戴克斯": "Codex",
-            "且gpt": "ChatGPT", "chat gpt": "ChatGPT",
-            "扣派乐特": "Copilot", "copilot": "Copilot",
-            "哈斯": "Hermes", "赫密斯": "Hermes",
-            "温德瑟夫": "Windsurf",
-
-            # 大模型 / AI
-            "deepseek": "DeepSeek", "迪普斯克": "DeepSeek", "迪普西克": "DeepSeek",
-            "deep sick": "DeepSeek",
-            "拉玛": "LLaMA", "喇嘛": "LLaMA",
-            "千问": "Qwen", "q问": "Qwen",
-            "秘密欧": "MiMo", "米莫": "MiMo",
-            "欧拉玛": "Ollama", "奥拉玛": "Ollama", "ollama": "Ollama",
-            "克拉玛": "CLI",
-            "hugging face": "HuggingFace", "哈根face": "HuggingFace",
-            "兰钦": "LangChain", "lang chain": "LangChain",
-            "comfy ui": "ComfyUI", "comfy": "ComfyUI",
-
-            # 编程语言 / 框架
-            "拍桑": "Python", "拍森": "Python", "排桑": "Python", "pison": "Python",
-            "加瓦": "Java",
-            "go浪": "Golang", "狗浪": "Golang",
-            "js": "JavaScript",
-            "ts": "TypeScript",
-            "拉斯特": "Rust",
-            "c加加": "C++", "c plus plus": "C++",
-            "react": "React",
-            "next js": "Next.js", "nex js": "Next.js",
-            "fast api": "FastAPI", "fastapi": "FastAPI",
-            "docker": "Docker", "多克": "Docker",
-            "k8s": "Kubernetes", "k8": "Kubernetes", "库博内特斯": "Kubernetes",
-            "酷博": "Kubernetes",
-            "吉特": "Git", "git": "Git",
-            "吉特哈布": "GitHub", "github": "GitHub", "give hub": "GitHub",
-
-            # 技术概念
-            "a p i": "API", "api": "API",
-            "rest api": "REST API",
-            "rag": "RAG",
-            "微调": "微调", "fine tuning": "fine-tuning",
-            "劳拉": "LoRA", "lora": "LoRA",
-            "库达": "CUDA", "cuda": "CUDA",
-            "托肯": "token",
-            "哈鲁斯内选": "hallucination", "幻觉": "幻觉",
-            "语音识别": "ASR", "asr": "ASR",
-            "stt": "STT",
-            "tts": "TTS",
-            "v开头": "vLLM",
-            "gp t": "GPT",
-
-            # 口语修正
-            "好滴": "好的", "好嘞": "好的",
-            "欧克": "OK", "ok": "OK", "okay": "OK",
-            "三Q": "谢谢",
-            "拜拜": "再见",
-            "嗯嗯": "", "啊啊": "",
-            "额额": "",
-
-            # 格式修正
-            "http": "HTTP", "https": "HTTPS",
-            "url": "URL",
-            "json": "JSON",
-            "csv": "CSV",
-            "sql": "SQL",
-        }
-
-        if self.vocabulary:
-            corrections.update(self.vocabulary.corrections)
-
-        return corrections
+        """Apply only the correction pairs visible in the managed dictionary."""
+        return dict(self.vocabulary.corrections) if self.vocabulary else {}
 
     def _correction_files_signature(self):
         if not self.vocabulary:
@@ -209,7 +129,6 @@ class TextCleaner:
 
         text = text.strip()
 
-        text = self.then_dedup.sub("然后", text)
         if self.fix_mistakes:
             self._reload_corrections_if_changed()
             text = self._fix_mistakes(text)

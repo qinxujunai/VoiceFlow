@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "app_version": "0.3.9",
+  "components": [
+    {
+      "file": "qtbase-6.11.1.tar.gz",
+      "repository": "qt/qtbase",
+      "revision": "59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+      "url": "https://codeload.github.com/qt/qtbase/tar.gz/59c81a3c2247b821b9b84b4eb8d939b77e07e276",
+      "sha256": "7341ef4547f3b80cad69c155992f97b07a73d5b1b165528e5b3500b9edb84774",
+      "bytes": 67780073
+    },
+    {
+      "file": "qtsvg-6.11.1.tar.gz",
+      "repository": "qt/qtsvg",
+      "revision": "2596f43da2dc72d2afecc084355b0f5f87922a6c",
+      "url": "https://codeload.github.com/qt/qtsvg/tar.gz/2596f43da2dc72d2afecc084355b0f5f87922a6c",
+      "sha256": "daada4ac5c351d167ac556be18dda5d4192bbe923f5244545ee5635719fcb6b6",
+      "bytes": 2624774
+    },
+    {
+      "file": "qtimageformats-6.11.1.tar.gz",
+      "repository": "qt/qtimageformats",
+      "revision": "77f35e5694885844c3eb3a737769b5ed290b8ccc",
+      "url": "https://codeload.github.com/qt/qtimageformats/tar.gz/77f35e5694885844c3eb3a737769b5ed290b8ccc",
+      "sha256": "eafe337c27bec155e7937f99fc619d379fd61e205223d9b724a30e7a2715a049",
+      "bytes": 2644931
+    },
+    {
+      "file": "pyside-6.11.1.tar.gz",
+      "repository": "qtproject/pyside-pyside-setup",
+      "revision": "73fb12a067c2e8f7a464a310aaee2860fa2b64d2",
+      "url": "https://codeload.github.com/qtproject/pyside-pyside-setup/tar.gz/73fb12a067c2e8f7a464a310aaee2860fa2b64d2",
+      "sha256": "a6b134456b06cb6893185df82a1e120b5e440ba08efb69f03ececa09b0d80955",
+      "bytes": 20935188
+    },
+    {
+      "file": "pynput-1.8.2.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/86/c6/e2d415610cfbc78308bee44218a46124aaa3301b1df08814df819b2254a1/pynput-1.8.2.tar.gz",
+      "version": "1.8.2",
+      "sha256": "f493c87157cd3861b4468f7f896857051762f44ed26f1b641e7cc5840a457087",
+      "bytes": 82818
+    }
+  ],
+  "bundle": {
+    "name": "VoiceFlow-0.3.9-LGPL-sources.zip",
+    "sha256": "5137f59bab8df5002446cf2a8910b2105eb3eed6876574c09769857f7160e816",
+    "bytes": 94070953,
+    "url": "https://github.com/qinxujunai/VoiceFlow/releases/download/v0.3.9/VoiceFlow-0.3.9-LGPL-sources.zip"
+  }
+}

@@ -61,6 +61,7 @@ class AppController:
         on_query_microphones: Callable | None = None,
         on_query_dictation_preferences: Callable | None = None,
         on_update_dictation_preferences: Callable | None = None,
+        on_save_settings: Callable | None = None,
         on_delete_history: Callable | None = None,
         on_clear_history: Callable | None = None,
         on_clear_local_data: Callable | None = None,
@@ -101,6 +102,7 @@ class AppController:
             "query_microphones": on_query_microphones,
             "query_dictation_preferences": on_query_dictation_preferences,
             "update_dictation_preferences": on_update_dictation_preferences,
+            "save_settings": on_save_settings,
             "delete_history": on_delete_history,
             "clear_history": on_clear_history,
             "clear_local_data": on_clear_local_data,
@@ -258,6 +260,9 @@ class AppController:
 
     def update_dictation_preferences(self, options):
         return self._call("update_dictation_preferences", options)
+
+    def save_settings(self, draft):
+        return self._call("save_settings", draft)
 
     def delete_history(self, entry_id):
         return self._call("delete_history", entry_id)

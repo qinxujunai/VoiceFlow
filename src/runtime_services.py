@@ -81,7 +81,7 @@ class ModelManager:
                 model_dir = self.paths.data_dir / profile.target_dir
                 if not model_dir.exists():
                     model_dir = self.paths.install_dir / profile.target_dir
-                errors = verify_model_assets(model_dir, model)
+                errors = verify_model_assets(model_dir, model, runtime_only=True)
                 if errors:
                     state = ModelState.CORRUPT
                     missing.extend(errors)

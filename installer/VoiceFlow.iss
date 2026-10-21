@@ -2,12 +2,19 @@
 #include "version.iss"
 #define MyAppPublisher "qinxujunai / VoiceFlow contributors"
 #define MyAppExeName "VoiceFlow.exe"
+#ifndef APP_TEST_ID
+#define MyAppId "{{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}"
+#else
+; Isolated acceptance installers must not replace the installed product's
+; uninstall registration. Never set this override in a public build.
+#define MyAppId "{{" + APP_TEST_ID + "}"
+#endif
 #ifndef APP_SOURCE_DIR
 #define APP_SOURCE_DIR "..\dist\VoiceFlow"
 #endif
 
 [Setup]
-AppId={{A38E48E3-1D73-42EC-A5F7-7D16B29C55AF}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 VersionInfoVersion={#MyAppFileVersion}
@@ -23,7 +30,7 @@ OutputDir=..\dist\installer
 OutputBaseFilename=VoiceFlow-{#MyAppVersion}-Windows-x64
 SetupIconFile=..\assets\voiceflow.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
-LicenseFile=..\LICENSE
+LicenseFile=..\licenses\VoiceFlow-install-terms.txt
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -62,6 +69,9 @@ Source: "..\models\streaming-preview\encoder-epoch-99-avg-1.int8.onnx"; DestDir:
 Source: "..\models\streaming-preview\decoder-epoch-99-avg-1.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
 Source: "..\models\streaming-preview\joiner-epoch-99-avg-1.int8.onnx"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
 Source: "..\models\streaming-preview\tokens.txt"; DestDir: "{app}\models\streaming-preview"; Flags: ignoreversion
+#endif
+#ifdef INCLUDE_PUNCTUATION
+Source: "..\models\punctuation\model.int8.onnx"; DestDir: "{app}\models\punctuation"; Flags: ignoreversion
 #endif
 
 [Icons]

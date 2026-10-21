@@ -7,6 +7,7 @@ import unicodedata
 
 
 _SPACE_RE = re.compile(r"\s+")
+_LATIN_WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['’_-][A-Za-z0-9]+)*")
 SENTENCE_END_CHOICES = (
     ("preserve", "保留识别标点"),
     ("omit_period", "省略最后一个句号"),
@@ -23,6 +24,22 @@ _TECHNICAL_RE = re.compile(
 
 def contains_technical_text(text: str) -> bool:
     return bool(_TECHNICAL_RE.search(str(text or "")))
+
+
+def normalize_dictation_spacing(text: str) -> str:
+    """Normalize presentation without guessing or replacing spoken words."""
+    source = str(text or "")
+    if contains_technical_text(source):
+        return source
+    candidate = re.sub(r"(?<=[\u3400-\u9fff])[ \t]+(?=[\u3400-\u9fff])", "", source)
+    candidate = re.sub(r"[ \t]+([，。！？；：、])", r"\1", candidate)
+    candidate = re.sub(r"([，。！？；：、])[ \t]+", r"\1", candidate)
+    # Three periods may be an intentional ellipsis; collapse only malformed
+    # mixed runs or a doubled full stop.
+    candidate = re.sub(r"([。！？])[，。、]*[，、][，。、]*", r"\1", candidate)
+    candidate = re.sub(r"(?<!。)。。(?!。)", "。", candidate)
+    candidate = re.sub(r"([，、；：])[，、；：]+", r"\1", candidate)
+    return candidate if lexical_skeleton(candidate) == lexical_skeleton(source) else source
 
 
 def apply_sentence_end(text: str, mode: str = "preserve", *, preserve_format=False) -> str:
@@ -53,7 +70,7 @@ def lexical_skeleton(text: str) -> str:
     return "".join(
         character
         for character in _SPACE_RE.sub("", str(text or ""))
-        if not unicodedata.category(character).startswith("P")
+        if character not in "，。！？；：、,.!?;:"
     )
 
 
@@ -67,12 +84,13 @@ class FinalPunctuationRestorer:
         if preserve_format:
             return str(text or "")
         source = str(text or "").strip()
-        if not source or self.backend is None:
+        if not source or self.backend is None or contains_technical_text(source):
             return source
         try:
             candidate = str(self.backend(source) or "").strip()
         except Exception:
             return source
-        if lexical_skeleton(candidate) != lexical_skeleton(source):
+        if (lexical_skeleton(candidate) != lexical_skeleton(source)
+                or _LATIN_WORD_RE.findall(candidate) != _LATIN_WORD_RE.findall(source)):
             return source
         return candidate or source

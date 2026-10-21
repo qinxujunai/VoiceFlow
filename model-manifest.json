@@ -244,6 +244,30 @@
         {"path": "model-00002-of-00002.safetensors", "size": 478200688, "sha256": "6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc"}
       ]
     },
+    "ct-transformer-punctuation-int8": {
+      "runtime_engine": "offline-punctuation",
+      "role": "final_punctuation",
+      "product_status": "default",
+      "target_dir": "models/punctuation",
+      "source": {
+        "provider": "github_release_archive",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8.tar.bz2",
+        "archive_size": 64717756,
+        "archive_sha256": "c0d5aa5f8eeb686032345e180bedf39319dc2e0556781c6264bcadba8328a6e1",
+        "archive_root": "sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8",
+        "upstream": "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "name": "Apache License 2.0; additional FunASR model terms retained",
+        "distribution_review_required": false,
+        "decision_file": "docs/punctuation-model-review.md"
+      },
+      "download_bytes": 75519198,
+      "files": [
+        {"path": "model.int8.onnx", "size": 75519198, "sha256": "65a3fb9f5ad7bfb96bf69e0dc4481df97f6ee60513c1d94ce981ba6effd524b1"}
+      ]
+    },
     "whisper-large-v3-turbo-int8": {
       "runtime_engine": "whisper-turbo",
       "role": "multilingual_control",

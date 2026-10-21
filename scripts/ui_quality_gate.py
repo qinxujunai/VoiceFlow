@@ -24,6 +24,8 @@ def run(output_dir: str | Path, *, offscreen_windows_fonts: bool = False) -> dic
         scale_dir = output / scale.replace(".", "_")
         env = os.environ.copy()
         env["QT_SCALE_FACTOR"] = scale
+        if offscreen_windows_fonts:
+            env["QT_QPA_PLATFORM"] = "offscreen"
         completed = subprocess.run(
             [
                 sys.executable,
