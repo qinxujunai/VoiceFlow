@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-21",
+  "basis": "User-authorized Visual Studio Community installation for an MIT/OSI open-source project; Community license section 1 and section 4 plus the VS2022 redistributable list",
+  "product": {
+    "productId": "Microsoft.VisualStudio.Product.Community",
+    "installationVersion": "17.14.37806.7",
+    "isComplete": true,
+    "isLaunchable": true
+  },
+  "bootstrapper_sha256": "e38048c45811bed66da5315aa921573a0b01cadaeb5f82b3aa183b8ad497e58b",
+  "bootstrapper_url": "https://aka.ms/vs/17/release/vs_community.exe",
+  "license_urls": [
+    "https://visualstudio.microsoft.com/license-terms/vs2022-ga-community/",
+    "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/",
+    "https://aka.ms/vs/17/redistribution"
+  ],
+  "license_files": [
+    {
+      "path": "Visual-C-Runtime-2015-2022-License-EN.docx",
+      "sha256": "f1e3d56ceb2ad68aae0711b910375009e651ac5530fa0760f0dea6e81e54fae1"
+    },
+    {
+      "path": "Visual-Studio-2022-Community-License-EN.docx",
+      "sha256": "41a207b10c8ab91d0d2f10a854715f73dca54509581692d2fe179aa3ffcb8540"
+    }
+  ],
+  "text_copy_scope": "Readable DOCX paragraph extraction; trailing whitespace normalized; original signed-source DOCX bytes retained separately"
+}

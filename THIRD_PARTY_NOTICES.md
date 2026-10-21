@@ -11,6 +11,7 @@ also contains third-party components under their own licenses.
 | Mesa llvmpipe 11.2.2 | MIT and Boost-1.0 component notices | Qt's optional Windows software OpenGL runtime |
 | LLVM 3.6.2 | University of Illinois/NCSA and component notices | Compiler support statically included in Mesa llvmpipe |
 | CPython | PSF and included component notices | Bundled Python interpreter and standard library |
+| Microsoft Visual C++ Runtime | Microsoft Distributable Code and Runtime terms | Windows runtime support; original terms and licensed Community provenance in `licenses/microsoft-vc-runtime/` |
 | OpenSSL 3.5.6 | Apache-2.0 | TLS libraries accompanying CPython and Qt |
 | PortAudio 19.7.0 | MIT | Ordinary Windows microphone backends; optional ASIO library excluded from the current package |
 | sherpa-onnx | Apache-2.0 | Offline ASR runtime |
@@ -71,6 +72,12 @@ distributions referenced by PyInstaller Analysis are copied unchanged under
 LAPACK and the GCC runtime exception. A wheel with no notice file is explicitly
 listed with an empty notice array and still requires a reviewed upstream notice.
 These generated lists do not approve every native or statically linked component.
+
+The 0.3.9 release review is recorded separately in `licenses/release-review-0.3.9.md`.
+Earlier manifests retain their original evidence scope and pending-review fields;
+they are historical provenance, not the final release sign-off. The exact corresponding
+Qt/PySide6/pynput source archives are a separate versioned Release asset documented in
+`licenses/LGPL-SOURCE.md` and pinned by `licenses/lgpl-sources.json`.
 
 `licenses/cpython-3.12.13/` additionally retains nine unchanged native component
 notice/header files from the interpreter's official 20260602 full archive and
