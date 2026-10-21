@@ -14,14 +14,28 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name == 'release' && 'request' || 'deploy' }}
   cancel-in-progress: true
 
 jobs:
+  request-deploy:
+    if: github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Pages permits master, not release tags. Dispatch from that allowed ref
+      # instead of broadening the environment's deployment protection rules.
+      - name: Request deployment from the protected branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref master --repo "$GITHUB_REPOSITORY"
+
   deploy:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'release' && !github.event.release.draft && !github.event.release.prerelease) ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     environment:
       name: github-pages
