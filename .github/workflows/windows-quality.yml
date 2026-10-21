@@ -152,6 +152,10 @@ jobs:
 
   installed-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.candidate_tag != ''
+    # GitHub restricts unpublished releases to push-capable repository access.
+    # Keep that permission on this manually dispatched verification job only.
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
