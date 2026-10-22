@@ -26,13 +26,29 @@ to swap engines without the quality gates below.
 
 ## Known Issues And Owner-Only Steps
 
-- 0.3.10 is not released: `master` has the redesigned settings, the capsule text fade and the
-  page split. Releasing needs the owner's sign-off flow (license review record, LGPL source
-  bundle, installed-machine verification), as for 0.3.9.
+- Windows 0.3.10/build 261022.1 is released with the exact installer sign-off,
+  corresponding LGPL sources and installed-machine verification. See
+  `docs/release-validation-0.3.10.md`. Future artifacts still require their own
+  sign-off; this release does not approve different dependency or installer bytes.
 - Unsigned installer; Windows 10/11 only; no public accuracy figures until enough authorized
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-10-22, Codex**: released Windows 0.3.10 from `c9df2cc`, after
+  829 local tests, release gates, Windows/macOS source checks, exact uploaded
+  installer fresh/0.3.9-upgrade/uninstall-data checks and a verified local upgrade.
+  All 500 payload files matched; seven protected data files survived unchanged.
+  The user completed a 62.186 s F2 acceptance and reported good results. Source
+  and installed screenshots, metadata-only speech acceptance and rollback are
+  private under `logs/release-0.3.10/` and
+  `tests_runtime/release261022-upgrade/backup`.
+  Signed review: `release/v0.3.10/RELEASE_SIGNOFF.json`; full public evidence:
+  `docs/release-validation-0.3.10.md`. The website follow-up versions `app.js`
+  to prevent a cached prior script from overwriting the visible release number;
+  its renderer regression failed before the fix and passed after. The redundant
+  tag-triggered rebuild was canceled; the reviewed local installer was preserved,
+  and no GitHub build attestation is claimed.
 
 - **2026-10-22, Codex**: prepared 0.3.10 build 261022.1 from `72dc69c`,
   preserving `backup/local-20261022` and all unrelated private artifacts.

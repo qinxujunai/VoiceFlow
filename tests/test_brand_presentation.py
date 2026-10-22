@@ -257,6 +257,7 @@ def test_public_site_renderer_validates_digest_and_replaces_placeholders(tmp_pat
     copy = (output_dir / "app.js").read_text(encoding="utf-8")
     assert "__VOICEFLOW_VERSION__" not in page + copy
     assert "v0.3.0" in page + copy
+    assert 'src="app.js?v=0.3.0"' in page
     assert release["assets"][0]["browser_download_url"] in page
 
 
