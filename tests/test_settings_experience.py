@@ -4,15 +4,66 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+def _settings_source():
+    """overlay_webview.py with the settings_ui mixins it was split into (2026-10-22) placed inside
+    the settings section, i.e. before ``class OverlayWindow``, so section slices still cover them."""
+    src = ROOT / "src"
+    overlay = (src / "overlay_webview.py").read_text(encoding="utf-8")
+    mixins = "\n".join(path.read_text(encoding="utf-8") for path in sorted((src / "settings_ui").glob("*.py")))
+    head, tail = overlay.split("class OverlayWindow", 1)
+    return head + mixins + "\nclass OverlayWindow" + tail
+
+
+def _method_source(name):
+    """Source of one settings-window method, wherever the split put it."""
+    import ast
+
+    src = ROOT / "src"
+    for path in [src / "overlay_webview.py", *sorted((src / "settings_ui").glob("*.py"))]:
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name == name:
+                        return ast.get_source_segment(text, item)
+    raise AssertionError(f"method {name} not found")
+
 OVERLAY = ROOT / "src" / "overlay_webview.py"
 
 
 def _block(source, start, end):
+    # Methods are taken by name, because the 2026-10-22 split moved them between files: the start
+    # method and the ones after it in the same file, up to the end method. A class section by text.
+    if start.startswith("def "):
+        return _method_run(start[4:], end[4:] if end.startswith("def ") else None)
     return source.split(start, 1)[1].split(end, 1)[0]
 
 
+def _method_run(first, stop):
+    import ast
+
+    src = ROOT / "src"
+    for path in [src / "overlay_webview.py", *sorted((src / "settings_ui").glob("*.py"))]:
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            names = [item for item in node.body if isinstance(item, ast.FunctionDef)]
+            index = next((i for i, item in enumerate(names) if item.name == first), None)
+            if index is None:
+                continue
+            run = []
+            for item in names[index:]:
+                if item.name == stop:
+                    break
+                run.append(ast.get_source_segment(text, item))
+            return "\n\n".join(run)
+    raise AssertionError(f"method {first} not found")
+
+
 def test_primary_status_pages_hide_model_and_thread_implementation_details():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     home = _block(source, "def _home_page", "def _recent_page")
     refresh_home = _block(source, "def _refresh_home", "def _dictionary_path")
 
@@ -25,7 +76,7 @@ def test_primary_status_pages_hide_model_and_thread_implementation_details():
 
 
 def test_sidebar_version_is_two_lines_and_the_shell_avoids_a_double_border():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
 
     assert 'QLabel(f"{display_version()}\\n{platform_label()}")' in source
     assert "self.setMinimumSize(600, 460)" in source
@@ -35,7 +86,7 @@ def test_sidebar_version_is_two_lines_and_the_shell_avoids_a_double_border():
 
 
 def test_settings_home_uses_a_quiet_command_center_hierarchy():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     shell = _block(source, "class _SettingsWindow", "def _show_primary_page")
     home = _block(source, "def _home_page", "def _recent_page")
 
@@ -50,7 +101,7 @@ def test_settings_home_uses_a_quiet_command_center_hierarchy():
 
 
 def test_settings_shell_keeps_diagnostics_auxiliary_and_no_model_marketplace():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     settings = _block(source, "class _SettingsWindow", "class OverlayWindow")
 
     assert 'for label in ("听写", "词典", "历史")' in settings
@@ -60,7 +111,7 @@ def test_settings_shell_keeps_diagnostics_auxiliary_and_no_model_marketplace():
 
 
 def test_dictation_home_is_the_single_settings_entrypoint_without_private_recent_text():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     settings = _block(source, "class _SettingsWindow", "class OverlayWindow")
     home = _block(source, "def _home_page", "def _recent_page")
 
@@ -76,7 +127,7 @@ def test_dictation_home_is_the_single_settings_entrypoint_without_private_recent
 
 
 def test_dictionary_uses_an_entry_list_instead_of_a_raw_file_editor():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     dictionary = _block(source, "def _dictionary_page", "def _diagnostics_page")
 
     assert "self.dictionary_list = QListWidget()" in dictionary
@@ -89,7 +140,7 @@ def test_dictionary_uses_an_entry_list_instead_of_a_raw_file_editor():
 
 
 def test_dictionary_exposes_bundled_ai_terms_as_read_only_product_content():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     dictionary = _block(source, "def _dictionary_page", "def _diagnostics_page")
     rendering = _block(source, "def _render_dictionary_section", "def _change_dictionary_section")
 
@@ -102,7 +153,7 @@ def test_dictionary_exposes_bundled_ai_terms_as_read_only_product_content():
 
 
 def test_dictionary_copy_explains_what_each_entry_can_reliably_change():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     dictionary = _block(source, "def _dictionary_page", "def _diagnostics_page")
     rendering = _block(source, "def _render_dictionary_section", "def _change_dictionary_section")
     saving = _block(source, "def _save_dictionary", "def _valid_correction")
@@ -114,7 +165,7 @@ def test_dictionary_copy_explains_what_each_entry_can_reliably_change():
 
 
 def test_help_and_settings_labels_are_short_and_task_oriented():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     shell = _block(source, "class _SettingsWindow", "def _show_primary_page")
     settings = _block(source, "def _home_page", "def _recent_page")
 
@@ -127,7 +178,7 @@ def test_help_and_settings_labels_are_short_and_task_oriented():
 
 
 def test_each_history_card_owns_copy_and_delete_without_repaste():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     recent = _block(source, "def _recent_page", "def _dictionary_page")
     card = _block(source, "def _history_card", "def _empty_card")
 
@@ -153,7 +204,7 @@ def test_ui_evidence_captures_the_current_sidebar_order():
 
 
 def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     labels = _block(source, "def _output_status_label", "def _format_timestamp")
 
     assert '"clipboard_verified_paste_dispatched": "已复制，输入未确认"' in labels
@@ -165,7 +216,7 @@ def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
 
 
 def test_history_actions_use_the_verified_delivery_callbacks():
-    source = OVERLAY.read_text(encoding="utf-8")
+    source = _settings_source()
     copy_action = _block(source, "def _copy_text", "def _repaste_selected")
     repaste_action = _block(source, "def _repaste_text", "def _refresh_recovery")
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")

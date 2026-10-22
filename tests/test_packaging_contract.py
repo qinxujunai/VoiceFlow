@@ -8,6 +8,31 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def _settings_source():
+    """overlay_webview.py with the settings_ui mixins it was split into (2026-10-22) placed inside
+    the settings section, i.e. before ``class OverlayWindow``, so section slices still cover them."""
+    src = ROOT / "src"
+    overlay = (src / "overlay_webview.py").read_text(encoding="utf-8")
+    mixins = "\n".join(path.read_text(encoding="utf-8") for path in sorted((src / "settings_ui").glob("*.py")))
+    head, tail = overlay.split("class OverlayWindow", 1)
+    return head + mixins + "\nclass OverlayWindow" + tail
+
+
+def _method_source(name):
+    """Source of one settings-window method, wherever the split put it."""
+    import ast
+
+    src = ROOT / "src"
+    for path in [src / "overlay_webview.py", *sorted((src / "settings_ui").glob("*.py"))]:
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name == name:
+                        return ast.get_source_segment(text, item)
+    raise AssertionError(f"method {name} not found")
+
+
 
 def test_pynput_remains_replaceable_as_external_source_modules():
     import ast
@@ -373,7 +398,7 @@ def test_release_candidate_has_a_traceable_build_id_everywhere():
     from sync_version import read_version
     metadata = read_version(ROOT)
     application = (ROOT / "src" / "version.py").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     installer = (ROOT / "installer" / "VoiceFlow.iss").read_text(encoding="utf-8")
     generated = (ROOT / "installer" / "version.iss").read_text(encoding="utf-8")
     version_info = (ROOT / "assets" / "version_info.txt").read_text(
@@ -500,7 +525,7 @@ def test_silero_vad_keeps_pinned_original_license_and_asset_provenance():
 
 
 def test_tray_uses_app_icon_and_keeps_exit_action():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "icon_asset_name()" in overlay
     assert "build_tray_icon(TRAY_ICON_IDLE, icon_path)" in overlay
