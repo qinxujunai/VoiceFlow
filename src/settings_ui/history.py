@@ -242,6 +242,7 @@ class HistoryMixin:
         info = QLabel(meta)
         info.setTextFormat(Qt.TextFormat.PlainText)
         info.setObjectName("historyMeta")
+        info.setWordWrap(True)
         text_group.addWidget(body)
         text_group.addWidget(info)
         record = next((record for record in self._history_rows if record.get("_entry_id") == entry_id), {})

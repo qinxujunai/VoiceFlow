@@ -325,6 +325,39 @@ def test_history_cards_are_rendered_in_bounded_event_loop_batches(app, paths):
         window.close()
 
 
+def test_history_actions_fit_the_narrow_settings_window(app, paths):
+    window = _SettingsWindow(paths=paths)
+    window.refresh()
+    assert _pump_until(app, lambda: not window._refresh_in_progress)
+    window._history_rows = [{
+        "timestamp": "2026-10-22T12:00:00",
+        "clean_text": "核心听写离线完成，结果保留在剪贴板和本地历史。",
+        "output_status": "clipboard_verified_paste_dispatched",
+        "duration": 32.5,
+        "final_tail": "0.25s",
+        "_entry_id": "fixture-entry",
+    }]
+    try:
+        window.resize(600, 600)
+        window.sidebar.setCurrentRow(2)
+        window.show()
+        window._render_history()
+        for _ in range(20):
+            app.processEvents()
+            time.sleep(0.005)
+        assert window.width() == 600
+        assert window.history_list.horizontalScrollBar().maximum() == 0
+        card = window.history_list.itemWidget(window.history_list.item(0))
+        viewport = window.history_list.viewport()
+        assert card.minimumSizeHint().width() <= viewport.width()
+        for button in card.findChildren(QPushButton):
+            position = button.mapTo(viewport, button.rect().topLeft())
+            assert position.x() >= 0
+            assert position.x() + button.width() <= viewport.width()
+    finally:
+        window.close()
+
+
 def test_history_reader_ignores_valid_json_that_is_not_a_history_record(app, paths):
     paths.history_file.write_text(
         '[]\n"not a record"\n{"clean_text": "保留这条"}\n',

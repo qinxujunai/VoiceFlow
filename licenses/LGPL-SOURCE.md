@@ -1,7 +1,7 @@
 # Library source and replacement
 
 Corresponding source for the unchanged Qt/PySide6 6.11.1 and pynput 1.8.2 libraries
-bundled with VoiceFlow 0.3.9. Original sources and their licenses are retained in
+bundled with VoiceFlow 0.3.10. Original sources and their licenses are retained in
 each archive. SOURCES.json pins origin, revision and SHA256. See the upstream
 README/CMake files for build instructions. Compatible user-built library files
 may replace the separate onedir libraries; VoiceFlow imposes no restriction on
@@ -11,7 +11,7 @@ and replacement procedure are in installed docs/qt-lgpl-compliance.md.
 
 The matching source archive is a separate asset beside the Windows installer:
 
-https://github.com/qinxujunai/VoiceFlow/releases/download/v0.3.9/VoiceFlow-0.3.9-LGPL-sources.zip
+https://github.com/qinxujunai/VoiceFlow/releases/download/v0.3.10/VoiceFlow-0.3.10-LGPL-sources.zip
 
 SHA256: `5137f59bab8df5002446cf2a8910b2105eb3eed6876574c09769857f7160e816`
 

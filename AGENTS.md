@@ -34,6 +34,14 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-10-22, Codex**: prepared 0.3.10 build 261022.1 from `72dc69c`,
+  preserving `backup/local-20261022` and all unrelated private artifacts.
+  Fixed narrow history metadata wrapping with a failing-then-passing native
+  geometry regression; full local suite: 829 passed. Updated installed-candidate
+  acceptance to upgrade from 0.3.9. Evidence: `logs/release-0.3.10/` (private).
+  Release verification, exact installer acceptance, installed upgrade and final
+  artifact sign-off must complete before publication; this entry is preparation.
+
 - **2026-10-22, Claude**: settings redesign and capsule text fade (`1e63302`, `e8f345e`), site demo
   and `installer/macos/` (`66c27cf`), design QA record moved into `docs/` (`843c039`), Win32
   tests Windows-only (`bff8dbc`), settings split into `src/settings_ui/` (`8fd32c3`).
