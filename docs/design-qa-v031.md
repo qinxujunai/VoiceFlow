@@ -1,14 +1,14 @@
 # VoiceFlow v0.3.1 Design QA
 
-> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](docs/README.md).
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
 
 ## Selected direction and evidence
 
 - Selected direction: the quiet command-center concept generated during the
   product-design exploration, not the first visual option.
-- Reference: `docs/design-reference-v031.png`.
-- Real implementation capture: `docs/design-implementation-v031.png`.
-- Same-state comparison: `docs/design-comparison-v031.png`.
+- Reference: `design-reference-v031.png`.
+- Real implementation capture: `design-implementation-v031.png`.
+- Same-state comparison: `design-comparison-v031.png`.
 - Complete state capture manifest:
   `logs/ui-v031-command-center-final/manifest.json`.
 

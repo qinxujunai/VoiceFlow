@@ -30,7 +30,7 @@
 | [DESIGN.md](../DESIGN.md) | Current contract / guide | 2026-10-22 |
 | [README.en.md](../README.en.md) | Current contract / guide | 2026-10-22 |
 | [README.md](../README.md) | Current contract / guide | 2026-10-22 |
-| [design-qa.md](../design-qa.md) | Historical evidence / release notes | 2026-10-22 |
+| [design-qa-v031.md](design-qa-v031.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/asr-evaluation-plan.md](asr-evaluation-plan.md) | Current contract / guide | 2026-10-22 |
 | [docs/asr-runtime-build.md](asr-runtime-build.md) | Current contract / guide | 2026-10-22 |
 | [docs/decisions/ADR-001-capsule-finalization-contract.md](decisions/ADR-001-capsule-finalization-contract.md) | Superseded design | 2026-10-22 |
