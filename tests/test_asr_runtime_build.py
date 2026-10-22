@@ -9,6 +9,9 @@ import subprocess
 
 import pytest
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -91,6 +94,7 @@ def test_offline_missing_input_never_uses_network(tmp_path, monkeypatch):
         download_input(row, tmp_path, offline=True)
 
 
+@windows_only
 def test_repack_updates_all_native_notice_paths_and_records_modification_date(tmp_path):
     from build_asr_runtime import package_rebuild
     from asr_runtime_assets import EXTENSION, checked_wheel_path, load_manifest

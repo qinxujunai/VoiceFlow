@@ -10,6 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from delivery import TargetSnapshot
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 
 def test_positive_composition_blocks_paste_and_a_last_moment_context_guard():
     before = TargetSnapshot(101, 202, "edit", True, True, True)
@@ -26,6 +29,7 @@ def test_unknown_composition_is_not_positive_evidence_to_block_ordinary_typing()
     assert before.paste_decision_from(None).allowed
 
 
+@windows_only
 @pytest.mark.parametrize("size,expected", [(12, True), (0, False), (-1, None), (-2, None)])
 def test_imm_query_reads_only_composition_size_and_releases_context(monkeypatch, size, expected):
     import delivery

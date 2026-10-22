@@ -4,6 +4,9 @@ import sys
 
 import pytest
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -251,6 +254,7 @@ def test_capsule_refreshes_system_colors_when_theme_changes_without_a_new_record
         view.close()
 
 
+@windows_only
 @pytest.mark.parametrize("query_succeeds,flags,expected", [(True, 1, True), (True, 0, False), (False, 1, False)])
 def test_high_contrast_system_query_uses_typed_win32_contract(monkeypatch, query_succeeds, flags, expected):
     import ctypes
