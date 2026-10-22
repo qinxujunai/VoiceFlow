@@ -2,14 +2,15 @@
 """VoiceFlow macOS onedir application bundle.
 
 Build on the target architecture:
-    python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
+    python -m PyInstaller installer/macos/VoiceFlow.macOS.spec --noconfirm
 """
 
 import os
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(SPECPATH)
+# The spec lives in installer/macos/; every path below is relative to the project root.
+PROJECT_ROOT = Path(SPECPATH).parents[1]
 CODESIGN_IDENTITY = os.environ.get("VOICEFLOW_CODESIGN_IDENTITY") or None
 
 a = Analysis(

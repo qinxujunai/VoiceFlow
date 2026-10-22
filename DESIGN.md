@@ -75,8 +75,17 @@ under backlog and coalesce after the 600 ms lag limit. Do not recenter each
 character, replay text or apply horizontal transforms. Stop freezes the audio
 boundary and rejects late preview updates before the final text replaces it.
 
+Text on screen follows iOS dictation: each newly appended glyph fades in over
+140 ms (a hard catch-up fades its whole run once); when the start is cropped,
+the leading 18 px fade out instead of cutting a glyph; the final text either
+completes the draft in place or, when it differs, the draft fades out and the
+final fades in (160 ms, no overlap, no movement). Reduced motion and high
+contrast render statically.
+
 Settings have one draft and one save transaction, with feedback in the content
-area. Closing settings hides the window; the tray remains available. Vocabulary
+area. The window follows macOS System Settings: a light sidebar, grouped white
+cards of label/control rows on a soft grey canvas, a fixed save bar, text
+buttons for secondary actions and red for destructive ones. Closing settings hides the window; the tray remains available. Vocabulary
 supports visible selection and undo. There is no independent Trial recorder.
 
 The tray icon is generated at runtime for status. The application/shortcut icon is `assets/voiceflow.ico`.

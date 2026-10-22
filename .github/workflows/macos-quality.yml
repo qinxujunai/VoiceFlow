@@ -7,13 +7,13 @@ on:
   pull_request:
     paths:
       - ".github/workflows/macos-quality.yml"
-      - "VoiceFlow.macOS.spec"
+      - "installer/macos/VoiceFlow.macOS.spec"
       - "assets/**"
       - "config.yaml"
       - "installer/macos/**"
       - "model-manifest.json"
-      - "requirements-macos.in"
-      - "requirements-macos.lock"
+      - "installer/macos/requirements-macos.in"
+      - "installer/macos/requirements-macos.lock"
       - "requirements.lock"
       - "scripts/**"
       - "src/**"
@@ -22,13 +22,13 @@ on:
     branches: [master]
     paths:
       - ".github/workflows/macos-quality.yml"
-      - "VoiceFlow.macOS.spec"
+      - "installer/macos/VoiceFlow.macOS.spec"
       - "assets/**"
       - "config.yaml"
       - "installer/macos/**"
       - "model-manifest.json"
-      - "requirements-macos.in"
-      - "requirements-macos.lock"
+      - "installer/macos/requirements-macos.in"
+      - "installer/macos/requirements-macos.lock"
       - "requirements.lock"
       - "scripts/**"
       - "src/**"
@@ -62,7 +62,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install pinned dependencies
-        run: python -m pip install -r requirements-macos.lock
+        run: python -m pip install -r installer/macos/requirements-macos.lock
       - name: Restore runtime model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -81,7 +81,7 @@ jobs:
       - name: Lifecycle stability gate
         run: python scripts/stability_gate.py --cycles 500
       - name: Build application bundle
-        run: python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
+        run: python -m PyInstaller installer/macos/VoiceFlow.macOS.spec --noconfirm
       - name: Verify packaged runtime
         env:
           QT_QPA_PLATFORM: offscreen

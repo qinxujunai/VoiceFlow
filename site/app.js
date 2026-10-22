@@ -326,6 +326,7 @@ function renderDemo() {
   if (transcript.textContent !== text) {
     transcript.textContent = text;
     demoTargetWidth = Math.max(96, Math.min(700, demoWindow.clientWidth - 64, transcript.scrollWidth + 66));
+    transcript.dataset.overflow = String(transcript.scrollWidth + 66 > demoTargetWidth);
   }
   if (delivering) demoTargetWidth = 96;
   // Announce state boundaries, not every letter.
