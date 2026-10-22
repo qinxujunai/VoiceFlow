@@ -5,7 +5,7 @@
 ## 后续智能体从这里开始
 
 1. 先读 [AGENTS.md](../AGENTS.md) 和 [产品/架构设计](../DESIGN.md)，再读对应模块的现行契约。
-2. 当前已核对的公开 Windows 版本为 **0.3.9 / build 261021.6 / PE 0.3.9.6**。先看 [发布与本机验收](release-validation-0.3.9.md)、[精确安装包签署](../release/v0.3.9/RELEASE_SIGNOFF.json) 和 [Release 附件](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.9)。版本状态会变化，执行前重新核对。
+2. 当前已核对的公开 Windows 版本为 **0.3.10 / build 261022.1 / PE 0.3.10.1**。先看 [发布与本机验收](release-validation-0.3.10.md)、[精确安装包签署](../release/v0.3.10/RELEASE_SIGNOFF.json) 和 [Release 附件](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.10)。版本状态会变化，执行前重新核对。
 3. 日常行为以源码和实际运行进程为准；发布身份以版本标签、安装包哈希和安装后 EXE 为准。仓库文档更新不会自动改变已安装程序。
 4. 历史文档中的“当前”“候选”“未完成”仅指原记录时点；不要拿旧候选的许可阻断或旧测试数字代替最新签署。历史性能不代表本次重新测量，也不能证明自然语音准确率提升。
 5. 保持离线优先、忠实整理、独立预览与终稿、剪贴板/历史恢复、一个保存事务和关闭设置继续驻留托盘。不要恢复滚动窗口重识别、隐藏猜词替换或用户端模型选择器。
@@ -16,7 +16,7 @@
 - [中文使用帮助](help.zh-CN.md) · [English help](help.en.md)
 - [中文开发文档](development.zh-CN.md) · [Development](development.en.md)
 - [质量标准](product-quality-standard.md) · [质量门](quality-gate.md) · [模型策略](model-strategy.md)
-- [第三方声明](../THIRD_PARTY_NOTICES.md) · [当前依赖审查](../licenses/release-review-0.3.9.md) · [对应 LGPL 源码](../licenses/LGPL-SOURCE.md)
+- [第三方声明](../THIRD_PARTY_NOTICES.md) · [当前依赖审查](../licenses/release-review-0.3.10.md) · [对应 LGPL 源码](../licenses/LGPL-SOURCE.md)
 
 ## 整理范围
 
@@ -63,7 +63,9 @@
 | [docs/release-notes-0.3.9.md](release-notes-0.3.9.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/release-notes-v0.1.0.md](release-notes-v0.1.0.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/release-performance-evidence-2026-08-11.md](release-performance-evidence-2026-08-11.md) | Historical evidence / release notes | 2026-10-22 |
-| [docs/release-validation-0.3.9.md](release-validation-0.3.9.md) | Current release evidence; dated results retained | 2026-10-22 |
+| [docs/release-validation-0.3.9.md](release-validation-0.3.9.md) | Historical release evidence; dated results retained | 2026-10-22 |
+| [docs/release-validation-0.3.10.md](release-validation-0.3.10.md) | Current release evidence | 2026-10-22 |
+| [docs/release-notes-0.3.10.md](release-notes-0.3.10.md) | Release notes | 2026-10-22 |
 | [docs/resource-profile-2026-07-28.md](resource-profile-2026-07-28.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/runtime-boundary.md](runtime-boundary.md) | Current contract / guide | 2026-10-22 |
 | [docs/sensevoice-redistribution-decision.md](sensevoice-redistribution-decision.md) | Current contract / guide | 2026-10-22 |
@@ -95,3 +97,5 @@
 - [release/v0.3.7/RELEASE_NOTES.md](../release/v0.3.7/RELEASE_NOTES.md)
 - [release/v0.3.8/RELEASE_NOTES.md](../release/v0.3.8/RELEASE_NOTES.md)
 - [release/v0.3.9/RELEASE_NOTES.md](../release/v0.3.9/RELEASE_NOTES.md)
+
+- [release/v0.3.10/RELEASE_NOTES.md](../release/v0.3.10/RELEASE_NOTES.md)

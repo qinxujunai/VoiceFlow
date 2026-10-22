@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-22",
+  "app_version": "0.3.10",
+  "build_id": "261022.1",
+  "source_commit": "c9df2cc027b1929f51504ec02f747a980b8246bc",
+  "verification_workflow_commit": "c9df2cc027b1929f51504ec02f747a980b8246bc",
+  "source_inputs_sha256": "3f16823cfe85f7b30ae4035f9e7a5bcbfe5940e73606a7712efeb5f88626b1ac",
+  "installer": {
+    "name": "VoiceFlow-0.3.10-Windows-x64.exe",
+    "bytes": 306742685,
+    "sha256": "0ba560a26b58794f16510379dea9e720365ac2dc7ec37c719c3e27fb25c1de36",
+    "pe_identity": {
+      "file_version": "0.3.10.1",
+      "product_version": "0.3.10",
+      "text_file_version": "0.3.10+261022.1"
+    }
+  },
+  "application": {
+    "sha256": "e716d89e73b325c89f88baeeca18806c1c14afcf4135f70db0b3b2f2f01046d0",
+    "pe_identity": {
+      "file_version": "0.3.10.1",
+      "product_version": "0.3.10+261022.1",
+      "text_file_version": "0.3.10.1"
+    }
+  },
+  "native_asr": {
+    "extension_sha256": "e9adfb09dd79d8ed341ba4534e91cd4580370d2166206472c3d27ce88390e588",
+    "onnxruntime_sha256": "756c938b0f2d14c45c7ad469c6429041d7e905ee6c6ad6049aa67ce937567e97"
+  },
+  "model_manifest_sha256": "3082ae7bd67a55382b3d99fbb6ed4f2a07fc8e9e17d10a76b94a31ffd5fe5049",
+  "license_review_record_sha256": "4b6b58ead56f7f417059c061eca4eb5df3a82de5778c9fc769034bf76709b10d",
+  "provenance_sha256": "ca1275bedcfa8b9e5a6af07cd152adc23756bdf4a6ffebdd650c84a13afd5a94",
+  "sbom_sha256": "943f6ba36d8711c1449535b5df77d3d0c12378a8d94f9984a5a08e394520b903",
+  "notices_sha256": "19c3daf6d175ac29019bf3ae6400cc08135011643c6cba4a68a3987265f77038",
+  "lgpl_sources_sha256": "5137f59bab8df5002446cf2a8910b2105eb3eed6876574c09769857f7160e816",
+  "build_inputs_sha256": "91d96294a7d1b0de52b50df9ec4ade0b755432ff0e0b7d7040b1a50fdbe9d102",
+  "verification_bundle_sha256": "22554c53f440bc5890bb1541c23fcd4ccde864cff42cb4a8443334a84d18f6df",
+  "exact_installer_ci_url": "https://github.com/qinxujunai/VoiceFlow/actions/runs/39805855353",
+  "checks": {
+    "local_full_suite": 829,
+    "first_single_install_start": true,
+    "previous_039_upgrade": true,
+    "uninstall_preserves_user_data": true,
+    "runtime_vc_dlls_loaded_from_installer": true,
+    "native_import_closure_missing": 0,
+    "qt_and_pynput_replacement": true
+  },
+  "installed_machine_verification": {
+    "build_id": "261022.1",
+    "ready": true,
+    "protected_data_files_unchanged": 7,
+    "installer_sha256": "0ba560a26b58794f16510379dea9e720365ac2dc7ec37c719c3e27fb25c1de36",
+    "payload_files_verified": 500,
+    "pid": 56548,
+    "previous_version": "0.3.9.6",
+    "exe_sha256": "e716d89e73b325c89f88baeeca18806c1c14afcf4135f70db0b3b2f2f01046d0",
+    "file_version": "0.3.10.1",
+    "close_hides_window_without_stopping_runtime": true,
+    "normal_launch_restores_same_instance": true,
+    "actual_settings_window_version_verified": true
+  },
+  "human_speech_acceptance": {
+    "user_confirmed": true,
+    "duration_seconds": 62.186,
+    "inserted_final_text": true,
+    "no_replay_or_rollback": true,
+    "final_replaced_in_place": true,
+    "source": "User reports good overall experience after requested F2 test; duration and dispatch status verified from metadata only. No transcript retained in this evidence.",
+    "runtime_delivery_status": "clipboard_verified_paste_dispatched",
+    "insertion_verification": "user observation; runtime status correctly remains unverified dispatch"
+  },
+  "limits": [
+    "Hosted windows-latest includes development tools; not a pristine consumer OS.",
+    "Unsigned installer.",
+    "Natural authorized speech holdout incomplete; no accuracy superiority claim.",
+    "No public macOS artifact.",
+    "Pipeline latency evidence retained from prior measurements; no fresh comparative latency claim.",
+    "Historical engineering manifests remain incomplete; this approval binds only these exact artifacts."
+  ]
+}

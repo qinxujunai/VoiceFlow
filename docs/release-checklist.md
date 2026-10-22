@@ -112,7 +112,7 @@ venv\Scripts\python.exe scripts\check_release_compliance.py release\v<version>
 
 ## Current release evidence
 
-See [0.3.9 release verification](release-validation-0.3.9.md) and the
+See [0.3.10 release verification](release-validation-0.3.10.md) and the
 [documentation index](README.md). The natural-speech holdout remains incomplete,
 the installer is unsigned, and macOS is not a public download target.
 
