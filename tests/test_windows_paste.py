@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -20,6 +23,7 @@ def test_windows_cannot_use_the_unchecked_cross_platform_paste_path(monkeypatch)
         handler._dispatch_paste()
 
 
+@windows_only
 @pytest.mark.parametrize("terminal, keys", [
     (False, [(0x11, 0), (0x56, 0), (0x56, 2), (0x11, 2)]),
     (True, [(0x11, 0), (0x10, 0), (0x56, 0), (0x56, 2), (0x10, 2), (0x11, 2)]),

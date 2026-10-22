@@ -8,6 +8,9 @@ import zipfile
 
 import pytest
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -74,6 +77,7 @@ def test_locked_versions_accepts_only_the_repository_wheel_directory(tmp_path):
         _locked_versions(lock)
 
 
+@windows_only
 def test_vendored_native_wheel_is_integrity_checked_without_loading_engine():
     from asr_runtime_assets import validate_wheel
 
@@ -107,6 +111,7 @@ def test_native_source_and_embedded_attribution_supplements_keep_original_bytes(
         assert hashlib.sha256((ROOT / "licenses/native-asr" / name).read_bytes()).hexdigest() == digest
 
 
+@windows_only
 @pytest.mark.parametrize("fault,reason", [("record", "RECORD hash"), ("unhashed", "RECORD hash"),
     ("incomplete", "Incomplete.*RECORD"), ("duplicate", "Duplicate"), ("unsafe", "Unsafe.*entry"),
     ("notice_missing", "notice index"), ("notice_path", "notice index"), ("patch_date", "modification date")])
@@ -165,6 +170,7 @@ def test_native_wheel_checks_internal_records_after_outer_hash_is_updated(tmp_pa
         validate_wheel(tmp_path)
 
 
+@windows_only
 @pytest.mark.parametrize("unexpected", ["sherpa-onnx-c-api.dll", "piper.dll", "espeak.dll"])
 def test_frozen_asr_boundary_requires_only_the_pinned_extension_and_runtime(tmp_path, unexpected):
     from asr_runtime_assets import check_frozen_runtime
@@ -211,6 +217,7 @@ def test_native_patch_must_remain_inside_its_asset_directory(tmp_path):
         validate_wheel(tmp_path)
 
 
+@windows_only
 def test_native_dependency_archive_provenance_must_match_manifest(tmp_path):
     from asr_runtime_assets import validate_wheel
     import shutil

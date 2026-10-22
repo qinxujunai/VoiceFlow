@@ -4,6 +4,9 @@ from pathlib import Path
 
 import pytest
 
+# Exercises Win32 APIs, struct layouts or Windows release artifacts; covered by Windows quality.
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only contract")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 
@@ -96,6 +99,7 @@ def test_preferences_apply_only_explicit_executable_scope(tmp_path):
         store.update(sentence_end="preserve", preserve_format=False, app_id="../code.exe")
 
 
+@windows_only
 def test_windows_application_scope_reads_only_current_executable_basename():
     import os
     from delivery import _process_executable_name
