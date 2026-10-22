@@ -7,6 +7,41 @@ dated release verification, superseded designs and archived measurements.
 Document synchronization dates are not new test dates. Preserve original
 evidence, versioned Release materials and pinned third-party license bytes.
 
+## Decisions Not To Undo
+
+Each has a reason; change one only after writing the new reason here.
+
+| Decision | Why | Commit |
+| --- | --- | --- |
+| Settings pages live in `src/settings_ui/` (one mixin per page); `overlay_webview.py` only composes them | The window was one 3,507-line file. New page code goes into its page module; tests read the shell and the package together (`_settings_source()`, `_method_run()`) | `8fd32c3` |
+| Settings look: light sidebar, grouped white cards, one fixed save bar, keycap shortcuts | Native macOS System Settings layout; single save transaction | `1e63302` |
+| Capsule text: new glyphs fade in (140 ms), the final replaces the draft in place, a cropped start fades at the edge | Apple dictation feel without breaking the append-only contract below | `1e63302` |
+| Win32 contract tests carry `@windows_only` | They test Win32 APIs or the Windows native wheel; macOS quality had been red since 2026-10-10 because of them. They still run in Windows quality | `bff8dbc` |
+| macOS packaging files live in `installer/macos/` | One place per platform | `66c27cf` |
+| A public release needs the artifact-bound license review (`licenses/release-review-<version>.md`, LGPL sources) and installed verification | Compliance gate in `scripts/check_release_compliance.py` is fail-closed by design; do not bypass it in CI | 0.3.9 release |
+
+The stack is already the mature choice for offline dictation on Windows (sherpa-onnx with
+SenseVoice and a streaming Zipformer, PySide6, sounddevice, uiautomation); there is no reason
+to swap engines without the quality gates below.
+
+## Known Issues And Owner-Only Steps
+
+- 0.3.10 is not released: `master` has the redesigned settings, the capsule text fade and the
+  page split. Releasing needs the owner's sign-off flow (license review record, LGPL source
+  bundle, installed-machine verification), as for 0.3.9.
+- Unsigned installer; Windows 10/11 only; no public accuracy figures until enough authorized
+  natural speech is collected.
+
+## Handoff Log
+
+- **2026-10-22, Claude**: settings redesign and capsule text fade (`1e63302`, `e8f345e`), site demo
+  and `installer/macos/` (`66c27cf`), design QA record moved into `docs/` (`843c039`), Win32
+  tests Windows-only (`bff8dbc`), settings split into `src/settings_ui/` (`8fd32c3`).
+  Verified: Linux offscreen full suite identical before and after each change; Windows and
+  macOS quality green. On `8fd32c3` Windows quality first failed once because the node process in
+  `test_site_demo_motion.py` hung past 15 s (the test takes 0.1 s locally and `site/` was
+  unchanged); the re-run passed. If it recurs, look at node startup on the runner first.
+
 ## Project Identity
 
 VoiceFlow is a Windows local-first dictation layer. Press **F2**, **Right Ctrl**, or a mouse side button to start recording, press again to stop, and cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
@@ -56,7 +91,9 @@ src/
   text_cleaner.py      # deterministic cleanup
   output_handler.py    # clipboard first, then Ctrl+V
   history_store.py     # logs/history.jsonl
-  overlay_webview.py   # Qt Widgets settings, overlay facade + tray menu
+  overlay_webview.py   # settings window shell (construction, navigation, events), overlay facade + tray menu
+  settings_ui/         # settings pages as mixins composed by _SettingsWindow:
+                       #   preferences.py, dictionary.py, history.py, diagnostics.py, style.py
   capsule_native.py    # native black/red capsule, bounded append-only animation
   overlay.html         # retired renderer retained for development comparison
   runtime_bootstrap.py # process-local native thread budget before NumPy imports
