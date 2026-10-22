@@ -1,9 +1,14 @@
 # VoiceFlow platform release contract
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 This document is an internal release contract. Consumer-facing pages describe
 only platforms that have a verified public asset.
 
-## Supported release shapes
+The published 0.3.9 release provides Windows x64 only. The macOS requirements
+below are a future release contract, not an availability or compatibility claim.
+
+## Required artifact shapes
 
 - Windows: one x64 installer built with PyInstaller onedir and Inno Setup.
 - macOS: two native disk images, one for Apple Silicon and one for Intel.

@@ -54,3 +54,5 @@ VoiceFlow 专注于快捷键触发的日常输入，不提供会议说话人区�
 安装包目前未签名，Windows 可能显示安全提示。详细说明见[使用帮助](docs/help.zh-CN.md)。
 
 [反馈](https://github.com/qinxujunai/VoiceFlow/issues) · [开发与验证](docs/development.zh-CN.md) · [项目许可](LICENSE) · [第三方许可](THIRD_PARTY_NOTICES.md)
+
+<sub>文档同步：2026-10-22 · [文档索引](docs/README.md)</sub>

@@ -1,5 +1,7 @@
 # 使用 VoiceFlow
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 [返回产品首页](../README.md)
 
 ## 开始听写
@@ -16,6 +18,18 @@
 从托盘打开设置，进入「听写」。你可以选择保留识别标点、省略最后一个句号，或补全句末句号。
 聊天不想带句号，可以选择「省略最后一个句号」。问号、感叹号和句中标点仍会保留。
 这个设置只调整句末，不会重新改写你的表达。
+
+中文标点整理也可能分句错误，请检查最终结果。代码、网址以及启用「保留格式」的输入不会进入标点推理。
+
+## 设置与词典
+
+听写设置共用一个「保存更改」入口；没有改动时按钮不可用。保存失败会保留编辑内容并显示原因。
+文字习惯在下一次听写生效；语言和麦克风更改需要重启程序。
+
+词典支持搜索、勾选、删除所选和撤销；清空分类前会确认，内置词条只读。
+添加纠错时，分别填写识别到的词和希望使用的词。
+
+关闭设置窗口会继续驻留托盘，不会退出程序。再次启动 VoiceFlow 或从托盘打开设置即可返回；真正退出请使用托盘「退出」。
 
 ## 安装与更新
 
@@ -44,4 +58,4 @@
 
 [提交反馈](https://github.com/qinxujunai/VoiceFlow/issues)。描述使用的应用和遇到的现象即可；不必上传私人录音或历史。
 
-[发布记录](release-evidence-0.3.7.md) · [开发与验证](development.zh-CN.md) · [许可](../THIRD_PARTY_NOTICES.md)
+[发布记录](https://github.com/qinxujunai/VoiceFlow/releases/latest) · [开发与验证](development.zh-CN.md) · [许可](../THIRD_PARTY_NOTICES.md)

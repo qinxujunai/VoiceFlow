@@ -1,6 +1,8 @@
 # ADR-004: Stable UI controller and supervised native workers
 
-- Status: Accepted for the 0.3.2 local candidate
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](../README.md).
+
+- Status: Accepted; used by the 0.3.9 Windows release. See [release verification](../release-validation-0.3.9.md).
 - Date: 2026-08-24
 
 ## Context

@@ -1,8 +1,10 @@
 # VoiceFlow Design
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
+
 ## Product Contract
 
-VoiceFlow is a local-first Windows dictation layer. Press F2 or a mouse side button, speak, press again, and text appears where the cursor is. If paste cannot land in an input field, the text must remain in the clipboard and local history.
+VoiceFlow is a local-first Windows dictation layer. Press F2, Right Ctrl or a mouse side button, speak, and press again to finish. Final text is copied before one paste attempt; unverified insertion retains recovery guidance and local history.
 
 The product is intentionally small. Reliability, low latency, and "never lose text" matter more than decorative UI or automatic rewriting.
 
@@ -20,17 +22,20 @@ The product is intentionally small. Reliability, low latency, and "never lose te
 
 ```text
 HotkeyManager
-  -> VoiceInputSystem
-  -> RecordingSession
-  -> AudioCapture
-  -> Transcriber
-  -> TextCleaner + Vocabulary
+  -> AppController / VoiceInputSystem
+  -> RecordingSession / supervised audio worker
+  -> separate online preview and authoritative ASR workers
+  -> safe cleanup / visible dictionary corrections / bounded punctuation worker
   -> OutputHandler
   -> HistoryStore
   -> OverlayWindow / tray icon
 ```
 
-Recording starts on toggle. A background thread updates the overlay with preview text. For long dictation, preview transcription uses only the most recent audio window and refreshes at a bounded interval so it cannot dominate CPU time. Preview remains UI feedback, not the source of truth.
+Recording starts on toggle. The preview worker owns one online stream per session
+and receives each PCM sample once. It emits confirmed append deltas; do not
+retranscribe overlapping recent-audio windows through the final recognizer.
+The Qt process does not load native audio/ASR engines. Preview remains feedback,
+not the source of truth; see [ADR-004](docs/decisions/ADR-004-supervised-runtime-boundary.md).
 
 Short recordings run final recognition over the complete stopped audio buffer. Long recordings progressively transcribe stable audio segments during recording and only transcribe the remaining tail on stop. The assembled final output still covers the complete audio. If final recognition returns empty while preview had text, the preview text is used as a safety fallback.
 
@@ -54,14 +59,25 @@ should have raw text, cleaned text, output status, and timestamp.
 
 ## UI
 
-The overlay is a compact bottom-centered pill. It is a state indicator, not a full editor. The left mark region and right text region stay stable so waveform, spinner, checkmark, and text never stack on top of each other:
+The overlay is a compact native Qt pill, not a full editor. Its mark and text
+regions remain stable. WebEngine/QML/Quick are excluded from Windows releases.
 
 - listening / streaming: three-bar waveform and live text
 - processing: spinner in the left mark while preserving the last visible text and width
-- done: checkmark plus short completion text, then hide/reset
+- final: replace the draft with the complete authoritative text in place
+- confirmed insertion: fade silently; a dispatched paste is not confirmation
+- unverified dispatch / clipboard fallback: show `已复制到剪贴板`; durable recovery: `已保存`
 - error / canceled: brief state, then hide
 
-The pill should remain visually centered. Width grows with text up to a small maximum, and long text scrolls with a left fade.
+Keep the pill centered as a window, with left-aligned text and bounded staged
+width growth. Append characters once, normally at 48 ms cadence, accelerate
+under backlog and coalesce after the 600 ms lag limit. Do not recenter each
+character, replay text or apply horizontal transforms. Stop freezes the audio
+boundary and rejects late preview updates before the final text replaces it.
+
+Settings have one draft and one save transaction, with feedback in the content
+area. Closing settings hides the window; the tray remains available. Vocabulary
+supports visible selection and undo. There is no independent Trial recorder.
 
 The tray icon is generated at runtime for status. The application/shortcut icon is `assets/voiceflow.ico`.
 
@@ -73,9 +89,13 @@ maintainers. Installed builds use the Start menu shortcut created by Inno.
 
 `VoiceFlow.spec` produces a PySide6 onedir build so Qt libraries remain dynamically replaceable and startup avoids one-file extraction. `installer/VoiceFlow.iss` produces a per-user installer. Model inclusion is a separate release decision gated by Model Lab results and redistribution terms.
 
-The public installer candidate includes only the pinned SenseVoice int8 model
-and tokens. User configuration, history, vocabulary, logs, and downloaded
+The 0.3.9 Windows installer includes the pinned SenseVoice final recognizer,
+bilingual online preview, bounded Chinese punctuation model and Silero VAD with
+their runtime files and notices. They serve separate roles, not a user-facing
+model selector. User configuration, history, vocabulary, logs and downloaded
 models live outside the install directory under `%LOCALAPPDATA%\VoiceFlow`.
+See [release verification](docs/release-validation-0.3.9.md) and the
+[documentation index](docs/README.md) for dated evidence and limits.
 
 ## Verification
 

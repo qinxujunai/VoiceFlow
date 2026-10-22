@@ -1,5 +1,7 @@
 # VoiceFlow v0.3.1 Design QA
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](docs/README.md).
+
 ## Selected direction and evidence
 
 - Selected direction: the quiet command-center concept generated during the

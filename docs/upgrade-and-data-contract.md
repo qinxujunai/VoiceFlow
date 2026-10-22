@@ -1,5 +1,7 @@
 # Upgrade and local-data contract
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 Status: required product behavior
 
 ## Updates

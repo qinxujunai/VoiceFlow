@@ -1,5 +1,7 @@
 # Final punctuation candidate review — 2026-10-11
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 VoiceFlow uses `CT-Transformer` only to rebuild punctuation in Chinese prose.
 It does not replace the dictation recognizer, correct guessed words, or rewrite
 the speaker's wording. English-only input retains recognizer punctuation: a

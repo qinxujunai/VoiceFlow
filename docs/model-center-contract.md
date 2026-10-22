@@ -1,5 +1,7 @@
 # Model Center Contract
 
+> Documentation sync: **2026-10-22** · Superseded design. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: superseded by
 [`ADR-002`](decisions/ADR-002-single-visual-state-and-fixed-model.md). The
 ordinary product no longer exposes model selection, download, repair, or

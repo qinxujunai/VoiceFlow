@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.1 release performance evidence
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: automated release performance gate passed on the release workstation.
 
 This evidence measures latency and rendering mechanics. It does not claim

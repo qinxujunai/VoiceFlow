@@ -1,5 +1,7 @@
 # ADR-001: Separate live draft, authoritative text, and delivery feedback
 
+> Documentation sync: **2026-10-22** · Superseded design. Original decision/test dates remain authoritative; this is not a new test result. [Current index](../README.md).
+
 ## Status
 
 Superseded by ADR-002

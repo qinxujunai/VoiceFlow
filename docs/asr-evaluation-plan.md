@@ -1,8 +1,12 @@
 # VoiceFlow ASR Evaluation Plan
 
-The latest local smoke report is
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
+The historical preliminary local smoke report is
 [`model-lab-2026-07-18-preliminary.md`](model-lab-2026-07-18-preliminary.md).
 It is intentionally preliminary and did not promote a model.
+For shipped-artifact evidence and remaining natural-speech gaps, start with
+[the 0.3.9 release verification](release-validation-0.3.9.md).
 
 VoiceFlow should choose speech models by product evidence, not by popularity.
 The default remains local-first and offline.
