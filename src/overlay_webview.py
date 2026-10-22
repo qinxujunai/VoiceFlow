@@ -1841,6 +1841,9 @@ class _SettingsWindow(QMainWindow):
             widget = self.history_list.itemWidget(item)
             if widget:
                 width = max(1, self.history_list.viewport().width())
+                # Item margins and frame can make the card narrower than the viewport; size for the narrower one.
+                if 0 < widget.width() < width:
+                    width = widget.width()
                 layout = widget.layout()
                 height = max(widget.minimumSizeHint().height(), layout.heightForWidth(width))
                 item.setSizeHint(QSize(width, height))
@@ -2622,7 +2625,7 @@ class _SettingsWindow(QMainWindow):
         }
         QListWidget#historyList::item, QListWidget#diagnosticList::item {
             padding: 0px;
-            margin: 0px 6px;
+            margin: 0px;
             border: none;
             border-bottom: 1px solid #f0f0f3;
             background: transparent;
