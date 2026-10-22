@@ -50,7 +50,7 @@ jobs:
           esac
           git verify-tag "$RELEASE_TAG"
           version="${RELEASE_TAG#v}"
-          grep -Fq "\"CFBundleShortVersionString\": \"$version\"" VoiceFlow.macOS.spec
+          grep -Fq "\"CFBundleShortVersionString\": \"$version\"" installer/macos/VoiceFlow.macOS.spec
           windows_asset="VoiceFlow-$version-Windows-x64.exe"
           gh release view "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
@@ -83,7 +83,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install pinned dependencies
-        run: python -m pip install -r requirements-macos.lock
+        run: python -m pip install -r installer/macos/requirements-macos.lock
       - name: Restore runtime model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -133,7 +133,7 @@ jobs:
       - name: Generate platform icons and build signed application
         run: |
           python scripts/generate_icon.py
-          python -m PyInstaller VoiceFlow.macOS.spec --noconfirm
+          python -m PyInstaller installer/macos/VoiceFlow.macOS.spec --noconfirm
       - name: Smoke signed application bundle
         env:
           QT_QPA_PLATFORM: offscreen

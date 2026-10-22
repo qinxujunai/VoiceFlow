@@ -73,7 +73,7 @@ def test_macos_hotkeys_do_not_import_the_windows_keyboard_backend_at_module_load
 
 
 def test_macos_bundle_covers_both_runtime_models_and_permissions():
-    spec = (ROOT / "VoiceFlow.macOS.spec").read_text(encoding="utf-8")
+    spec = (ROOT / "installer" / "macos" / "VoiceFlow.macOS.spec").read_text(encoding="utf-8")
     entitlements = (
         ROOT / "installer" / "macos" / "entitlements.plist"
     ).read_text(encoding="utf-8")
@@ -102,7 +102,7 @@ def test_macos_quality_builds_apple_silicon_and_intel_without_publishing():
     assert "hdiutil verify" in workflow
     assert "actions/upload-artifact@" in workflow
     assert "gh release" not in workflow
-    assert "pip install -r requirements-macos.lock" in workflow
+    assert "pip install -r installer/macos/requirements-macos.lock" in workflow
 
 
 def test_macos_release_requires_native_signing_and_notarization():
@@ -126,7 +126,7 @@ def test_macos_release_requires_native_signing_and_notarization():
 
 
 def test_macos_dependency_lock_excludes_windows_only_runtime_packages():
-    lock = (ROOT / "requirements-macos.lock").read_text(encoding="utf-8")
+    lock = (ROOT / "installer" / "macos" / "requirements-macos.lock").read_text(encoding="utf-8")
 
     assert "pyobjc-core==" in lock
     assert "pyobjc-framework-applicationservices==" in lock
