@@ -1,5 +1,7 @@
 # Streaming preview model distribution review
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 Status: **approved as a bilingual first-pass preview**
 
 VoiceFlow bundles

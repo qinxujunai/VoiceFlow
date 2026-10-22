@@ -1,5 +1,7 @@
 # SenseVoiceSmall Redistribution Decision
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 Status: **approved for VoiceFlow 0.2 redistribution with attribution**
 
 Decision date: 2026-07-27
@@ -10,6 +12,10 @@ License reviewed: FunASR Model Open Source License Agreement, version 1.1
 This is an engineering release-compliance decision, not legal advice. It
 records why the pinned model may be included in VoiceFlow 0.2 and the
 conditions every build must satisfy.
+The 0.3.9 artifact review reuses this pinned-model decision and records its
+current scope in [the dependency review](../licenses/release-review-0.3.9.md)
+and [release verification](release-validation-0.3.9.md). The original decision
+date and 0.2 evidence below are retained rather than restated as new testing.
 
 ## Pinned artifact
 

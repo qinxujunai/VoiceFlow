@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.5 release verification evidence
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: WITHHELD on 2026-10-01. The candidate tag remains immutable.
 The release workflow was canceled before publication after one installer
 startup timeout. Exact-source Windows validation subsequently passed, but

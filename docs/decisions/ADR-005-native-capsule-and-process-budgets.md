@@ -1,7 +1,9 @@
 # ADR-005: Native capsule and bounded process costs
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](../README.md).
+
 - Date: 2026-10-04
-- Status: implemented locally; public release gates remain separate
+- Status: shipped in the 0.3.9 Windows release; [artifact-bound verification](../release-validation-0.3.9.md) records the scope. Earlier local measurements remain historical.
 
 ## Problem and decision
 

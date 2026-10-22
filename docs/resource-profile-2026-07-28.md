@@ -1,5 +1,7 @@
 # Resource profile — 2026-07-28
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 This document records historical measurements from the Windows 0.2.1
 candidate. It is a baseline for comparison, not current 0.2.2 evidence and not
 a claim about every computer.

@@ -1,5 +1,7 @@
 # Streaming Preview Evaluation — 2026-07-28
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: **no candidate promoted**
 
 This same-machine experiment uses the pinned public `zh.wav` sample only. It

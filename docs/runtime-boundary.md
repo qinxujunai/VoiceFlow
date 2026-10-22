@@ -1,5 +1,7 @@
 # Runtime Boundary Specification
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 ## Objective
 
 VoiceFlow must behave correctly from source and from a frozen Windows

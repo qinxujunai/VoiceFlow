@@ -1,6 +1,10 @@
 # VoiceFlow Model Strategy
 
-Status: accepted for the next VoiceFlow release candidate
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
+Status: accepted policy, used by the 0.3.9 Windows release. See
+[release verification](release-validation-0.3.9.md); this is not evidence for
+promoting a different model or claiming improved natural-speech accuracy.
 
 ## Product decision
 
