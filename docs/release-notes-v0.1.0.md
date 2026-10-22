@@ -1,5 +1,7 @@
 # VoiceFlow v0.1.0
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 VoiceFlow v0.1.0 is the first source release of the local-first Windows dictation layer.
 
 ## What It Delivers

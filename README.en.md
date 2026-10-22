@@ -52,3 +52,5 @@ If text does not appear, press **Ctrl+V** to paste. Some apps require manual pas
 The installer is currently unsigned, so Windows may show a security prompt. See [Help](docs/help.en.md) for details.
 
 [Feedback](https://github.com/qinxujunai/VoiceFlow/issues) · [Development](docs/development.en.md) · [Project license](LICENSE) · [Third-party licenses](THIRD_PARTY_NOTICES.md)
+
+<sub>Documentation sync: 2026-10-22 · [Documentation index](docs/README.md)</sub>

@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.3 release verification evidence
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 This document records the evidence for the `0.3.3` public patch release. It
 does not make a population-level speech-accuracy claim.
 

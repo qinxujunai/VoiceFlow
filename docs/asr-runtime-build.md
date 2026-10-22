@@ -1,8 +1,13 @@
 # Windows ASR runtime build
 
-The development candidate keeps SenseVoice, the online preview model and Silero
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
+The 0.3.9 Windows runtime keeps SenseVoice, the online preview model and Silero
 VAD unchanged. Its Python runtime is Windows Python 3.12 x64. macOS uses its
 separate requirements files and is outside this native build procedure.
+See [the final dependency review](../licenses/release-review-0.3.9.md) and
+[artifact-bound release verification](release-validation-0.3.9.md). Earlier
+development manifests retain their original incomplete review flags.
 
 ## Why a local build
 

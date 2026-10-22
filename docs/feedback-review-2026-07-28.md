@@ -1,5 +1,7 @@
 # User Feedback Closure — 2026-07-28
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Source: the complete `需求反馈` folder supplied by the maintainer. The Word
 document and all three screenshots were reviewed. External project names were
 verified against public repositories or official product documentation before

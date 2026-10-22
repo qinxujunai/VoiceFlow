@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.8 发布记录
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 本次按用户的同步指令发布设置保存修复；保留 0.3.7 的安装包和版本标签。
 
 ## 版本与产物

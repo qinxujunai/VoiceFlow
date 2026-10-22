@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.9 Windows release verification
 
+> Documentation sync: **2026-10-22** · Current release evidence; dated results retained. Synchronization date is not a new test date. [Current index](README.md).
+
 Verified on 2026-10-21. Build **261021.6**, Windows file version **0.3.9.6**.
 
 - Build source: `4f9ab9c7c980f64c27283a2edb38fb716b537f40`.
@@ -20,7 +22,30 @@ The actual installation at `D:\Apps\VoiceFlow` was upgraded in place. All 492 pa
 
 See [artifact-bound sign-off](../release/v0.3.9/RELEASE_SIGNOFF.json), [dependency review](../licenses/release-review-0.3.9.md) and the versioned Release attachments for exact inventories and corresponding LGPL sources. Historical development manifests retain their incomplete flags; the current sign-off identifies the precise reviewed artifact.
 
-## Limits and recovery
+## Public delivery recheck — 2026-10-22
+
+The latest stable Release and live website metadata were rechecked as 0.3.9,
+with the installer size and SHA256 above. The installed EXE still reports
+0.3.9.6 and matches the recorded application SHA256. This is a state recheck,
+not a repeat of the 822-test run or the physical installation performed on
+2026-10-21.
+
+[Post-merge Windows checks](https://github.com/qinxujunai/VoiceFlow/actions/runs/39559627823)
+and [the subsequent README-only revision](https://github.com/qinxujunai/VoiceFlow/actions/runs/39566885381)
+completed successfully. [Pages deployment](https://github.com/qinxujunai/VoiceFlow/actions/runs/39559227990)
+serves the verified 0.3.9 download. The public installer was anonymously
+downloaded and hashed on 2026-10-21; all ten uploaded assets matched their
+recorded digest identities. That day's browser acceptance passed two automatic
+loops with no Replay control, text filter, text transform, overflow or page error.
+
+[PR 25](https://github.com/qinxujunai/VoiceFlow/pull/25) and
+[PR 28](https://github.com/qinxujunai/VoiceFlow/pull/28) are merged. The Pages
+fix routes stable release events to a deployment requested from `master`,
+preserving the environment's branch protection. Its regression test passed;
+the next stable tag must still verify that complete event path. No GitHub
+build-provenance attestation is claimed for the locally built installer.
+
+## Remaining limits and recovery
 
 The installer is unsigned. Authorized natural-speech holdout coverage is incomplete; model weights are unchanged and no accuracy superiority is claimed. macOS checks still have Windows API test-adaptation failures; this release and sign-off cover Windows only and expose no macOS download.
 

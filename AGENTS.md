@@ -1,5 +1,12 @@
 # AGENTS.md -- VoiceFlow
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
+
+Start documentation work at `docs/README.md`. It separates current contracts,
+dated release verification, superseded designs and archived measurements.
+Document synchronization dates are not new test dates. Preserve original
+evidence, versioned Release materials and pinned third-party license bytes.
+
 ## Project Identity
 
 VoiceFlow is a Windows local-first dictation layer. Press **F2**, **Right Ctrl**, or a mouse side button to start recording, press again to stop, and cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
@@ -161,6 +168,19 @@ Use `wrong=correct` only in correction files.
   reviewed default model and its license assets.
 - Windows installers belong in GitHub Releases, not GitHub Packages. Never publish an
   installer link before the matching versioned Release asset exists.
+- Keep generated compliance inventories fail-closed. An artifact-bound review must
+  identify the exact installer, EXE, build inputs, licenses and corresponding LGPL
+  sources; historical incomplete review flags must not be rewritten as new approval.
+- Verify the uploaded installer itself on a disposable Windows runner: single fresh
+  install/start, previous-release upgrade, uninstall and retained user data. Do not
+  run installer lifecycle smoke under the production Windows user: an isolated
+  directory does not isolate the installer's HKCU uninstall registration.
+- Synchronize source, installed build, Release assets, bilingual documentation and
+  live website metadata before reporting delivery. Keep dated evidence in
+  `docs/release-validation-<version>.md`, with exact SHA256 and private rollback paths.
+- Pages release events request deployment from `master`; only the deployment job
+  enters the protected `github-pages` environment. Do not broaden its branch policy
+  to work around a rejected version-tag deployment.
 - Never publish a macOS download, badge, or compatibility claim until a separately built,
   signed, notarized, and tested macOS artifact exists.
 - macOS public releases use separately named Apple Silicon and Intel disk images built from

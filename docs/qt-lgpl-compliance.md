@@ -1,9 +1,15 @@
 # Qt / PySide6 LGPL Compliance Record
 
-VoiceFlow's current native development package uses dynamically linked PySide6 and Qt 6.11.1
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
+VoiceFlow's 0.3.9 native Windows package uses dynamically linked PySide6 and Qt 6.11.1
 runtime under the LGPL-3.0-only option. This record describes the exact source,
 license texts, and replacement path used by the Windows onedir build. It is an
 engineering compliance record, not legal advice.
+The completed review for that exact release is in
+[the dependency review](../licenses/release-review-0.3.9.md) and
+[release sign-off](../release/v0.3.9/RELEASE_SIGNOFF.json). The older development
+checkpoints below remain historical and do not approve different artifacts.
 
 ## Pinned source
 

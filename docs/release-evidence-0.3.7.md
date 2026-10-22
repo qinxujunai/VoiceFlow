@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.7 发布记录
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 本次按用户 2026-10-11 的明确指令发布：围绕上屏和句末标点反馈更新产品、网站与安装包。
 这次发布不表示此前完整 RC 审计的所有项目已通过，不降低或改写原有性能门。
 

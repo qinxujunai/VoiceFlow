@@ -1,5 +1,7 @@
 # VoiceFlow Eval
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](../docs/README.md).
+
 Local ASR evaluation lives here. Keep private recordings out of Git.
 
 ## Manifest

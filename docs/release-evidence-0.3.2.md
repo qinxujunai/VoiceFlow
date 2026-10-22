@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.2 release verification evidence
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: local release candidate passed the automated source, packaged-runtime,
 and isolated-installer gates on the release workstation. Public asset hashes
 are published in the matching GitHub Release `SHA256SUMS.txt`.

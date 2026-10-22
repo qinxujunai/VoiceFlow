@@ -1,5 +1,7 @@
 # Streaming Preview Evaluation — 2026-08-05
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: **bilingual first pass promoted; final accuracy still belongs to SenseVoice**
 
 The experiment used the pinned public Chinese and English SenseVoice samples

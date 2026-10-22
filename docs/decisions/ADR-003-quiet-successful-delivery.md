@@ -1,5 +1,7 @@
 # ADR-003: Dismiss successful delivery without redundant confirmation
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](../README.md).
+
 ## Status
 
 Accepted; delivery confirmation tightened on 2026-10-06
