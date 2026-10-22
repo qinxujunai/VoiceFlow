@@ -1,5 +1,7 @@
 # Using VoiceFlow
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 [Back to the product](../README.en.md)
 
 ## Start speaking
@@ -15,6 +17,18 @@ Mixed Chinese and English preview may appear later; check the final text after s
 
 Open settings from the tray and select Dictation. Keep recognized punctuation, omit the final period, or complete the sentence with a period.
 Question marks, exclamation marks and punctuation within the text stay. This changes the ending, without rewriting your words.
+
+Chinese punctuation processing can still split sentences incorrectly; check the final text. Code, URLs and preserve-format input bypass punctuation inference.
+
+## Settings and vocabulary
+
+Dictation settings share one Save changes action, disabled until something changes. Failed saves keep your edits and explain the problem.
+Text preferences apply to the next dictation; language and microphone changes require restarting the app.
+
+Vocabulary supports search, checkboxes, deleting selected entries and undo. Clearing a category requires confirmation; built-in entries are read-only.
+For a correction, enter the recognized word and the desired word in separate fields.
+
+Closing settings keeps VoiceFlow in the tray. Launch VoiceFlow again or open settings from the tray to return. Use Exit in the tray to quit.
 
 ## Install and update
 
@@ -43,4 +57,4 @@ Preparing source dependencies or an approved model download requires a connectio
 
 [Share feedback](https://github.com/qinxujunai/VoiceFlow/issues). Describe the app and what happened. You do not need to upload private audio or history.
 
-[Release record](release-evidence-0.3.7.md) · [Development](development.en.md) · [Licenses](../THIRD_PARTY_NOTICES.md)
+[Release record](https://github.com/qinxujunai/VoiceFlow/releases/latest) · [Development](development.en.md) · [Licenses](../THIRD_PARTY_NOTICES.md)

@@ -1,5 +1,7 @@
 # VoiceFlow Quality Gate
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
 VoiceFlow changes are accepted only when the runtime contract and delivery path
 still match the product promise: local-first dictation, complete final output,
 and recoverable text.

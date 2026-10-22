@@ -1,6 +1,10 @@
 # Flagship Reliability Architecture
 
-Status: implemented in the local source candidate; public release remains subject to the release checklist.
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+
+Status: implemented in the 0.3.9 Windows release; see
+[artifact-bound verification](release-validation-0.3.9.md) for scope and limits.
+Future artifacts still require the release checklist.
 
 ## Product contract
 

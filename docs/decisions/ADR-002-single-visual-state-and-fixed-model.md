@@ -1,5 +1,7 @@
 # ADR-002: Use one recording color, explicit completion, and one bundled model
 
+> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](../README.md).
+
 ## Status
 
 Accepted; completion feedback superseded by ADR-003

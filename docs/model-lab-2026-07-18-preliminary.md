@@ -1,5 +1,7 @@
 # VoiceFlow Model Lab — 2026-07-18 preliminary run
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Status: **no candidate promoted**. The active engine remains SenseVoice.
 
 This is an engineering smoke comparison, not the final 120-sample model

@@ -1,5 +1,7 @@
 # VoiceFlow 0.3.9
 
+> Documentation sync: **2026-10-22** · Historical evidence / release notes. Original decision/test dates remain authoritative; this is not a new test result. [Current index](README.md).
+
 Windows 构建：261021.6。本次更新统一听写设置、词典管理、录音展示和官网说明。
 
 ## 这次改了什么
