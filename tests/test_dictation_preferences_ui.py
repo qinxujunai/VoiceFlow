@@ -99,8 +99,9 @@ def test_dictation_settings_fit_the_supported_minimum_window(window):
     position = ui.save_settings_button.mapTo(ui, ui.save_settings_button.rect().bottomRight())
     assert position.y() < 660
     fields = [ui.language_combo, ui.microphone_combo, ui.dictation_scope_combo, ui.sentence_end_combo]
+    # The fields sit in two grouped cards, so compare them in window coordinates.
     for first, second in zip(fields, fields[1:]):
-        assert first.geometry().bottom() < second.geometry().top()
+        assert first.mapTo(ui, first.rect().bottomLeft()).y() < second.mapTo(ui, second.rect().topLeft()).y()
 
 
 def test_preferences_save_failure_keeps_live_policy_and_shows_failure(window, monkeypatch):

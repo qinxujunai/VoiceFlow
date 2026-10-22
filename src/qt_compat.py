@@ -53,6 +53,8 @@ try:
         QPen,
         QPixmap,
         QFontMetricsF,
+        QImage,
+        QLinearGradient,
     )
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
     from PySide6.QtWidgets import (
@@ -103,6 +105,8 @@ except ImportError as pyside_error:  # Development bridge for an existing pre-mi
             QPen,
             QPixmap,
             QFontMetricsF,
+            QImage,
+            QLinearGradient,
         )
         from PyQt6.QtNetwork import QLocalServer, QLocalSocket
         from PyQt6.QtWidgets import (
