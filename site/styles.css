@@ -5,7 +5,7 @@
   --paper:#fff;
   --soft:#f0f0f2;
   --ink:#19191b;
-  --secondary:#727278;
+  --secondary:#6a6a70;
   --line:#e4e4e7;
   --red:#ed4b42;
   --width:1180px
@@ -129,10 +129,11 @@ nav a:hover{
   gap:12px
 }
 .language-switch button{
-  padding:2px 0;
+  min-height:44px;
+  padding:2px 4px;
   border:0;
   background:transparent;
-  color:#898990;
+  color:var(--secondary);
   font-size:12px;
   cursor:pointer
 }
@@ -208,7 +209,7 @@ nav a:hover{
 }
 .hero-note{
   margin-top:22px;
-  color:#898990;
+  color:var(--secondary);
   font-size:12px
 }
 .film-section{
@@ -265,7 +266,7 @@ nav a:hover{
   font-size:13px
 }
 .film-tag{
-  color:#909097;
+  color:var(--secondary);
   font-size:11px
 }
 .section-shell{
@@ -281,7 +282,7 @@ nav a:hover{
 .section-lede{
   max-width:500px;
   margin-top:26px;
-  color:#74747c;
+  color:var(--secondary);
   font-size:19px;
   line-height:1.8;
   text-wrap:pretty
@@ -322,7 +323,7 @@ nav a:hover{
 }
 .paper-date{
   font-size:11px;
-  color:#b6a977
+  color:#7d6e33
 }
 .paper-note h3{
   font-size:19px;
@@ -412,7 +413,7 @@ nav a:hover{
 }
 .art-note{
   font-size:11px;
-  color:#727279;
+  color:var(--secondary);
   margin-top:18px
 }
 .flow-section{
@@ -477,7 +478,7 @@ nav a:hover{
   height:25px
 }
 .quiet-section .art-note{
-  color:#85858f
+  color:#8e8e94
 }
 .personal-section{
   display:grid;
@@ -507,7 +508,7 @@ nav a:hover{
 .ending-label{
   display:block;
   font-size:12px;
-  color:#84848d
+  color:var(--secondary)
 }
 .ending-row p{
   font-size:28px;
@@ -521,7 +522,7 @@ nav a:hover{
   border:1px solid #d9d9df;
   border-radius:30px;
   padding:5px 10px;
-  color:#85858f
+  color:var(--secondary)
 }
 .privacy-section{
   background:#f0f0f2
@@ -560,7 +561,7 @@ nav a:hover{
 }
 .history-time{
   font-size:11px;
-  color:#aaaab2
+  color:var(--secondary)
 }
 .history-entry p{
   margin-top:12px;
@@ -574,7 +575,7 @@ nav a:hover{
 .history-note{
   margin-top:32px;
   font-size:12px;
-  color:#85858f
+  color:var(--secondary)
 }
 .download-section{
   text-align:center;
@@ -594,7 +595,7 @@ nav a:hover{
 }
 .release-link{
   margin-top:18px;
-  color:#74747c;
+  color:var(--secondary);
   font-size:12px
 }
 .faq{
@@ -659,9 +660,15 @@ footer{
 }
 .footer-links{
   display:flex;
-  gap:23px;
+  flex-wrap:wrap;
+  gap:0 23px;
   font-size:12px;
-  color:#818189
+  color:var(--secondary)
+}
+.footer-links a{
+  display:inline-flex;
+  align-items:center;
+  min-height:44px
 }
 .footer-links a:hover{
   text-decoration:underline
@@ -867,7 +874,8 @@ footer{
     padding-bottom:72px
   }
   .download-section h2{
-    font-size:44px
+    /* Small enough that 从下一次输入开始。 stays on one line on a phone. */
+    font-size:min(44px,9.4vw)
   }
   .faq{
     margin-top:48px
