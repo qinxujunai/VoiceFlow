@@ -270,3 +270,105 @@ def test_high_contrast_system_query_uses_typed_win32_contract(monkeypatch, query
     monkeypatch.setattr(platform_utils.sys, "platform", "win32")
     monkeypatch.setattr(ctypes, "WinDLL", lambda *_args, **_kwargs: SimpleNamespace(SystemParametersInfoW=Query()))
     assert platform_utils.system_high_contrast_enabled() is expected
+
+
+def test_new_glyphs_fade_in_and_settled_text_stays_opaque():
+    from capsule_native import CapsuleState, glyph_alpha
+
+    state = CapsuleState()
+    state.prepare_recording(1)
+    state.append_streaming("你好", 1, now=0)
+    state.advance(now=0)
+    assert state.text == "你" and state.born == [0]
+    state.advance(now=0.06)
+    assert state.born == [0, 0.06]
+    assert glyph_alpha(0.06, now=0.06, motion=True) == 0.0
+    assert 0 < glyph_alpha(0.06, now=0.12, motion=True) < 1
+    assert glyph_alpha(0.06, now=0.30, motion=True) == 1.0
+    assert glyph_alpha(0.06, now=0.06, motion=False) == 1.0
+    state.show_final("完整", 1)
+    assert state.born == [None, None], "final text is shown settled, never faded per glyph"
+    long_text = "甲" * 80
+    state.show_final(long_text, 1)
+    assert len(state.born) == len(state.visible) == 64
+
+
+def test_final_text_crossfades_in_place_without_moving(monkeypatch):
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: True)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.present("prepare_recording", [1])
+        view.present("transcript", ["预览文字", "", 1])
+        view.present("final", ["预览文字，再补两句", 1])
+        assert view._crossfade_from is None, "a final that extends the draft completes in place"
+        view.present("prepare_recording", [2])
+        view.present("transcript", ["预览文字", "", 2])
+        view.present("final", ["终稿文字", 2])
+        assert view._crossfade_from == "预览文字"
+        assert view.frame_timer.isActive()
+        view._crossfade_at -= 1
+        view._animate()
+        assert view._crossfade_from is None
+        view.present("prepare_recording", [3])
+        assert view._crossfade_from is None
+    finally:
+        view.close()
+
+
+def test_reduced_motion_skips_the_final_crossfade(monkeypatch):
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: False)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.present("prepare_recording", [1])
+        view.present("transcript", ["预览", "", 1])
+        view.present("final", ["终稿", 1])
+        assert view._crossfade_from is None
+        assert not view.frame_timer.isActive()
+    finally:
+        view.close()
+
+
+def test_long_text_is_cropped_from_the_start_and_marked_for_an_edge_fade():
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        shown, cropped = view._visible_graphemes(list("短句"))
+        assert shown == ["短", "句"] and not cropped
+        shown, cropped = view._visible_graphemes(list("很长的一段话" * 20))
+        assert cropped and "".join(shown).endswith("很长的一段话")
+    finally:
+        view.close()
+
+
+def test_streaming_frame_paints_text_and_reports_the_first_preview(monkeypatch):
+    monkeypatch.setattr("capsule_native.system_high_contrast_enabled", lambda: False)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    painted = []
+    view.preview_painted.connect(painted.append)
+    try:
+        view.resize(380, 48)
+        view.present("prepare_recording", [7])
+        view.present("transcript", ["很长的一段话" * 12, "", 7])
+        view.show()
+        frame = view.grab().toImage()
+        app.processEvents()
+        bright = [x for x in range(150, 330) if any(frame.pixelColor(x, y).lightness() > 160 for y in range(16, 32))]
+        assert bright, "streamed text is visible"
+        assert painted == [7]
+    finally:
+        view.close()

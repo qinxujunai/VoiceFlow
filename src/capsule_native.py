@@ -8,6 +8,7 @@ import time
 from qt_compat import (
     QColor, QFont, QFontMetricsF, QPainter, QPen, QPointF, QRectF,
     QTextBoundaryFinder, QTimer, QWidget, Qt, Signal, Slot, QObject, QEvent,
+    QImage, QLinearGradient,
 )
 from platform_utils import system_high_contrast_enabled
 
@@ -43,6 +44,19 @@ def split_graphemes(text):
         start = end
 
 
+GLYPH_FADE = 0.14
+FINAL_CROSSFADE = 0.16
+EDGE_FADE = 18.0
+
+
+def glyph_alpha(born, *, now, motion=True):
+    """Opacity of a streamed glyph: new characters fade in once, like iOS dictation; settled ones are opaque."""
+    if born is None or not motion:
+        return 1.0
+    progress = min(1.0, max(0.0, (now - born) / GLYPH_FADE))
+    return 1 - (1 - progress) ** 2
+
+
 class CapsuleState:
     BASE_INTERVAL = 0.048
     HARD_LAG = 0.6
@@ -52,6 +66,8 @@ class CapsuleState:
         self.generation = 0
         self.mode = "idle"
         self.visible = []
+        # When each visible grapheme appeared (None = shown settled). Kept the same length as visible.
+        self.born = []
         self.pending = deque()
         self.next_character_at = 0.0
 
@@ -59,13 +75,20 @@ class CapsuleState:
     def text(self):
         return "".join(self.visible)
 
-    def _append(self, values):
-        self.visible = (self.visible + list(values))[-self.VISIBLE_LIMIT:]
+    def _append(self, values, born=None):
+        values = list(values)
+        self.visible = (self.visible + values)[-self.VISIBLE_LIMIT:]
+        self.born = (self.born + [born] * len(values))[-self.VISIBLE_LIMIT:]
+
+    def _replace(self, text):
+        self.visible = split_graphemes(text)[-self.VISIBLE_LIMIT:]
+        self.born = [None] * len(self.visible)
 
     def prepare_recording(self, generation):
         self.generation = int(generation)
         self.mode = "listening"
         self.visible.clear()
+        self.born.clear()
         self.pending.clear()
         self.next_character_at = 0.0
 
@@ -77,16 +100,18 @@ class CapsuleState:
         self.pending.extend((char, now) for char in split_graphemes(text))
         if len(self.pending) > 256:
             self._append(self.pending.popleft()[0] for _ in range(len(self.pending) - 20))
+            self.born = [None] * len(self.visible)
 
     def advance(self, *, now=None):
         now = time.perf_counter() if now is None else now
         if not self.pending or now < self.next_character_at:
             return False
         if now - self.pending[0][1] >= self.HARD_LAG:
-            self._append(char for char, _ in self.pending)
+            # A hard catch-up shows the backlog at once: one soft fade for the whole run, not a cascade.
+            self._append((char for char, _ in self.pending), born=now)
             self.pending.clear()
         else:
-            self._append([self.pending.popleft()[0]])
+            self._append([self.pending.popleft()[0]], born=now)
         if self.pending:
             pressure = min(1.0, max((now - self.pending[0][1]) / 0.18, len(self.pending) / 12))
             self.next_character_at = now + self.BASE_INTERVAL - 0.031 * pressure
@@ -104,17 +129,18 @@ class CapsuleState:
             return
         self.generation = int(generation)
         self.pending.clear()
-        self.visible = split_graphemes(text)[-self.VISIBLE_LIMIT:]
+        self._replace(text)
         self.mode = "final_text"
 
     def show_label(self, mode, text):
         self.pending.clear()
-        self.visible = split_graphemes(text)[-self.VISIBLE_LIMIT:]
+        self._replace(text)
         self.mode = mode
 
     def reset(self):
         self.pending.clear()
         self.visible.clear()
+        self.born.clear()
         self.mode = "idle"
 
 
@@ -142,6 +168,8 @@ class NativeCapsuleView(QWidget):
         self._levels_changed_at = 0.0
         self._painted_generation = None
         self._dismiss_at = None
+        self._crossfade_from = None
+        self._crossfade_at = 0.0
         self._motion_enabled = system_animations_enabled()
         self._high_contrast_active = system_high_contrast_enabled()
         self._motion_checked_at = time.perf_counter()
@@ -171,6 +199,7 @@ class NativeCapsuleView(QWidget):
             self._levels_changed_at = now
             self._painted_generation = None
             self._dismiss_at = None
+            self._crossfade_from = None
         elif command == "append_streaming":
             self.state.append_streaming(*args, now=now)
             self.state.advance(now=now)
@@ -180,7 +209,16 @@ class NativeCapsuleView(QWidget):
                 self.state.show_final(authoritative + draft, generation)
                 self.state.mode = "streaming"
         elif command == "final":
+            previous = self.state.text
             self.state.show_final(*args)
+            # The draft becomes the final text in place: a short crossfade, never a slide.
+            # When the final text only extends the draft, it simply completes in place.
+            if (previous and not self.state.text.startswith(previous)
+                    and self.state.mode == "final_text" and self._motion_enabled):
+                self._crossfade_from = previous
+                self._crossfade_at = now
+            else:
+                self._crossfade_from = None
         elif command == "settling":
             self.state.show_settling(*args)
         elif command == "levels":
@@ -215,6 +253,7 @@ class NativeCapsuleView(QWidget):
         elif command == "reset":
             self.state.reset()
             self._dismiss_at = None
+            self._crossfade_from = None
         else:
             raise ValueError(f"unknown capsule command: {command}")
         self._retarget_width(now)
@@ -247,6 +286,8 @@ class NativeCapsuleView(QWidget):
         if not self._motion_enabled:
             return False
         return (bool(self.state.pending) or abs(self._width - self._target_width) > 0.05
+                or self._crossfade_from is not None
+                or any(born is not None and now - born < GLYPH_FADE for born in self.state.born[-12:])
                 or any(abs(a - b) > 0.001 for a, b in zip(self._levels, self._level_targets))
                 or self.state.mode in {"processing", "settling"}
                 or self._dismiss_at is not None and now - self._dismiss_at < 0.12)
@@ -266,6 +307,8 @@ class NativeCapsuleView(QWidget):
         self._width = self._width_start + (self._target_width - self._width_start) * (1 - (1 - progress) ** 3)
         progress = min(1.0, max(0.0, (now - self._levels_changed_at) / 0.09))
         self._levels = [a + (b - a) * progress for a, b in zip(self._level_starts, self._level_targets)]
+        if self._crossfade_from is not None and now - self._crossfade_at >= FINAL_CROSSFADE:
+            self._crossfade_from = None
         self.update()
         if not self._has_motion(now):
             self.frame_timer.stop()
@@ -292,6 +335,8 @@ class NativeCapsuleView(QWidget):
         had_pending = bool(self.state.pending)
         self.state._append(char for char, _ in self.state.pending)
         self.state.pending.clear()
+        self.state.born = [None] * len(self.state.visible)
+        self._crossfade_from = None
         self._retarget_width(now)
         self._width = self._width_start = self._target_width
         self._levels = [0.45] * 3
@@ -345,17 +390,17 @@ class NativeCapsuleView(QWidget):
                 painter.drawRoundedRect(QRectF(mark_x + (6 if high_contrast else 4) * index,
                                               center_y - height / 2, 4 if high_contrast else 2, height), 1, 1)
         text_rect = QRectF(rect.x() + 38, rect.y(), max(0.0, rect.width() - 50), rect.height())
-        text = self.state.text
-        metrics = QFontMetricsF(self.font())
-        graphemes = split_graphemes(text)
-        # Crop against the fixed capacity, never the in-flight animated width.
-        # Growing the pill must not replay a previously hidden prefix.
-        while graphemes and metrics.horizontalAdvance("".join(graphemes)) > self.MAX_WIDTH - 50:
-            graphemes.pop(0)
-        painter.setFont(self.font())
-        painter.setPen(foreground)
-        painter.setClipRect(text_rect)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "".join(graphemes))
+        now = time.perf_counter()
+        motion = self._motion_enabled and not high_contrast
+        if self._crossfade_from is not None and motion:
+            # Out, then in: the two texts never overlap.
+            fade = min(1.0, max(0.0, (now - self._crossfade_at) / FINAL_CROSSFADE))
+            if fade < 0.5:
+                self._paint_text(painter, text_rect, split_graphemes(self._crossfade_from), None, foreground, 1 - fade * 2, now, motion)
+            else:
+                self._paint_text(painter, text_rect, self.state.visible, None, foreground, fade * 2 - 1, now, motion)
+        else:
+            self._paint_text(painter, text_rect, self.state.visible, self.state.born, foreground, 1.0, now, motion)
         painter.end()
         if self.state.mode in {"listening", "streaming"}:
             if self._last_recording_paint is not None:
@@ -363,9 +408,63 @@ class NativeCapsuleView(QWidget):
             self._last_recording_paint = paint_started
             self.paint_durations_ms.append((time.perf_counter() - paint_started) * 1000)
         generation = self.state.generation
-        if self.state.mode == "streaming" and text and self._painted_generation != generation:
+        if self.state.mode == "streaming" and self.state.visible and self._painted_generation != generation:
             self._painted_generation = generation
             QTimer.singleShot(0, lambda: self.preview_painted.emit(generation) if self.state.generation == generation else None)
+
+
+    def _visible_graphemes(self, graphemes):
+        """The tail that fits the fixed capacity, and whether the start was cropped."""
+        metrics = QFontMetricsF(self.font())
+        shown = list(graphemes)
+        # Crop against the fixed capacity, never the in-flight animated width.
+        # Growing the pill must not replay a previously hidden prefix.
+        while shown and metrics.horizontalAdvance("".join(shown)) > self.MAX_WIDTH - 50:
+            shown.pop(0)
+        return shown, len(shown) < len(graphemes)
+
+    def _paint_text(self, painter, text_rect, graphemes, born, color, opacity, now, motion):
+        if opacity <= 0 or not graphemes:
+            return
+        shown, cropped = self._visible_graphemes(graphemes)
+        born = (born or [])[-len(shown):] if born else [None] * len(shown)
+        metrics = QFontMetricsF(self.font())
+        ratio = self.devicePixelRatioF()
+        layer = QImage(max(1, int(text_rect.width() * ratio)), max(1, int(text_rect.height() * ratio)),
+                       QImage.Format.Format_ARGB32_Premultiplied)
+        layer.setDevicePixelRatio(ratio)
+        layer.fill(Qt.GlobalColor.transparent)
+        text_painter = QPainter(layer)
+        text_painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        text_painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        text_painter.setFont(self.font())
+        text_painter.setPen(color)
+        local = QRectF(0, 0, text_rect.width(), text_rect.height())
+        # Settled text in one run (keeps kerning); only glyphs still fading are drawn one by one.
+        settled = 0
+        while settled < len(shown) and glyph_alpha(born[settled], now=now, motion=motion) >= 1.0:
+            settled += 1
+        prefix = "".join(shown[:settled])
+        text_painter.drawText(local, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, prefix)
+        x = metrics.horizontalAdvance(prefix)
+        for glyph, glyph_born in zip(shown[settled:], born[settled:]):
+            text_painter.setOpacity(glyph_alpha(glyph_born, now=now, motion=motion))
+            text_painter.drawText(QRectF(x, 0, local.width(), local.height()),
+                                  Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, glyph)
+            x += metrics.horizontalAdvance(glyph)
+        if cropped and motion:
+            # The cropped start fades out instead of being cut mid-glyph.
+            text_painter.setOpacity(1.0)
+            text_painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
+            mask = QLinearGradient(0, 0, EDGE_FADE, 0)
+            mask.setColorAt(0, QColor(0, 0, 0, 0))
+            mask.setColorAt(1, QColor(0, 0, 0, 255))
+            text_painter.fillRect(QRectF(0, 0, EDGE_FADE, local.height()), mask)
+        text_painter.end()
+        painter.save()
+        painter.setOpacity(opacity)
+        painter.drawImage(text_rect.topLeft(), layer)
+        painter.restore()
 
 
 class NativeCapsuleBridge(QObject):

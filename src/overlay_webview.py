@@ -9,6 +9,7 @@ import sys
 import time
 import threading
 import copy
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from qt_compat import (
     QCheckBox, QComboBox, QMessageBox, QScrollArea,
     Qt, QUrl, QSize, QObject, Signal, Slot, QTimer,
     QAction, QLocalServer, QLocalSocket, QEvent,
-    QIcon, QPixmap, QPainter, QPen, QColor, QRectF,
+    QIcon, QPixmap, QPainter, QPen, QColor, QRectF, QPointF,
 )
 
 from tray_icon import (
@@ -395,7 +396,7 @@ class _SettingsWindow(QMainWindow):
         image.fill(Qt.GlobalColor.transparent)
         painter = QPainter(image)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor("#c8c8d0"), 1.5))
+        painter.setPen(QPen(QColor("#3a3a3c"), 1.5))
         if index == 0:
             for x, height in ((5, 7), (10, 14), (15, 10)):
                 painter.drawLine(x, int(10 - height / 2), x, int(10 + height / 2))
@@ -467,32 +468,59 @@ class _SettingsWindow(QMainWindow):
         settings_panel.setObjectName("dictationSettingsPanel")
         settings_layout = QVBoxLayout(settings_panel)
         self._settings_panel_layout = settings_layout
-        settings_layout.setContentsMargins(20, 18, 20, 18)
-        settings_layout.setSpacing(14)
-        settings_title = QLabel("听写设置")
-        settings_title.setObjectName("subsectionTitle")
-        settings_layout.addWidget(settings_title)
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout.setSpacing(8)
 
-        fields = QGridLayout()
-        fields.setHorizontalSpacing(16)
-        fields.setVerticalSpacing(12)
+        # Grouped rows, as in macOS System Settings: a caption, then a card of label/control rows.
+        def group(caption):
+            title = QLabel(caption)
+            title.setObjectName("groupCaption")
+            settings_layout.addWidget(title)
+            card = QWidget()
+            card.setObjectName("groupCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(16, 6, 16, 6)
+            card_layout.setSpacing(0)
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(16)
+            grid.setVerticalSpacing(0)
+            grid.setColumnStretch(0, 1)
+            card_layout.addLayout(grid)
+            settings_layout.addWidget(card)
+            settings_layout.addSpacing(14)
+            return card_layout, grid
+
+        def add_row(grid, row, name, control):
+            label = QLabel(name)
+            label.setObjectName("fieldName")
+            label.setMinimumHeight(44)
+            control.setMinimumWidth(240)
+            grid.addWidget(label, row, 0)
+            grid.addWidget(control, row, 1)
+            return label
+
+        input_card, fields = group("输入")
         self.language_combo = QComboBox()
         self.language_combo.setAccessibleName("识别语言")
         self.microphone_combo = QComboBox()
         self.microphone_combo.setAccessibleName("麦克风")
         self.language_combo.setObjectName("fieldValue")
         self.microphone_combo.setObjectName("fieldValue")
-        for row, (name, value) in enumerate((
-            ("识别语言", self.language_combo),
-            ("麦克风", self.microphone_combo),
-        )):
-            label = QLabel(name)
-            label.setObjectName("fieldName")
-            fields.addWidget(label, row, 0)
-            fields.addWidget(value, row, 1)
-        fields.setColumnStretch(1, 1)
-        settings_layout.addLayout(fields)
+        field_labels = [
+            add_row(fields, row, name, value)
+            for row, (name, value) in enumerate((
+                ("识别语言", self.language_combo),
+                ("麦克风", self.microphone_combo),
+            ))
+        ]
+        self.autostart_check = QCheckBox(
+            "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
+        )
+        self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
+        self.autostart_check.setMinimumHeight(44)
+        input_card.addWidget(self.autostart_check)
 
+        format_card, format_fields = group("标点与格式")
         self.dictation_scope_combo = QComboBox()
         self.dictation_scope_combo.setAccessibleName("句末策略适用范围")
         self.dictation_scope_combo.addItem("所有应用的默认值", None)
@@ -500,66 +528,64 @@ class _SettingsWindow(QMainWindow):
         self.sentence_end_combo.setAccessibleName("句末标点")
         for value, label in SENTENCE_END_CHOICES:
             self.sentence_end_combo.addItem(label, value)
-        fields.addWidget(QLabel("适用范围"), 2, 0)
-        fields.addWidget(self.dictation_scope_combo, 2, 1)
-        fields.addWidget(QLabel("句末标点"), 3, 0)
-        fields.addWidget(self.sentence_end_combo, 3, 1)
+        field_labels += [
+            add_row(format_fields, 0, "适用范围", self.dictation_scope_combo),
+            add_row(format_fields, 1, "句末标点", self.sentence_end_combo),
+        ]
         self.preserve_format_check = QCheckBox("保留格式")
         self.preserve_format_check.setAccessibleName("保留输入格式")
-        settings_layout.addWidget(self.preserve_format_check)
+        self.preserve_format_check.setMinimumHeight(44)
+        format_card.addWidget(self.preserve_format_check)
         self.sentence_end_sample = QLabel()
-        self.sentence_end_sample.setObjectName("sectionSubtitle")
+        self.sentence_end_sample.setObjectName("rowNote")
         self.sentence_end_sample.setWordWrap(True)
         self.dictation_scope_note = QLabel("应用设置优先；代码编辑器和终端默认保留格式。")
-        self.dictation_scope_note.setObjectName("sectionSubtitle")
+        self.dictation_scope_note.setObjectName("rowNote")
         self.dictation_scope_note.setWordWrap(True)
-        settings_layout.addWidget(self.sentence_end_sample)
-        settings_layout.addWidget(self.dictation_scope_note)
+        format_card.addWidget(self.sentence_end_sample)
+        format_card.addWidget(self.dictation_scope_note)
         sentence_actions = QHBoxLayout()
         self.follow_default_button = QPushButton("跟随默认值")
+        self.follow_default_button.setObjectName("textButton")
         self.follow_default_button.setAccessibleName("移除此应用的标点与格式设置，跟随默认值")
         self.follow_default_button.setEnabled(False)
         self.follow_default_button.clicked.connect(self._draft_follow_default)
         sentence_actions.addWidget(self.follow_default_button)
         sentence_actions.addStretch(1)
-        settings_layout.addLayout(sentence_actions)
+        format_card.addLayout(sentence_actions)
+        format_card.addSpacing(6)
         self.dictation_scope_combo.currentIndexChanged.connect(self._change_dictation_scope)
         self.sentence_end_combo.currentIndexChanged.connect(self._update_sentence_end_sample)
         self.preserve_format_check.toggled.connect(self._update_sentence_end_sample)
         self._update_sentence_end_sample()
 
-        self.autostart_check = QCheckBox(
-            "登录系统后自动启动" if sys.platform == "darwin" else "登录 Windows 后自动启动"
-        )
-        self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
-        settings_layout.addWidget(self.autostart_check)
-
         actions = QHBoxLayout()
-        self.save_settings_button = QPushButton("保存更改")
+        actions.setSpacing(10)
         self._settings_actions = actions
-        self.save_settings_button.setObjectName("primaryButton")
-        self.save_settings_button.setAccessibleName("保存听写设置")
-        self.save_settings_button.clicked.connect(self._save_settings)
-        actions.addWidget(self.save_settings_button)
+        save_note = QLabel("文字习惯下次听写生效；语言和麦克风更改需重启")
+        save_note.setWordWrap(True)
+        save_note.setObjectName("saveNote")
+        actions.addWidget(save_note, 1)
         self.reload_settings_button = QPushButton("重新载入")
         self.reload_settings_button.clicked.connect(self._reload_settings)
         self.reload_settings_button.hide()
         actions.addWidget(self.reload_settings_button)
-        save_note = QLabel("文字习惯下次听写生效；语言和麦克风更改需重启")
-        save_note.setWordWrap(True)
-        save_note.setObjectName("sectionSubtitle")
-        actions.addWidget(save_note)
-        actions.addStretch(1)
+        self.save_settings_button = QPushButton("保存更改")
+        self.save_settings_button.setObjectName("primaryButton")
+        self.save_settings_button.setAccessibleName("保存听写设置")
+        self.save_settings_button.clicked.connect(self._save_settings)
+        actions.addWidget(self.save_settings_button)
         layout.addWidget(settings_panel)
 
         status_row = QHBoxLayout()
+        status_row.setSpacing(8)
         self.home_microphone = QLabel("麦克风 · 正在检查")
         self.home_microphone.setObjectName("systemStatusItem")
         self.home_model = QLabel("本地识别 · 正在检查")
         self.home_model.setObjectName("systemStatusItem")
         status_row.addWidget(self.home_microphone)
-        status_row.addStretch(1)
         status_row.addWidget(self.home_model)
+        status_row.addStretch(1)
         layout.addLayout(status_row)
 
         shortcut_hint = QLabel("文字会粘贴到当前光标；不能粘贴时，仍可从剪贴板取用。Esc 取消听写。")
@@ -571,18 +597,24 @@ class _SettingsWindow(QMainWindow):
         self.dictation_scroll.setObjectName("dictationScroll")
         self.dictation_scroll.setAccessibleName("听写设置")
         self.dictation_scroll.setWidgetResizable(True)
+        self.dictation_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self.dictation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.dictation_scroll.setWidget(page)
         container = QWidget()
         outer = QVBoxLayout(container)
         outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
         outer.addWidget(self.dictation_scroll, 1)
         footer = QWidget()
-        footer.setContentsMargins(24, 8, 24, 16)
+        footer.setObjectName("saveBar")
         footer.setLayout(actions)
+        actions.setContentsMargins(40, 12, 40, 12)
+        self._save_bar = footer
         outer.addWidget(footer)
-        self._settings_fields = fields
-        self._field_labels = [fields.itemAtPosition(row, 0).widget() for row in range(4)]
+        self._settings_grids = [
+            (fields, field_labels[:2], (self.language_combo, self.microphone_combo)),
+            (format_fields, field_labels[2:], (self.dictation_scope_combo, self.sentence_end_combo)),
+        ]
         for widget in (self.language_combo, self.microphone_combo):
             widget.currentIndexChanged.connect(self._settings_changed)
         for widget in (self.autostart_check, self.preserve_format_check):
@@ -599,21 +631,21 @@ class _SettingsWindow(QMainWindow):
             self.brand_title.setVisible(not compact)
             self.brand_subtitle.setVisible(not compact)
             self.build_label.setVisible(not compact)
-        if hasattr(self, "_settings_fields"):
+        if hasattr(self, "_settings_grids"):
             self._home_layout.setContentsMargins(16 if compact else 40, 24, 16 if compact else 40, 24)
-            self._settings_panel_layout.setContentsMargins(12 if compact else 20, 18, 12 if compact else 20, 18)
+            self._settings_actions.setContentsMargins(16 if compact else 40, 12, 16 if compact else 40, 12)
             self._settings_actions.setDirection(QHBoxLayout.Direction.TopToBottom if compact else QHBoxLayout.Direction.LeftToRight)
             narrow = self.width() < 820
-            self._settings_fields.setColumnStretch(0, 1 if narrow else 0)
-            self._settings_fields.setColumnStretch(1, 0 if narrow else 1)
-            for row, (label, control) in enumerate(zip(self._field_labels, (
-                    self.language_combo, self.microphone_combo, self.dictation_scope_combo, self.sentence_end_combo))):
-                self._settings_fields.removeWidget(label)
-                self._settings_fields.removeWidget(control)
-                self._settings_fields.addWidget(label, row * 2 if narrow else row, 0)
-                self._settings_fields.addWidget(control, row * 2 + 1 if narrow else row, 0 if narrow else 1)
-                control.setMinimumContentsLength(8)
-                control.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            for grid, labels, controls in self._settings_grids:
+                for row, (label, control) in enumerate(zip(labels, controls)):
+                    grid.removeWidget(label)
+                    grid.removeWidget(control)
+                    grid.addWidget(label, row * 2 if narrow else row, 0)
+                    grid.addWidget(control, row * 2 + 1 if narrow else row, 0 if narrow else 1)
+                    label.setMinimumHeight(30 if narrow else 44)
+                    control.setMinimumWidth(0 if narrow else 240)
+                    control.setMinimumContentsLength(8)
+                    control.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         super().resizeEvent(event)
         if hasattr(self, "history_list"):
             QTimer.singleShot(0, self._resize_history_cards)
@@ -635,8 +667,8 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(18, 16, 18, 18)
-        layout.setSpacing(12)
+        layout.setContentsMargins(40, 32, 40, 28)
+        layout.setSpacing(14)
         layout.addLayout(self._section_header("历史", "查看和复制最近结果。复制后，在需要的位置按 Ctrl+V。"))
 
         self.recovery_panel = QWidget()
@@ -669,6 +701,7 @@ class _SettingsWindow(QMainWindow):
         recovery_layout.addWidget(self.recovery_detail)
         recovery_layout.addWidget(self.recovery_combo)
         recovery_layout.addLayout(recovery_actions)
+        self.recovery_panel.setVisible(False)
         layout.addWidget(self.recovery_panel)
 
         toolbar = QHBoxLayout()
@@ -676,6 +709,7 @@ class _SettingsWindow(QMainWindow):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("搜索最近转录")
         self.search_box.setAccessibleName("搜索历史转录")
+        self.search_box.setClearButtonEnabled(True)
         self._history_search_timer = QTimer(self)
         self._history_search_timer.setSingleShot(True)
         self._history_search_timer.setInterval(140)
@@ -685,15 +719,19 @@ class _SettingsWindow(QMainWindow):
         )
         toolbar.addWidget(self.search_box, 1)
         refresh = QPushButton("刷新")
+        refresh.setObjectName("textButton")
         refresh.clicked.connect(self._refresh_history)
         toolbar.addWidget(refresh)
         copy_all = QPushButton("复制全部")
+        copy_all.setObjectName("textButton")
         copy_all.clicked.connect(self._copy_all_visible)
         toolbar.addWidget(copy_all)
         clear_history = QPushButton("清空历史")
+        clear_history.setObjectName("textButton")
         clear_history.clicked.connect(self._clear_history)
         toolbar.addWidget(clear_history)
         clear_local_data = QPushButton("清除本机数据")
+        clear_local_data.setObjectName("destructiveTextButton")
         clear_local_data.clicked.connect(self._clear_local_data)
         toolbar.addWidget(clear_local_data)
         self.undo_history_button = QPushButton("撤销删除")
@@ -715,7 +753,7 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(28, 26, 28, 24)
+        layout.setContentsMargins(40, 32, 40, 28)
         layout.setSpacing(14)
         layout.addLayout(
             self._section_header(
@@ -730,12 +768,22 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_section.addItem("专有词", "user-dictionary.txt")
         self.dictionary_section.addItem("常用短语", "phrases.txt")
         self.dictionary_section.addItem("确定性纠错", "corrections.txt")
-        layout.addWidget(self.dictionary_section)
+        self.dictionary_section.setMinimumWidth(180)
         self.dictionary_search = QLineEdit()
         self.dictionary_search.setPlaceholderText("搜索当前分类")
         self.dictionary_search.setAccessibleName("搜索词典")
+        self.dictionary_search.setClearButtonEnabled(True)
         self.dictionary_search.textChanged.connect(self._filter_dictionary)
-        layout.addWidget(self.dictionary_search)
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(10)
+        filter_row.addWidget(self.dictionary_section)
+        filter_row.addWidget(self.dictionary_search, 1)
+        layout.addLayout(filter_row)
+        dictionary_card = QWidget()
+        dictionary_card.setObjectName("groupCard")
+        card_layout = QVBoxLayout(dictionary_card)
+        card_layout.setContentsMargins(16, 14, 16, 14)
+        card_layout.setSpacing(10)
 
         add_row = QHBoxLayout()
         self._dictionary_add_row = add_row
@@ -754,12 +802,12 @@ class _SettingsWindow(QMainWindow):
         add_row.addWidget(self.dictionary_input, 1)
         add_row.addWidget(self.dictionary_correct_input, 1)
         add_row.addWidget(self.dictionary_add_button)
-        layout.addLayout(add_row)
+        card_layout.addLayout(add_row)
 
         self.dictionary_hint = QLabel("每项单独一行，双击可以修改。")
-        self.dictionary_hint.setObjectName("sectionSubtitle")
+        self.dictionary_hint.setObjectName("rowNote")
         self.dictionary_hint.setWordWrap(True)
-        layout.addWidget(self.dictionary_hint)
+        card_layout.addWidget(self.dictionary_hint)
 
         self.dictionary_list = QListWidget()
         self.dictionary_list.setObjectName("dictionaryList")
@@ -770,11 +818,11 @@ class _SettingsWindow(QMainWindow):
         self.dictionary_list.setSpacing(8)
         self.dictionary_list.setMinimumHeight(180)
         self.dictionary_list.itemChanged.connect(self._dictionary_item_changed)
-        layout.addWidget(self.dictionary_list, 1)
+        card_layout.addWidget(self.dictionary_list, 1)
+        layout.addWidget(dictionary_card, 1)
 
         self.dictionary_count = QLabel("0 项")
         self.dictionary_count.setObjectName("historyMeta")
-        layout.addWidget(self.dictionary_count)
 
         self.dictionary_section.currentIndexChanged.connect(
             self._change_dictionary_section
@@ -784,11 +832,12 @@ class _SettingsWindow(QMainWindow):
         note = QLabel(
             "词典只保存在这台电脑。纠错只按你指定的两个词替换，不改写你的意思。"
         )
-        note.setObjectName("privacyNote")
+        note.setObjectName("rowNote")
         note.setWordWrap(True)
-        layout.addWidget(note)
         actions = QHBoxLayout()
+        actions.setSpacing(6)
         self.dictionary_remove_button = QPushButton("删除所选")
+        self.dictionary_remove_button.setObjectName("textButton")
         self._dictionary_actions = actions
         self.dictionary_remove_button.clicked.connect(
             self._remove_dictionary_entries
@@ -797,28 +846,34 @@ class _SettingsWindow(QMainWindow):
         save.setObjectName("primaryButton")
         save.clicked.connect(self._save_dictionary)
         open_folder = QPushButton("打开词典目录")
+        open_folder.setObjectName("textButton")
         open_folder.clicked.connect(
             lambda: open_path(self.paths.knowledge_dir)
         )
-        actions.addWidget(self.dictionary_remove_button)
-        self.dictionary_undo_button = QPushButton("撤销删除")
-        self.dictionary_undo_button.clicked.connect(self._undo_dictionary_delete)
-        self.dictionary_undo_button.hide()
-        actions.addWidget(self.dictionary_undo_button)
-        actions.addWidget(save)
-        actions.addWidget(open_folder)
-        actions.addStretch(1)
-        layout.addLayout(actions)
         selection_actions = QHBoxLayout()
+        selection_actions.setSpacing(6)
         self._dictionary_selection_actions = selection_actions
+        selection_actions.addWidget(self.dictionary_count)
         self.dictionary_select_button = QPushButton("全选搜索结果")
+        self.dictionary_select_button.setObjectName("textButton")
         self.dictionary_select_button.clicked.connect(self._select_dictionary_results)
         self.dictionary_clear_button = QPushButton("清空当前分类")
+        self.dictionary_clear_button.setObjectName("destructiveTextButton")
         self.dictionary_clear_button.clicked.connect(self._clear_dictionary)
         selection_actions.addWidget(self.dictionary_select_button)
+        selection_actions.addWidget(self.dictionary_remove_button)
+        self.dictionary_undo_button = QPushButton("撤销删除")
+        self.dictionary_undo_button.setObjectName("textButton")
+        self.dictionary_undo_button.clicked.connect(self._undo_dictionary_delete)
+        self.dictionary_undo_button.hide()
+        selection_actions.addWidget(self.dictionary_undo_button)
         selection_actions.addWidget(self.dictionary_clear_button)
         selection_actions.addStretch(1)
         layout.addLayout(selection_actions)
+        actions.addWidget(note, 1)
+        actions.addWidget(open_folder)
+        actions.addWidget(save)
+        layout.addLayout(actions)
         return self._scrollable_page(page)
 
     @staticmethod
@@ -835,7 +890,7 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(18, 16, 18, 18)
+        layout.setContentsMargins(40, 32, 40, 28)
         layout.setSpacing(14)
         header = QHBoxLayout()
         header.addLayout(
@@ -874,7 +929,7 @@ class _SettingsWindow(QMainWindow):
         page = QWidget()
         page.setObjectName("contentPage")
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(28, 26, 28, 24)
+        layout.setContentsMargins(40, 32, 40, 28)
         layout.setSpacing(16)
 
         about_hero = QWidget()
@@ -1699,7 +1754,7 @@ class _SettingsWindow(QMainWindow):
         if not cards:
             empty = QListWidgetItem()
             empty.setData(Qt.ItemDataRole.UserRole, "")
-            empty.setSizeHint(QSize(0, 68))
+            empty.setSizeHint(QSize(0, 180))
             self.history_list.addItem(empty)
             self.history_list.setItemWidget(empty, self._empty_card())
             return
@@ -1917,11 +1972,15 @@ class _SettingsWindow(QMainWindow):
         card = QWidget()
         card.setObjectName("emptyCard")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setContentsMargins(14, 40, 14, 40)
+        layout.setSpacing(6)
         title = QLabel("暂无转录")
-        title.setObjectName("historyText")
-        note = QLabel("开始一次语音输入后会出现在这里")
+        title.setObjectName("emptyTitle")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        note = QLabel(f"按 {trigger_summary()} 说一句话，结果会出现在这里")
         note.setObjectName("historyMeta")
+        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        note.setWordWrap(True)
         layout.addWidget(title)
         layout.addWidget(note)
         return card
@@ -2270,19 +2329,41 @@ class _SettingsWindow(QMainWindow):
     def _high_contrast_enabled(self):
         return system_high_contrast_enabled()
 
+    @staticmethod
+    def _combo_arrow_path():
+        """A small chevron for combo boxes, drawn once per process (QSS needs an image file)."""
+        directory = Path(tempfile.gettempdir()) / "voiceflow-ui"
+        path = directory / "chevron-down@2x.png"
+        if not path.exists():
+            directory.mkdir(parents=True, exist_ok=True)
+            image = QPixmap(24, 24)
+            image.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(image)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            pen = QPen(QColor("#6e6e73"), 2.2)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+            painter.drawPolyline([QPointF(7, 10), QPointF(12, 15), QPointF(17, 10)])
+            painter.end()
+            image.save(str(path))
+        return path.as_posix()
+
     def _style(self):
+        # Quiet, native-feeling settings: light sidebar, grouped white cards on a soft grey canvas,
+        # one dark primary button per page, text buttons for secondary actions.
         return """
         * {
             font-size: 13px;
         }
         QWidget#appShell {
-            background: #f7f7f8;
+            background: #f5f5f7;
             color: #1d1d1f;
         }
         QWidget#sidebarPanel {
-            background: #17171b;
+            background: #ececef;
             border: none;
-            border-right: 1px solid #29292f;
+            border-right: 1px solid #dcdce1;
             border-radius: 0px;
         }
         QLabel#brandIcon {
@@ -2290,32 +2371,13 @@ class _SettingsWindow(QMainWindow):
             min-height: 32px;
         }
         QLabel#appTitle {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 650;
-            color: #f5f5f7;
-        }
-        QScrollArea#settingsPageScroll {
-            background: #ffffff;
-            border: none;
-        }
-        QLabel#appSubtitle, QLabel#sectionSubtitle, QLabel#fieldName {
-            color: #6e6e73;
+            color: #1d1d1f;
         }
         QLabel#appSubtitle, QLabel#sidebarVersion {
             font-size: 11px;
-            color: #a7a7b1;
-        }
-        QLabel#statusBadge {
-            padding: 10px 12px;
-            background: #242429;
-            color: #b6dfc2;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-        }
-        QLabel#statusBadge[attention="true"] {
-            color: #edbe78;
-            background: #242429;
+            color: #6e6e73;
         }
         QListWidget#sidebar {
             background: transparent;
@@ -2323,95 +2385,149 @@ class _SettingsWindow(QMainWindow):
             outline: none;
         }
         QListWidget#sidebar::item {
-            min-height: 42px;
-            padding-left: 12px;
-            border-radius: 10px;
-            color: #b6b6c0;
+            min-height: 36px;
+            padding-left: 10px;
+            border-radius: 8px;
+            color: #1d1d1f;
+        }
+        QListWidget#sidebar::item:hover {
+            background: rgba(0, 0, 0, 0.04);
         }
         QListWidget#sidebar::item:selected {
-            background: #303037;
-            color: #ffffff;
+            background: rgba(0, 0, 0, 0.08);
+            color: #1d1d1f;
             border: none;
-            border-left: 3px solid #ff453a;
             font-weight: 600;
         }
-        QStackedWidget#contentStack {
+        QLabel#statusBadge {
+            padding: 8px 10px;
             background: #ffffff;
+            color: #1f7a3a;
+            border: 1px solid #e0e0e5;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        QLabel#statusBadge[attention="true"] {
+            color: #9a5b00;
+            background: #fff8eb;
+            border-color: #f2dfb8;
+        }
+        QWidget#sidebarPanel QPushButton {
+            color: #3a3a3c;
+            background: transparent;
+            border: none;
+            text-align: left;
+            padding: 6px 10px;
+            min-height: 30px;
+        }
+        QWidget#sidebarPanel QPushButton:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        QPushButton::menu-indicator {
+            subcontrol-position: right center;
+            right: 8px;
+        }
+        QStackedWidget#contentStack {
+            background: #f5f5f7;
             border: none;
             border-radius: 0px;
+        }
+        QScrollArea#settingsPageScroll, QScrollArea#dictationScroll {
+            background: #f5f5f7;
+            border: none;
         }
         QWidget#contentPage {
             background: transparent;
             border: none;
         }
-        QScrollArea#dictationScroll {
-            border: none;
-            background: transparent;
-        }
-        QLabel#sectionTitle {
-            font-size: 22px;
+        QLabel#sectionTitle, QLabel#commandTitle {
+            font-size: 26px;
             font-weight: 650;
             color: #1d1d1f;
         }
-        QLabel#commandTitle {
-            font-size: 30px;
-            font-weight: 650;
-            color: #1d1d1f;
+        QLabel#sectionSubtitle, QLabel#commandSubtitle, QLabel#bodyText {
+            color: #6e6e73;
+            font-size: 13px;
         }
-        QLabel#commandSubtitle, QLabel#bodyText {
-            color: #515154;
+        QLabel#commandSubtitle {
             font-size: 14px;
         }
-        QLabel#subsectionTitle, QLabel#aboutVersion {
+        QLabel#groupCaption {
+            color: #6e6e73;
+            font-size: 12px;
+            font-weight: 600;
+            padding-left: 4px;
+        }
+        QWidget#groupCard, QWidget#recoveryPanel, QWidget#aboutHero, QWidget#privacyPanel {
+            background: #ffffff;
+            border: 1px solid #e5e5ea;
+            border-radius: 12px;
+        }
+        QLabel#fieldName {
             color: #1d1d1f;
-            font-size: 14px;
+        }
+        QLabel#rowNote, QLabel#saveNote {
+            color: #6e6e73;
+            font-size: 12px;
+            padding: 2px 0px 6px 0px;
+        }
+        QCheckBox {
+            spacing: 10px;
+            color: #1d1d1f;
+        }
+        QWidget#groupCard QCheckBox {
+            border-top: 1px solid #ececf0;
+        }
+        QCheckBox::indicator {
+            width: 16px;
+            height: 16px;
+        }
+        QLabel#shortcutKey {
+            color: #3a3a3c;
+            background: #ffffff;
+            border: 1px solid #d8d8dd;
+            border-bottom: 2px solid #c7c7cc;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
             font-weight: 600;
         }
-        QWidget#dictationSettingsPanel {
-            background: #ffffff;
-            border: 1px solid #e7e7ec;
-            border-radius: 18px;
-        }
         QLabel#systemStatusItem {
-            color: #4d4d50;
+            color: #3a3a3c;
+            background: #ffffff;
+            border: 1px solid #e5e5ea;
+            border-radius: 12px;
+            padding: 5px 11px;
             font-size: 12px;
             font-weight: 550;
         }
-        QWidget#hotkeyPanel, QWidget#recoveryPanel,
-        QWidget#aboutHero, QWidget#privacyPanel {
-            background: #ffffff;
-            border: 1px solid #ececf0;
-            border-radius: 13px;
+        QWidget#saveBar {
+            background: #fbfbfc;
+            border-top: 1px solid #e3e3e8;
         }
         QLabel#recoveryTitle {
             color: #8a5600;
             font-size: 14px;
             font-weight: 650;
         }
-        QLabel#readinessName {
-            color: #6e6e73;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        QLabel#readinessValue {
-            color: #24753d;
+        QLabel#subsectionTitle, QLabel#aboutVersion {
+            color: #1d1d1f;
+            font-size: 14px;
             font-weight: 600;
         }
-        QLabel#hotkeyValue {
-            color: #3a3a3c;
-            font-size: 13px;
+        QLabel#aboutVersion {
+            color: #6e6e73;
+            font-weight: 500;
         }
-        QLabel#recentLine {
-            color: #3a3a3c;
-            padding: 11px 1px;
-            background: transparent;
-            border: none;
-            border-top: 1px solid #ececf0;
+        QLabel#aboutTitle {
+            color: #1d1d1f;
+            font-size: 22px;
+            font-weight: 650;
         }
         QLabel#diagnosticSummary {
             color: #3a3a3c;
-            background: #f6f6f8;
-            border: 1px solid #ececf0;
+            background: #ffffff;
+            border: 1px solid #e5e5ea;
             border-radius: 12px;
             padding: 13px;
         }
@@ -2424,99 +2540,111 @@ class _SettingsWindow(QMainWindow):
             font-size: 12px;
         }
         QLabel#diagnosticOk, QLabel#diagnosticAttention {
-            padding: 4px 8px;
+            padding: 3px 8px;
             border-radius: 8px;
             font-size: 12px;
             font-weight: 600;
         }
         QLabel#diagnosticOk {
-            color: #24753d;
+            color: #1f7a3a;
             background: #eaf7ee;
         }
         QLabel#diagnosticAttention {
             color: #9a5b00;
             background: #fff4df;
         }
-        QLabel#aboutTitle {
-            color: #1d1d1f;
-            font-size: 22px;
-            font-weight: 650;
-        }
         QLabel#privacyNote {
             color: #515154;
-            background: #f6f6f8;
-            border: 1px solid #e4e4e9;
+            background: #ffffff;
+            border: 1px solid #e5e5ea;
             border-radius: 11px;
             padding: 11px 13px;
         }
-        QWidget#sidebarPanel QPushButton {
-            color: #d6d6de;
-            background: #232329;
-            border: 1px solid #34343c;
-        }
-        QWidget#sidebarPanel QPushButton:hover { background: #303037; }
-        QListWidget#sidebar::item:hover { background: #25252c; }
-        QLabel#shortcutKey {
-            color: #56565f;
-            background: #f3f3f6;
-            border: 1px solid #e7e7eb;
-            border-radius: 7px;
-            padding: 6px 10px;
-            font-size: 12px;
-        }
         QLabel#operationFeedback {
             color: #285b3a;
-            background: #f1f7f3;
-            border-top: 1px solid #e0ebe3;
+            background: #f0f8f2;
+            border-top: 1px solid #dcebe1;
         }
         QLabel#operationFeedback[attention="true"] {
             color: #874914;
-            background: #fff5ec;
+            background: #fff6ec;
+            border-top-color: #f2e0c8;
         }
         QLabel#fieldValue {
             color: #1d1d1f;
             font-weight: 500;
         }
-        QLineEdit, QComboBox,
-        QListWidget#historyList, QListWidget#diagnosticList,
-        QListWidget#dictionaryList {
-            border: 1px solid #d5d5da;
-            border-radius: 9px;
+        QLineEdit, QComboBox {
+            border: 1px solid #d8d8dd;
+            border-radius: 8px;
             background: #ffffff;
-            padding: 9px 11px;
-            selection-background-color: #343438;
+            padding: 6px 10px;
+            min-height: 20px;
+            selection-background-color: #0a64d6;
             selection-color: #ffffff;
         }
         QComboBox {
-            min-height: 24px;
-            padding: 6px 11px;
+            padding-right: 30px;
+        }
+        QComboBox:hover, QLineEdit:hover {
+            border-color: #c2c2c8;
         }
         QComboBox::drop-down {
-            width: 32px;
+            subcontrol-origin: padding;
+            subcontrol-position: center right;
+            width: 26px;
             border: none;
         }
-        QListWidget#historyList, QListWidget#diagnosticList,
-        QListWidget#dictionaryList {
-            outline: none;
-            background: #f4f4f6;
+        QComboBox::down-arrow {
+            image: url("__CHEVRON__");
+            width: 12px;
+            height: 12px;
         }
-        QListWidget#historyList::item, QListWidget#diagnosticList::item,
-        QListWidget#dictionaryList::item {
-            padding: 0px;
-            margin: 5px;
-            border-radius: 10px;
-            border: none;
+        QComboBox QAbstractItemView {
+            border: 1px solid #d8d8dd;
+            border-radius: 8px;
             background: #ffffff;
+            padding: 4px;
+            selection-background-color: #e8f0fd;
+            selection-color: #1d1d1f;
+            outline: none;
         }
-        QListWidget#historyList::item:selected,
-        QListWidget#diagnosticList::item:selected,
+        QListWidget#historyList, QListWidget#diagnosticList, QListWidget#dictionaryList {
+            border: 1px solid #e5e5ea;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 4px;
+            outline: none;
+        }
+        QListWidget#dictionaryList {
+            border: none;
+            padding: 0px;
+        }
+        QListWidget#historyList::item, QListWidget#diagnosticList::item {
+            padding: 0px;
+            margin: 0px 6px;
+            border: none;
+            border-bottom: 1px solid #f0f0f3;
+            background: transparent;
+        }
+        QListWidget#dictionaryList::item {
+            padding: 0px 10px;
+            margin: 3px;
+            border: 1px solid #e5e5ea;
+            border-radius: 15px;
+            background: #f7f7f9;
+        }
+        QListWidget#historyList::item:selected, QListWidget#diagnosticList::item:selected {
+            color: #1d1d1f;
+            background: #f2f6fd;
+            border-radius: 8px;
+        }
         QListWidget#dictionaryList::item:selected {
             color: #1d1d1f;
-            background: #fff3f1;
-            border: 1px solid #eec7c2;
+            background: #e8f0fd;
+            border-color: #b9cff3;
         }
-        QWidget#historyCard, QWidget#emptyCard,
-        QWidget#diagnosticCard {
+        QWidget#historyCard, QWidget#emptyCard, QWidget#diagnosticCard {
             background: transparent;
         }
         QLabel#historyText {
@@ -2524,53 +2652,91 @@ class _SettingsWindow(QMainWindow):
             font-size: 14px;
             font-weight: 500;
         }
+        QLabel#emptyTitle {
+            color: #1d1d1f;
+            font-size: 15px;
+            font-weight: 600;
+        }
         QLabel#historyMeta {
-            color: #6b6b70;
-            font-size: 13px;
+            color: #6e6e73;
+            font-size: 12px;
         }
         QPushButton {
-            min-height: 34px;
-            padding: 6px 15px;
-            border-radius: 9px;
-            border: 1px solid #d5d5da;
+            min-height: 30px;
+            padding: 4px 14px;
+            border-radius: 8px;
+            border: 1px solid #d8d8dd;
             background: #ffffff;
             color: #1d1d1f;
             font-weight: 500;
         }
         QPushButton:hover {
-            background: #f2f2f5;
+            background: #f5f5f7;
         }
-        QPushButton:focus, QLineEdit:focus,
-        QComboBox:focus, QListWidget:focus {
-            border: 2px solid #55555b;
+        QPushButton:pressed {
+            background: #ececef;
+        }
+        QPushButton:disabled {
+            color: #aeaeb2;
+            border-color: #e5e5ea;
+        }
+        QPushButton:focus, QLineEdit:focus, QComboBox:focus, QListWidget:focus {
+            border: 2px solid #0a64d6;
         }
         QPushButton#primaryButton {
             background: #1d1d1f;
             color: white;
             border: 1px solid #1d1d1f;
             font-weight: 600;
+            padding: 4px 18px;
         }
         QPushButton#primaryButton:hover {
-            background: #353539;
-            border-color: #353539;
+            background: #3a3a3c;
+            border-color: #3a3a3c;
         }
         QPushButton#primaryButton:disabled {
-            background: #c7c7cc;
-            border-color: #c7c7cc;
+            background: #d1d1d6;
+            border-color: #d1d1d6;
+            color: #ffffff;
         }
-        QPushButton#textButton {
+        QPushButton#textButton, QPushButton#destructiveTextButton {
             border: none;
             background: transparent;
-            color: #0066cc;
-            padding-left: 8px;
-            padding-right: 8px;
-        }
-        QPushButton#inlineCopyButton, QPushButton#inlineRepasteButton {
-            min-width: 58px;
+            color: #0060c7;
+            padding: 4px 8px;
             min-height: 28px;
-            padding: 3px 10px;
         }
-        """
+        QPushButton#destructiveTextButton {
+            color: #c4271f;
+        }
+        QPushButton#textButton:hover, QPushButton#destructiveTextButton:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+        QPushButton#textButton:disabled, QPushButton#destructiveTextButton:disabled {
+            color: #aeaeb2;
+        }
+        QPushButton#inlineCopyButton, QPushButton#inlineRepasteButton, QPushButton#inlineDeleteButton {
+            min-width: 52px;
+            min-height: 26px;
+            padding: 2px 10px;
+            font-size: 12px;
+        }
+        QScrollBar:vertical {
+            background: transparent;
+            width: 10px;
+            margin: 2px;
+        }
+        QScrollBar::handle:vertical {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 3px;
+            min-height: 32px;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            height: 0px;
+            background: transparent;
+        }
+        """.replace("__CHEVRON__", self._combo_arrow_path())
 
 
 class OverlayWindow:
