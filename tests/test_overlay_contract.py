@@ -3,6 +3,31 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+def _settings_source():
+    """overlay_webview.py with the settings_ui mixins it was split into (2026-10-22) placed inside
+    the settings section, i.e. before ``class OverlayWindow``, so section slices still cover them."""
+    src = ROOT / "src"
+    overlay = (src / "overlay_webview.py").read_text(encoding="utf-8")
+    mixins = "\n".join(path.read_text(encoding="utf-8") for path in sorted((src / "settings_ui").glob("*.py")))
+    head, tail = overlay.split("class OverlayWindow", 1)
+    return head + mixins + "\nclass OverlayWindow" + tail
+
+
+def _method_source(name):
+    """Source of one settings-window method, wherever the split put it."""
+    import ast
+
+    src = ROOT / "src"
+    for path in [src / "overlay_webview.py", *sorted((src / "settings_ui").glob("*.py"))]:
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef) and item.name == name:
+                        return ast.get_source_segment(text, item)
+    raise AssertionError(f"method {name} not found")
+
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
@@ -33,7 +58,7 @@ def test_streaming_queue_is_bounded_and_catches_up_without_unbounded_transcript_
 
 def test_delivery_state_uses_minimal_truthful_copy():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "function showDeliveryState(" in html
     assert "clipboard_verified_only: '已复制到剪贴板'" in html
@@ -48,7 +73,7 @@ def test_delivery_state_uses_minimal_truthful_copy():
 
 def test_streaming_renders_only_confirmed_append_only_text():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert "function updateStreaming(" not in html
@@ -146,7 +171,7 @@ def test_preview_mailbox_keeps_only_the_latest_pending_ui_value():
 
 def test_recording_meter_is_driven_by_real_audio_without_animation_backlog():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert "function updateAudioLevel(levels, sessionId)" in html
@@ -159,7 +184,7 @@ def test_recording_meter_is_driven_by_real_audio_without_animation_backlog():
 
 
 def test_streaming_bridge_preserves_every_ordered_delta():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     append_start = overlay.index("def append_streaming(self, delta, session_id):")
     append_end = overlay.index("def update_audio_level", append_start)
@@ -173,7 +198,7 @@ def test_streaming_bridge_preserves_every_ordered_delta():
 
 def test_online_preview_uses_one_monotonic_append_path():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     stream_idx = main.index("def _start_streaming")
     stop_idx = main.index("def _stop_streaming", stream_idx)
@@ -189,7 +214,7 @@ def test_online_preview_uses_one_monotonic_append_path():
 
 def test_settling_authoritative_final_and_delivery_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "function showSettling(sessionId)" in html
     settling_block = html[html.index("function showSettling(sessionId)"):html.index("function showDeliveryState(")]
@@ -216,7 +241,7 @@ def test_overlay_exposes_status_to_assistive_technology_and_reduces_motion():
 
 
 def test_settings_have_keyboard_and_narrator_names_for_primary_controls():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert 'for label in ("听写", "词典", "历史")' in overlay
     assert 'self.sidebar.setAccessibleName("主要导航")' in overlay
@@ -239,10 +264,9 @@ def test_recording_capsule_preserves_black_surface_light_text_and_three_red_bars
 
 
 def test_settings_do_not_expose_model_choice_or_download_controls():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
-    status_start = overlay.index("def _home_page(self):")
-    status_block = overlay[status_start:overlay.index("def _recent_page(self):", status_start)]
+    status_block = _method_source("_home_page")
 
     assert "model_combo" not in status_block
     assert "model_download_button" not in status_block
@@ -253,7 +277,7 @@ def test_settings_do_not_expose_model_choice_or_download_controls():
 
 
 def test_history_does_not_expose_internal_output_status_codes():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert '"clipboard_verified_paste_dispatched": "已复制，输入未确认"' in overlay
     assert '"landed_confirmed": "已输入"' in overlay
@@ -295,7 +319,7 @@ def test_recording_window_shows_after_js_state_preparation():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
     start_idx = main.index("def _on_record_start")
     start_block = main[start_idx:main.index("def _on_record_stop", start_idx)]
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "self.overlay.show_window()" not in start_block
     assert "js_then_show_requested.emit(f\"prepareRecording({int(session_id)})\")" in overlay
@@ -308,7 +332,7 @@ def test_recording_window_shows_after_js_state_preparation():
 
 def test_trigger_feedback_is_recorded_after_the_real_qt_paint():
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "class _PaintAwareWindow(QMainWindow):" in overlay
     assert "first_paint_completed = Signal()" in overlay
@@ -324,7 +348,7 @@ def test_trigger_feedback_is_recorded_after_the_real_qt_paint():
 
 def test_first_preview_text_reports_after_two_browser_paint_frames():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert "qrc:///qtwebchannel/qwebchannel.js" in html
@@ -347,7 +371,7 @@ def test_final_shortness_guard_uses_live_preview_text_not_removed_accumulator():
 
 
 def test_recording_start_cancels_pending_hide_timer():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     init_idx = overlay.index("def __init__(self):")
     run_idx = overlay.index("def _run(self):", init_idx)
     init_block = overlay[init_idx:run_idx]
@@ -366,7 +390,7 @@ def test_app_launch_only_opens_onboarding_before_background_model_load():
     ready_idx = main.index("def _on_overlay_ready")
     start_hotkeys_idx = main.index("def _start_hotkeys", ready_idx)
     ready_block = main[ready_idx:start_hotkeys_idx]
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "self.overlay.show_startup_window()" in ready_block
     assert "def show_settings_window(self):" in overlay
@@ -378,7 +402,7 @@ def test_app_launch_only_opens_onboarding_before_background_model_load():
 
 
 def test_settings_window_has_recent_history_copy_controls():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -401,7 +425,7 @@ def test_settings_window_has_recent_history_copy_controls():
 
 
 def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -417,7 +441,7 @@ def test_settings_window_uses_app_shell_sidebar_not_default_tabs():
 
 
 def test_settings_dictation_page_exposes_language_without_model_setup_actions():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -435,14 +459,14 @@ def test_settings_dictation_page_exposes_language_without_model_setup_actions():
 
 
 def test_sensevoice_language_copy_recommends_automatic_bilingual_detection():
-    source = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    source = _settings_source()
 
     assert '("自动中英（推荐）", "auto")' in source
     assert '("自动检测（实验）", "auto")' not in source
 
 
 def test_settings_merges_static_hotkey_help_into_dictation():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -454,7 +478,7 @@ def test_settings_merges_static_hotkey_help_into_dictation():
 
 
 def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -467,7 +491,7 @@ def test_dictionary_exposes_words_phrases_and_deterministic_corrections():
 
 
 def test_settings_runtime_actions_do_not_depend_on_source_tree_tools():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     settings_idx = overlay.index("class _SettingsWindow")
     overlay_window_idx = overlay.index("class OverlayWindow", settings_idx)
     settings_block = overlay[settings_idx:overlay_window_idx]
@@ -479,7 +503,7 @@ def test_settings_runtime_actions_do_not_depend_on_source_tree_tools():
 
 
 def test_tray_primary_click_opens_settings_not_raw_overlay():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     activated_idx = overlay.index("def _on_tray_activated")
     show_idx = overlay.index("def _show", activated_idx)
     activated_block = overlay[activated_idx:show_idx]
@@ -489,7 +513,7 @@ def test_tray_primary_click_opens_settings_not_raw_overlay():
 
 
 def test_overlay_enforces_single_instance_and_focuses_existing_window():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "SINGLE_INSTANCE_NAME" in overlay
     assert "QLocalServer" in overlay
@@ -587,7 +611,7 @@ def test_existing_instance_file_fallback_tolerates_small_clock_rollback(
 
 
 def test_hide_path_hides_window_before_resetting_dom():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     hide_idx = overlay.index("def _hide_and_idle")
     state_idx = overlay.index("def _set_tray_state", hide_idx)
     hide_block = overlay[hide_idx:state_idx]
@@ -597,7 +621,7 @@ def test_hide_path_hides_window_before_resetting_dom():
 
 
 def test_legacy_hide_resets_only_after_hiding_the_window():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     hide_idx = overlay.index("def _run_js_then_hide")
     hide_block = overlay[hide_idx:]
 
@@ -606,7 +630,7 @@ def test_legacy_hide_resets_only_after_hiding_the_window():
 
 def test_streaming_updates_are_session_guarded():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert "function appendStreaming(delta, sessionId)" in html
     assert "if (sessionId !== activeSession) return;" in html
@@ -633,7 +657,7 @@ def test_stop_flow_replaces_final_text_before_minimal_delivery_feedback():
 
 def test_overlay_has_processing_settling_spinner_and_final_checkmark():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     processing_idx = html.index("function showProcessing()")
     done_idx = html.index("function showSettling(sessionId)", processing_idx)
     processing_block = html[processing_idx:done_idx]
@@ -749,7 +773,7 @@ def test_readme_defaults_to_chinese_with_english_switch():
 
 
 def test_tray_menu_can_toggle_dictation_without_a_global_hotkey():
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
     main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
 
     assert 'QAction("开始 / 停止听写"' in overlay
@@ -759,7 +783,7 @@ def test_tray_menu_can_toggle_dictation_without_a_global_hotkey():
 
 def test_flagship_capsule_uses_draft_and_authoritative_text_layers():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     assert 'id="authoritativeText"' in html
     assert 'id="draftText"' in html
@@ -794,7 +818,7 @@ def test_stop_wait_keeps_text_and_uses_an_unlabelled_spinner_after_350ms():
 
 def test_delivery_feedback_is_minimal_truthful_and_has_accessible_detail():
     html = (ROOT / "src" / "overlay.html").read_text(encoding="utf-8")
-    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    overlay = _settings_source()
 
     delivery_start = html.index("function showDeliveryState(")
     delivery_end = html.index("function showResult(", delivery_start)

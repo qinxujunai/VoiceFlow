@@ -21,6 +21,7 @@ if str(SRC) not in sys.path:
 
 from overlay_webview import _SettingsWindow  # noqa: E402
 from overlay_webview import OverlayWindow  # noqa: E402
+import settings_ui.diagnostics  # noqa: E402
 from qt_compat import QAction, QApplication, QMessageBox, QPushButton  # noqa: E402
 from runtime_paths import AppPaths, RuntimeMode  # noqa: E402
 
@@ -223,7 +224,7 @@ def test_diagnostics_is_single_flight_even_when_repeated_from_help(
         release.wait(timeout=1.0)
         return {"ok": True, "checks": []}
 
-    monkeypatch.setattr(overlay_webview, "run_runtime_diagnostics", slow_diagnostics)
+    monkeypatch.setattr(settings_ui.diagnostics, "run_runtime_diagnostics", slow_diagnostics)
     window = _SettingsWindow(paths=paths)
     try:
         window._run_doctor()
