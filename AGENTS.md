@@ -35,6 +35,11 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-10-23, Claude**: website footer links to the owner's personal site
+  (「秦徐俊的作品」 / "More by Qin Xujun", per language). Site-only change; no app code,
+  installer or Release asset changed. Verified: site language, demo motion and brand
+  presentation tests (22 passed); zh/en footer rendered without script errors.
+
 - **2026-10-22, Codex**: released Windows 0.3.10 from `c9df2cc`, after
   829 local tests, release gates, Windows/macOS source checks, exact uploaded
   installer fresh/0.3.9-upgrade/uninstall-data checks and a verified local upgrade.
