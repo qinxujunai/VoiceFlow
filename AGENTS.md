@@ -35,6 +35,10 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-10-24, Claude**: website header shows "‹ 返回 / ‹ Back" only for visitors who arrived from the
+  owner's personal site (it leaves `qxj.back` in this tab's sessionStorage; contract in that repository's
+  `docs/back-link.md`). Site-only change. Verified: site tests (22 passed); end-to-end click-through and direct open.
+
 - **2026-10-23, Claude**: website footer links to the owner's personal site
   (「秦徐俊的作品」 / "More by Qin Xujun", per language). Site-only change; no app code,
   installer or Release asset changed. Verified: site language, demo motion and brand

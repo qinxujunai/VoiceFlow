@@ -3,6 +3,7 @@ const copy = {
     title: "VoiceFlow — 让想法成文",
     description: "VoiceFlow：Windows 离线语音输入。在当前输入框听写，与 AI 对话、写邮件、回消息。完整终稿保留在剪贴板和本地历史，无需登录。",
     brandHome: "VoiceFlow 首页",
+    back: "‹ 返回",
     primaryNav: "主要导航",
     languageSwitch: "语言",
     valuesAria: "VoiceFlow 核心价值",
@@ -116,6 +117,7 @@ const copy = {
     title: "VoiceFlow — Let ideas take shape",
     description: "VoiceFlow is offline voice typing for Windows. Dictate at your cursor for AI conversations, email and messages. Final text stays in your clipboard and local history. No account required.",
     brandHome: "VoiceFlow home",
+    back: "‹ Back",
     primaryNav: "Primary navigation",
     languageSwitch: "Language",
     valuesAria: "VoiceFlow core benefits",
@@ -407,3 +409,22 @@ if (demo && typeof IntersectionObserver !== "undefined") {
 }
 reducedMotion.addEventListener("change", resetDemo);
 setLanguage(requestedLanguage || "zh");
+
+// "‹ Back" to the author's personal site, only for visitors who came from it: that site leaves 'qxj.back' in this
+// tab's sessionStorage when someone clicks through. A link opened directly shows nothing. Contract: the personal
+// site repository, docs/back-link.md.
+(() => {
+  try {
+    const back = sessionStorage.getItem("qxj.back");
+    const link = document.querySelector("[data-qxj-back]");
+    if (!back || !link || !back.startsWith(`${location.origin}/`)) return;
+    link.href = back;
+    link.hidden = false;
+    link.addEventListener("click", (event) => {
+      if (document.referrer && document.referrer.split("#")[0] === back.split("#")[0]) {
+        event.preventDefault();
+        history.back();
+      }
+    });
+  } catch {}
+})();
