@@ -99,6 +99,21 @@ a:focus-visible,button:focus-visible,summary:focus-visible{
 .brand img{
   border-radius:6px
 }
+.qxj-back{
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  margin-right:-18px;
+  font-size:13px;
+  color:#515158;
+  white-space:nowrap
+}
+.qxj-back[hidden]{
+  display:none
+}
+.qxj-back:hover{
+  color:var(--ink)
+}
 nav{
   margin-left:auto;
   display:flex;
@@ -734,6 +749,9 @@ footer{
   .brand{
     font-size:17px;
     gap:7px
+  }
+  .qxj-back{
+    margin-right:-6px
   }
   .brand img{
     width:22px;
