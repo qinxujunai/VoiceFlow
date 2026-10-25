@@ -35,6 +35,13 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-10-25, Claude**: security bumps in both locks (`requirements.lock`, `installer/macos/requirements-macos.lock`):
+  anyio 4.14.1→4.15.1 (GHSA-82r6-8w77-94w6 critical), certifi →2026.10.23 (GHSA-6q48-6c7w-9gw2 critical,
+  compromised emSign roots), filelock 3.29.4→4.2.4 (GHSA-v4x8-3wr5-3wq8 high). Used only by model download tooling
+  (huggingface_hub/httpx); the app itself stays offline. Not released: the next release needs its own artifact-bound
+  license review for these versions. Verified: clean venv with huggingface_hub 1.21.0 + the new pins, `pip check` clean;
+  packaging/platform/runtime-asset contract tests 56 passed (13 Windows-only skipped on Linux).
+
 - **2026-10-24, Claude**: website header shows "‹ 返回 / ‹ Back" only for visitors who arrived from the
   owner's personal site (it leaves `qxj.back` in this tab's sessionStorage; contract in that repository's
   `docs/back-link.md`). Site-only change. Verified: site tests (22 passed); end-to-end click-through and direct open.
