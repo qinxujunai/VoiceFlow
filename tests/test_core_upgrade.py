@@ -812,7 +812,7 @@ class FinalTextSelectionTests(unittest.TestCase):
 
         text = VoiceInputSystem._transcribe_final_text(system, data)
 
-        self.assertEqual(text, "前半段 尾巴")
+        self.assertEqual(text, "前半段尾巴")  # Chinese pieces meet without a space
         self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 21])
 
     def test_ten_minute_final_keeps_cached_body_and_transcribes_remaining_tail(self):
@@ -861,7 +861,7 @@ class FinalTextSelectionTests(unittest.TestCase):
 
         text = VoiceInputSystem._transcribe_final_text(system, data)
 
-        self.assertEqual(text, "前九分钟 最后一分钟")
+        self.assertEqual(text, "前九分钟最后一分钟")  # Chinese pieces meet without a space
         self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 61])
 
     def test_final_text_uses_global_offsets_after_pcm_prefix_is_discarded(self):
@@ -903,7 +903,7 @@ class FinalTextSelectionTests(unittest.TestCase):
             total_samples=total,
         )
 
-        self.assertEqual(text, "前半段 尾巴")
+        self.assertEqual(text, "前半段尾巴")  # Chinese pieces meet without a space
         self.assertEqual(system.transcriber.lengths, [FakeAudio.sample_rate * 21])
 
     def test_short_final_still_transcribes_complete_audio_once(self):

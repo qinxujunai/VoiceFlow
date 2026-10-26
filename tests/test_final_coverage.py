@@ -332,3 +332,98 @@ def test_only_natural_endpoint_segments_replace_live_draft_with_authoritative_te
     assert "natural_endpoint = self._consume_preview_endpoint(" in loop
     assert "natural_endpoint" in loop
     assert "and authoritative" in loop
+
+
+# Stop latency (2026-10-26): pieces are cut inside the speaker's pauses while recording, so the stop path
+# only recognizes the last piece. See docs/stop-latency-evaluation-2026-10-26.md.
+
+def _audio_system(pcm):
+    system = _system()
+    system._audio_snapshot = lambda start, end: pcm[max(0, int(start)):int(end)]
+    return system
+
+
+def test_pause_cut_moves_back_to_the_silence_before_the_late_endpoint():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    pcm = np.full(10 * rate, 3000, dtype=np.int16)
+    pcm[int(5.0 * rate):int(5.6 * rate)] = 0          # the speaker paused at 5.0-5.6 s
+    system = _audio_system(pcm)
+    # the preview recognizer reported the pause late, when the next phrase had already started
+    cut = VoiceInputSystem._quiet_cut(system, 0, int(6.0 * rate))
+    assert int(5.0 * rate) <= cut <= int(5.6 * rate)
+
+
+def test_pause_cut_keeps_the_endpoint_when_audio_is_unavailable():
+    from main import VoiceInputSystem
+
+    system = _system()  # no audio buffer
+    assert VoiceInputSystem._quiet_cut(system, 0, 6 * FakeAudio.sample_rate) == 6 * FakeAudio.sample_rate
+
+
+def test_pieces_need_four_seconds_before_a_pause_ends_one():
+    from main import VoiceInputSystem
+
+    system = _system()
+    rate = system.audio.sample_rate
+    system._preview_endpoint_samples = [3 * rate]
+    assert VoiceInputSystem._next_final_segment_range(system, 6 * rate, 0) is None
+    system._preview_endpoint_samples = [3 * rate, int(4.5 * rate)]
+    assert VoiceInputSystem._next_final_segment_range(system, 6 * rate, 0) == (0, int(4.5 * rate))
+
+
+def test_a_piece_after_a_pause_cut_starts_exactly_at_the_cut():
+    from main import FinalSegmentCoverage, VoiceInputSystem
+
+    system = _system()
+    rate = system.audio.sample_rate
+    system._final_segments = [FinalSegmentCoverage(0, 5 * rate, "第一句", True, cut_in_pause=True)]
+    system._finalized_audio_len = 5 * rate
+    system._preview_endpoint_samples = [10 * rate]
+    assert VoiceInputSystem._next_final_segment_range(system, 11 * rate, 5 * rate) == (5 * rate, 10 * rate)
+    # a forced cut (no pause for 18 s) still re-reads one second so no word is lost
+    system._final_segments = [FinalSegmentCoverage(0, 5 * rate, "第一句", True)]
+    assert VoiceInputSystem._next_final_segment_range(system, 11 * rate, 5 * rate) == (4 * rate, 10 * rate)
+
+
+def test_a_twelve_second_dictation_uses_its_pieces_and_reads_only_the_tail_after_the_pause():
+    from main import FinalSegmentCoverage, VoiceInputSystem
+
+    system = _system()
+    rate = FakeAudio.sample_rate
+    system._final_segments = [FinalSegmentCoverage(0, 8 * rate, "先列出问题", True, cut_in_pause=True)]
+    system._finalized_audio_len = 8 * rate
+    data = np.ones(12 * rate, dtype=np.int16)
+
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+
+    assert system.transcriber.lengths == [4 * rate]      # only the last piece, no overlap
+    assert result.final_source == "segments_plus_tail"
+    assert result.coverage_ok is True
+
+
+def test_shorter_dictation_is_still_recognized_whole():
+    from main import FinalSegmentCoverage, VoiceInputSystem
+
+    system = _system()
+    rate = FakeAudio.sample_rate
+    system._final_segments = [FinalSegmentCoverage(0, 6 * rate, "很短", True, cut_in_pause=True)]
+    system._finalized_audio_len = 6 * rate
+    data = np.ones(11 * rate, dtype=np.int16)
+
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+
+    assert system.transcriber.lengths == [len(data)]
+    assert result.final_source == "full_pcm"
+
+
+def test_chinese_pieces_meet_without_a_space_and_latin_words_keep_theirs():
+    from main import VoiceInputSystem
+
+    system = object.__new__(VoiceInputSystem)
+    assert system._join_transcript_parts(["顺便把快递取了。", "明天早上要早点出门。"]) == "顺便把快递取了。明天早上要早点出门。"
+    assert system._join_transcript_parts(["open the", "settings page"]) == "open the settings page"
+    assert system._join_transcript_parts(["用 Claude", "写一个脚本"]) == "用 Claude 写一个脚本"
+    assert system._join_transcript_parts(["重新排一下优先级。", "Z 核心"]) == "重新排一下优先级。Z 核心"
+    assert system._join_transcript_parts(["要用中文", "Claude"]) == "要用中文 Claude"

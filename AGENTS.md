@@ -18,6 +18,8 @@ Each has a reason; change one only after writing the new reason here.
 | Capsule text: new glyphs fade in (140 ms), the final replaces the draft in place, a cropped start fades at the edge | Apple dictation feel without breaking the append-only contract below | `1e63302` |
 | Win32 contract tests carry `@windows_only` | They test Win32 APIs or the Windows native wheel; macOS quality had been red since 2026-10-10 because of them. They still run in Windows quality | `bff8dbc` |
 | macOS packaging files live in `installer/macos/` | One place per platform | `66c27cf` |
+| Stop path: pieces are cut inside the speaker's pauses (`_quiet_cut`), start at the cut with no overlap, are at least 4 s, and are used for the final text from 12 s up; Chinese pieces join without a space | Under 20 s the whole recording was recognized again after stop (0.67 s for 15-20 s of speech in the cloud evaluation); pieces cut at the late endpoint split words and the 1 s overlap duplicated them. Now 0.19 s, at 8.7 % vs 6.3 % character errors on synthetic dictation; under 12 s unchanged. Raise `SEGMENTED_FINAL_MIN_SECONDS` if long dictation gets worse in real use. Evidence: `docs/stop-latency-evaluation-2026-10-26.md` | 2026-10-26 |
+| Capsule preview stays append-only with the current bilingual model; no lighter-colour tentative tail | Measured: the unconfirmed guess would appear only ~80 ms earlier; every candidate model emits every 0.6-0.7 s. The 2023-02-20 bilingual model previews closer to the final text but doubles preview CPU and adds ~140 MB | 2026-10-26 |
 | A public release needs the artifact-bound license review (`licenses/release-review-<version>.md`, LGPL sources) and installed verification | Compliance gate in `scripts/check_release_compliance.py` is fail-closed by design; do not bypass it in CI | 0.3.9 release |
 
 The stack is already the mature choice for offline dictation on Windows (sherpa-onnx with
@@ -34,6 +36,15 @@ to swap engines without the quality gates below.
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-10-26, Claude**: stop latency. The final text now uses the pieces the progressive cache already
+  recognized at the speaker's pauses from 12 s up (was 20 s), with cuts moved into the pause, no overlap after
+  a pause cut, 4 s minimum pieces and no space at Chinese seams (`src/main.py`). Preview model and capsule
+  unchanged after measuring five models and a tentative tail. Not released. Verified: Linux offscreen suite
+  780 passed with the same 20 environment failures as before; 7 new tests in `tests/test_final_coverage.py`
+  fail on the old code; `scripts/evaluate_stop_latency.py` on 18 synthetic dictations: 15-20 s stop wait
+  0.67 s -> 0.19 s, character errors 6.3 % -> 8.7 %, under 12 s identical, coverage complete in every case.
+  Details: `docs/stop-latency-evaluation-2026-10-26.md`. Real-microphone feel is still to be judged on Windows.
 
 - **2026-10-25, Claude**: security bumps in both locks (`requirements.lock`, `installer/macos/requirements-macos.lock`):
   anyio 4.14.1→4.15.1 (GHSA-82r6-8w77-94w6 critical), certifi →2026.10.23 (GHSA-6q48-6c7w-9gw2 critical,
