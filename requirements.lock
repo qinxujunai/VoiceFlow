@@ -52,5 +52,5 @@ sounddevice==0.5.5
 soundfile==0.14.0
 tqdm==4.68.3
 typer==0.25.1
-typing_extensions==4.15.0
+typing_extensions==4.16.0
 uiautomation==2.0.29
