@@ -69,6 +69,7 @@
 | [docs/resource-profile-2026-07-28.md](resource-profile-2026-07-28.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/runtime-boundary.md](runtime-boundary.md) | Current contract / guide | 2026-10-22 |
 | [docs/sensevoice-redistribution-decision.md](sensevoice-redistribution-decision.md) | Current contract / guide | 2026-10-22 |
+| [docs/stop-latency-evaluation-2026-10-26.md](stop-latency-evaluation-2026-10-26.md) | Historical evidence / release notes | 2026-10-26 |
 | [docs/streaming-preview-evaluation-2026-07-28.md](streaming-preview-evaluation-2026-07-28.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/streaming-preview-evaluation-2026-08-05.md](streaming-preview-evaluation-2026-08-05.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/streaming-preview-model-review.md](streaming-preview-model-review.md) | Current contract / guide | 2026-10-22 |
