@@ -114,7 +114,9 @@ def test_insertion_timeout_uses_the_same_mta_thread_and_never_retries_paste():
         monitor.warmup()
         started = time.perf_counter()
         assert not monitor.verify_insertion(target(), "文字", timeout=.02)
-        assert time.perf_counter() - started < .15
+        # Returns at its 20 ms timeout, not after the hung verifier's 2 s; 0.5 s leaves room for a busy CI runner
+        # (0.153 s was seen on macOS on 2026-10-25).
+        assert time.perf_counter() - started < .5
         assert entered.wait(.5)
         worker = monitor._thread
         for _ in range(30):

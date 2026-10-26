@@ -38,6 +38,13 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-10-26, Claude**: CI was red since `01befe5` (my 2026-10-25 lock bump): anyio 4.15.1 needs
+  typing_extensions >= 4.16.0 on Python < 3.15, and the Windows lock pinned 4.15.0 (I had checked with pip on 3.13 only).
+  Bumped to 4.16.0, matching the macOS lock; both locks now resolve with `uv pip compile --python-version 3.12` for
+  their platform (the old lock reproduces the failure). The macOS run also hit a timing assert (0.153 s vs 0.15 s) in
+  `test_insertion_timeout_uses_the_same_mta_thread_and_never_retries_paste`; the bound is now 0.5 s, still far below the
+  hung verifier's 2 s. Lock checks for future bumps: resolve for each target platform at Python 3.12.
+
 - **2026-10-26, Claude**: stop latency (`src/main.py`). Under 20 s: speculative whole-recording recognition at
   pauses, used at stop when only silence follows. From 20 s: pause cuts inside the pause, no overlap or merge after
   them, 4 s minimum, no space at Chinese seams. Preview model and capsule unchanged after measuring five models and a
