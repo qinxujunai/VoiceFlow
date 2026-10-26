@@ -52,16 +52,26 @@ Results from `scripts/evaluate_speculative_final.py`:
 
 | Stop after last word | Length | Guess used | Wait | Whole at stop | Errors | Errors whole at stop |
 | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| 0.2 s | 6–10 s | 0/12 | 0.37 s | 0.37 s | 9.8 % | 9.8 % |
-| 0.2 s | 15–20 s | 1/6 | 0.78 s | 0.72 s | 9.8 % | 10.2 % |
-| 0.5 s | 6–10 s | 12/12 | 0.19 s | 0.39 s | 9.1 % | 10.0 % |
-| 0.5 s | 15–20 s | 6/6 | 0.57 s | 0.67 s | 10.1 % | 10.5 % |
-| 0.8 s | 6–10 s | 12/12 | 0.02 s | 0.40 s | 9.1 % | 8.6 % |
-| 0.8 s | 15–20 s | 6/6 | 0.27 s | 0.82 s | 10.1 % | 9.8 % |
-| 1.2 s | 6–10 s | 12/12 | 0.03 s | 0.42 s | 9.1 % | 8.6 % |
-| 1.2 s | 15–20 s | 6/6 | 0.07 s | 0.86 s | 10.1 % | 9.5 % |
+| 0.2 s | 6–10 s | 0/12 | 0.38 s | 0.42 s | 9.8 % | 9.8 % |
+| 0.2 s | 15–20 s | 0/6 | 0.85 s | 0.89 s | 10.2 % | 10.2 % |
+| 0.5 s | 6–10 s | 12/12 | 0.31 s | 0.44 s | 9.1 % | 10.0 % |
+| 0.5 s | 15–20 s | 6/6 | 0.70 s | 0.78 s | 9.8 % | 10.5 % |
+| 0.8 s | 6–10 s | 12/12 | 0.04 s | 0.45 s | 9.1 % | 8.6 % |
+| 0.8 s | 15–20 s | 6/6 | 0.40 s | 0.81 s | 9.8 % | 9.8 % |
+| 1.2 s | 6–10 s | 12/12 | 0.03 s | 0.50 s | 9.1 % | 8.6 % |
+| 1.2 s | 15–20 s | 6/6 | 0.08 s | 0.77 s | 9.8 % | 9.5 % |
 
-Accuracy is the same within measurement noise (−0.9 to +0.6 points), because the guess is SenseVoice on the same whole recording. The cost is CPU while recording: one background recognition of the recording so far at each pause, in the ASR worker process, for recordings under 20 s only.
+(This run's machine was slower than the earlier one: the whole-recording times are 0.42–0.89 s here.)
+
+Accuracy is the same within measurement noise (−0.9 to +0.5 points), because the guess is SenseVoice on the same whole recording. The cost is CPU while recording: one background recognition of the recording so far at each pause, in the ASR worker process, for recordings under 20 s only.
+
+### Safeguards (from a second independent review)
+
+- A guess or piece written by a cache worker of an earlier recording (for example one cancelled with Esc while a guess was running) is discarded: each reset moves an epoch, and workers write only within their own.
+- The guess is not used if the tail after it has speech by the worker's VAD, even when the recognizer returns no text for it (a soft last syllable), or if the tail is longer than 1.5 s, or at 20 s and longer.
+- The speech tracker measures against the noise floor (a frame is speech at 8x the quietest recent frame, or at -30 dBFS), so one cough does not hide quieter speech; it is rescanned at stop.
+- Below 14 s no pieces are recognized while recording (they are not used under 20 s and would hold the recognizer at stop).
+- A pause cut needs the quietest 200 ms at least 15 dB below the speech in the window, and the 4 s minimum is counted from the last cut.
 
 ### Rejected: pieces from 12 s
 
@@ -83,7 +93,7 @@ On 30–38 s dictations (four utterances each, −50 dBFS), driven through the s
 | Code | Stop wait | Character errors | Whole recording (2.0 s wait) |
 | --- | ---: | ---: | ---: |
 | before | 0.16 s | 12.7 % | 9.1 % |
-| after | 0.21 s | 11.8 % | 9.1 % |
+| after | 0.21–0.23 s | 11.7–11.8 % | 9.1 % |
 
 ## Limits of this evidence
 

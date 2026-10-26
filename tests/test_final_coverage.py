@@ -468,7 +468,7 @@ def test_words_repeated_across_a_pause_cut_are_kept():
 def _speculating_system(pcm):
     system = _audio_system(pcm)
     system._speculative_final = None
-    system._speech_scan = (0, 0.0, 0)
+    system._speech_scan = (0, float("inf"), 0)
     return system
 
 
@@ -501,8 +501,8 @@ def test_the_guess_is_the_final_text_when_only_silence_follows_it():
     from main import VoiceInputSystem
 
     rate = FakeAudio.sample_rate
-    data = np.concatenate([np.ones(5 * rate, np.int16), np.zeros(rate, np.int16)])
-    system = _system()
+    data = np.concatenate([_speech(5), np.zeros(rate, np.int16)])
+    system = _speculating_system(data)
     system._speculative_final = (5 * rate, "已经识别好的整句")
     system._transcribe_audio = lambda audio, **_kw: ("", False)
     result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
@@ -515,8 +515,8 @@ def test_words_after_the_guess_make_the_whole_recording_be_recognized_again():
     from main import VoiceInputSystem
 
     rate = FakeAudio.sample_rate
-    data = np.ones(8 * rate, np.int16)
-    system = _system()
+    data = np.concatenate([_speech(5), np.zeros(3 * rate, np.int16)])  # tracker sees no speech after 5 s
+    system = _speculating_system(data)
     system._speculative_final = (5 * rate, "前半句")
     calls = []
     def transcribe(audio, return_activity=False, **_kw):
@@ -526,4 +526,73 @@ def test_words_after_the_guess_make_the_whole_recording_be_recognized_again():
     result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
     assert result.text == "整句"
     assert result.final_source == "full_pcm"
-    assert calls == [3 * rate, 8 * rate]
+    assert calls == [len(data)]  # 3 s of tail is past the check limit: recognized whole, no tail check
+
+
+def test_a_soft_word_the_recognizer_missed_still_blocks_the_guess():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    data = np.concatenate([_speech(5), np.zeros(rate, np.int16)])
+    system = _speculating_system(data)
+    system._speculative_final = (5 * rate, "前半句")
+    system._transcribe_audio = lambda audio, return_activity=False, **_kw: ("", True) if return_activity else "前半句，嗯"
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+    assert result.final_source == "full_pcm"
+    assert result.text == "前半句，嗯"
+
+
+def test_speech_after_the_guess_skips_the_tail_check():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    data = np.concatenate([_speech(5), np.zeros(int(0.5 * rate), np.int16), _speech(0.6)])
+    system = _speculating_system(data)
+    system._speculative_final = (int(5.3 * rate), "前半句")
+    calls = []
+    system._transcribe_audio = lambda audio, return_activity=False, **_kw: calls.append(len(audio)) or (("x", True) if return_activity else "整句")
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+    assert result.text == "整句" and calls == [len(data)]
+
+
+def test_a_cough_does_not_hide_the_quieter_speech_after_it():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    room = lambda seconds: np.random.default_rng(2).normal(0, 20, int(seconds * rate)).astype(np.int16)
+    click = np.full(int(0.1 * rate), 30000, np.int16)
+    quiet_speech = (_speech(3) // 8).astype(np.int16)    # -39 dBFS: below the absolute level
+    pcm = np.concatenate([room(0.3), click, quiet_speech, room(0.4)])
+    system = _speculating_system(pcm)
+    _, _, last_speech = VoiceInputSystem._scan_speech(system, len(pcm))
+    assert last_speech >= int(3.3 * rate)
+
+
+def test_no_guess_at_twenty_seconds_or_more():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    data = np.concatenate([_speech(20), np.zeros(rate, np.int16)])
+    system = _speculating_system(data)
+    system._speculative_final = (19 * rate, "旧的猜测")
+    assert VoiceInputSystem._speculative_result(system, data, len(data)) is None
+
+
+def test_reset_forgets_the_guess_and_moves_the_epoch():
+    from main import VoiceInputSystem
+
+    system = _speculating_system(np.zeros(16000, np.int16))
+    system._final_cache_epoch = 3
+    system._speculative_final = (1, "上一次")
+    system._speech_scan = (100, 5.0, 50)
+    VoiceInputSystem._reset_final_cache(system)
+    assert system._speculative_final is None
+    assert system._speech_scan[0] == 0 and system._speech_scan[2] == 0
+    assert system._final_cache_epoch == 4
+
+
+def test_cache_workers_write_only_within_their_own_epoch():
+    source = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    loop = source[source.index("def final_cache_loop()"):source.index("self._stream_thread =")]
+    assert 'epoch = getattr(self, "_final_cache_epoch", 0)' in loop
+    assert loop.count('epoch != getattr(self, "_final_cache_epoch", 0)') + loop.count('epoch == getattr(self, "_final_cache_epoch", 0)') == 2

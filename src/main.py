@@ -120,6 +120,11 @@ class VoiceInputSystem:
     # The guess sees only 0.3 s after the last word; SenseVoice ends a sentence better with more silence
     # after it, so the guess is recognized with this much silence appended (the recording is not changed).
     SPECULATIVE_TAIL_PAD_SECONDS = 0.6
+    # At stop the tail after the guess is checked for speech; a longer tail is not worth checking.
+    SPECULATIVE_TAIL_CHECK_SECONDS = 1.5
+    # Below this length no pieces are recognized while recording: under SEGMENTED_FINAL_MIN_SECONDS they
+    # are not used, and they would hold the recognizer when stop comes. From here they are ready by 20 s.
+    PIECES_FROM_SECONDS = 14.0
     # A piece is at least 4 s of speech: shorter pieces lose too much context (2 s pieces cost
     # about 3 points of character errors in the same evaluation).
     FINAL_SEGMENT_MIN_SECONDS = 4.0
@@ -175,7 +180,10 @@ class VoiceInputSystem:
         self._final_segments = []
         self._finalized_audio_len = 0
         self._speculative_final = None
-        self._speech_scan = (0, 0.0, 0)
+        self._speech_scan = (0, float("inf"), 0)
+        # Bumped on every reset; a cache worker writes only while its own epoch is current, so a guess or
+        # piece from a cancelled recording can never land in the next one.
+        self._final_cache_epoch = 0
         self._final_cache_lock = threading.Lock()
         self._final_cache_state_lock = threading.Lock()
         self._final_cache_idle = threading.Event()
@@ -942,7 +950,8 @@ class VoiceInputSystem:
             self._final_segments = []
             self._finalized_audio_len = 0
             self._speculative_final = None
-            self._speech_scan = (0, 0.0, 0)
+            self._speech_scan = (0, float("inf"), 0)
+            self._final_cache_epoch = getattr(self, "_final_cache_epoch", 0) + 1
         endpoint_lock = getattr(self, "_preview_endpoint_lock", None)
         if endpoint_lock is not None:
             with endpoint_lock:
@@ -997,8 +1006,9 @@ class VoiceInputSystem:
         """
         rate = self.audio.sample_rate
         endpoint_sample = int(endpoint_sample)
+        _, finalized = self._snapshot_final_cache()
         low = max(
-            int(start_sample) + int(rate * self.FINAL_SEGMENT_MIN_SECONDS),
+            max(int(start_sample), int(finalized)) + int(rate * self.FINAL_SEGMENT_MIN_SECONDS),
             endpoint_sample - int(rate * self.PAUSE_CUT_SEARCH_SECONDS),
         )
         window = int(rate * 0.2)
@@ -1011,22 +1021,24 @@ class VoiceInputSystem:
         low = endpoint_sample - len(audio)  # the snapshot may start later if older audio was discarded
         energy = np.convolve(np.square(audio), np.ones(window, dtype=np.float32), "valid") / window
         quietest = int(np.argmin(energy))
-        # A pause: the quietest 200 ms is near silence, or at most a tenth of the speech in the window
-        # (its loud part: the pause itself may fill most of the window).
-        quiet = energy[quietest] <= max((32768 * 0.002) ** 2, float(np.percentile(energy, 90)) * 0.1)
+        # A pause: the quietest 200 ms is near silence, or at least 15 dB below the speech in the window
+        # (its loud part: the pause itself may fill most of the window). A syllable-level dip is not.
+        quiet = energy[quietest] <= max((32768 * 0.002) ** 2, float(np.percentile(energy, 90)) * 0.03)
         if not quiet:
             return endpoint_sample, False
         return low + quietest + window // 2, True
 
     # Speech level tracking for speculation: frames of 100 ms; a frame is speech when its energy is at
-    # least a tenth of the loudest frame so far (and above a fixed floor). A pause is
-    # SPECULATIVE_PAUSE_SECONDS since the last speech frame.
+    # least 8x (9 dB) the noise floor (the quietest recent frame, allowed to drift up 1 % per frame) and
+    # above a fixed floor (or loud enough on its own). Measuring against the noise, not the loudest frame, keeps one cough or click
+    # from hiding quieter speech. A pause is SPECULATIVE_PAUSE_SECONDS since the last speech frame.
     SPEECH_FRAME_SECONDS = 0.1
     SPEECH_ENERGY_FLOOR = (32768 * 0.01) ** 2
+    SPEECH_ENERGY_CERTAIN = (32768 * 0.03) ** 2  # -30 dBFS: speech even before a noise floor is known
 
     def _scan_speech(self, total_samples):
-        """Update (scanned_until, loudest frame energy, end of the last speech frame) up to total_samples."""
-        scanned, loudest, last_speech = getattr(self, "_speech_scan", (0, 0.0, 0))
+        """Update (scanned_until, noise floor energy, end of the last speech frame) up to total_samples."""
+        scanned, noise, last_speech = getattr(self, "_speech_scan", (0, float("inf"), 0))
         frame = int(self.audio.sample_rate * self.SPEECH_FRAME_SECONDS)
         end = scanned + (max(0, int(total_samples) - scanned) // frame) * frame
         if end > scanned:
@@ -1035,11 +1047,12 @@ class VoiceInputSystem:
             if usable:
                 energy = np.mean(np.square(audio[:usable].reshape(-1, frame)), axis=1)
                 for index, value in enumerate(energy):
-                    loudest = max(loudest, float(value))
-                    if value >= self.SPEECH_ENERGY_FLOOR and value >= loudest * 0.1:
+                    noise = min(float(value), noise * 1.01)
+                    if value >= self.SPEECH_ENERGY_FLOOR and (
+                            value >= max(noise, 1.0) * 8 or value >= self.SPEECH_ENERGY_CERTAIN):
                         last_speech = scanned + (index + 1) * frame
             scanned = end
-        self._speech_scan = (scanned, loudest, last_speech)
+        self._speech_scan = (scanned, noise, last_speech)
         return self._speech_scan
 
     def _speculation_due(self, total_samples):
@@ -1062,16 +1075,23 @@ class VoiceInputSystem:
         if speculative is None:
             return None
         end_sample, text = speculative
-        if not text or end_sample > len(data) or len(data) != total_samples:
+        rate = self.audio.sample_rate
+        if (not text or end_sample > len(data) or len(data) != total_samples
+                or total_samples >= int(rate * self.SEGMENTED_FINAL_MIN_SECONDS)):
             return None
-        _, _, last_speech = getattr(self, "_speech_scan", (0, 0.0, 0))
+        try:
+            _, _, last_speech = self._scan_speech(total_samples)  # the loop is idle after the handoff
+        except Exception:
+            return None
         if last_speech > end_sample:
             return None  # the speaker went on after the guess: recognize everything, without a wasted check
         tail = data[end_sample:]
+        if len(tail) > int(rate * self.SPECULATIVE_TAIL_CHECK_SECONDS):
+            return None  # a long tail costs as much to check as to recognize everything
         if len(tail):
-            tail_text, _speech = self._transcribe_audio(tail, return_activity=True)
-            if (tail_text or "").strip():
-                return None
+            tail_text, tail_speech = self._transcribe_audio(tail, return_activity=True)
+            if tail_speech or (tail_text or "").strip():
+                return None  # any speech after the guess, even a syllable the recognizer missed
         return FinalTranscriptionResult(
             text=text,
             captured_samples=total_samples,
@@ -1457,13 +1477,15 @@ class VoiceInputSystem:
                     pass
 
         def final_cache_loop():
+            epoch = getattr(self, "_final_cache_epoch", 0)
             while not stop_event.is_set():
                 try:
                     total_samples = self._audio_sample_count()
                     _, finalized_len = self._snapshot_final_cache()
-                    segment_range = self._next_final_segment_range(
-                        total_samples,
-                        finalized_len,
+                    segment_range = (
+                        self._next_final_segment_range(total_samples, finalized_len)
+                        if total_samples >= int(self.audio.sample_rate * self.PIECES_FROM_SECONDS)
+                        else None
                     )
                     if segment_range is not None:
                         with self._final_cache_state_lock:
@@ -1488,6 +1510,8 @@ class VoiceInputSystem:
                             if (
                                 not has_speech or segment_text
                             ):
+                                if stop_event.is_set() or epoch != getattr(self, "_final_cache_epoch", 0):
+                                    break
                                 natural_endpoint = self._consume_preview_endpoint(
                                     endpoint_end
                                 )
@@ -1526,9 +1550,10 @@ class VoiceInputSystem:
                                 np.concatenate([audio, np.zeros(int(self.audio.sample_rate * self.SPECULATIVE_TAIL_PAD_SECONDS), np.int16)]),
                                 blocking=False,
                             )
-                            if guess is not None:
+                            if guess is not None and len(audio) == speculate_to:
                                 with self._final_cache_lock:
-                                    self._speculative_final = (speculate_to, (guess or "").strip())
+                                    if not stop_event.is_set() and epoch == getattr(self, "_final_cache_epoch", 0):
+                                        self._speculative_final = (speculate_to, (guess or "").strip())
                         finally:
                             self._final_cache_idle.set()
                 except Exception:
