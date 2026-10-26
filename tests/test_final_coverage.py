@@ -347,19 +347,42 @@ def test_pause_cut_moves_back_to_the_silence_before_the_late_endpoint():
     from main import VoiceInputSystem
 
     rate = FakeAudio.sample_rate
-    pcm = np.full(10 * rate, 3000, dtype=np.int16)
-    pcm[int(5.0 * rate):int(5.6 * rate)] = 0          # the speaker paused at 5.0-5.6 s
+    noise = np.random.default_rng(1).normal(0, 30, 10 * rate)   # a microphone's noise floor
+    pcm = (noise + np.where(np.arange(10 * rate) % 400 < 200, 3000, -3000)).astype(np.int16)
+    pcm[int(5.0 * rate):int(5.6 * rate)] = noise[int(5.0 * rate):int(5.6 * rate)].astype(np.int16)
     system = _audio_system(pcm)
     # the preview recognizer reported the pause late, when the next phrase had already started
-    cut = VoiceInputSystem._quiet_cut(system, 0, int(6.0 * rate))
+    cut, in_pause = VoiceInputSystem._quiet_cut(system, 0, int(6.0 * rate))
+    assert in_pause is True
     assert int(5.0 * rate) <= cut <= int(5.6 * rate)
+
+
+def test_an_endpoint_without_a_quiet_stretch_is_not_treated_as_a_pause():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    speech = np.where(np.arange(20 * rate) % 400 < 200, 3000, -3000).astype(np.int16)  # no dip at all
+    system = _audio_system(speech)
+    assert VoiceInputSystem._quiet_cut(system, 0, 18 * rate) == (18 * rate, False)
 
 
 def test_pause_cut_keeps_the_endpoint_when_audio_is_unavailable():
     from main import VoiceInputSystem
 
     system = _system()  # no audio buffer
-    assert VoiceInputSystem._quiet_cut(system, 0, 6 * FakeAudio.sample_rate) == 6 * FakeAudio.sample_rate
+    assert VoiceInputSystem._quiet_cut(system, 0, 6 * FakeAudio.sample_rate) == (6 * FakeAudio.sample_rate, False)
+
+
+def test_pause_cut_never_makes_a_piece_shorter_than_four_seconds():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    pcm = np.where(np.arange(10 * rate) % 400 < 200, 3000, -3000).astype(np.int16)
+    pcm[int(2.3 * rate):int(2.6 * rate)] = 0                     # a pause too early to cut at
+    pcm[int(4.2 * rate):int(4.6 * rate)] = 0
+    system = _audio_system(pcm)
+    cut, in_pause = VoiceInputSystem._quiet_cut(system, 0, int(5.0 * rate))
+    assert in_pause and cut >= 4 * rate
 
 
 def test_pieces_need_four_seconds_before_a_pause_ends_one():
@@ -387,14 +410,14 @@ def test_a_piece_after_a_pause_cut_starts_exactly_at_the_cut():
     assert VoiceInputSystem._next_final_segment_range(system, 11 * rate, 5 * rate) == (4 * rate, 10 * rate)
 
 
-def test_a_twelve_second_dictation_uses_its_pieces_and_reads_only_the_tail_after_the_pause():
+def test_a_long_dictation_reads_only_the_tail_after_its_last_pause_cut():
     from main import FinalSegmentCoverage, VoiceInputSystem
 
     system = _system()
     rate = FakeAudio.sample_rate
-    system._final_segments = [FinalSegmentCoverage(0, 8 * rate, "先列出问题", True, cut_in_pause=True)]
-    system._finalized_audio_len = 8 * rate
-    data = np.ones(12 * rate, dtype=np.int16)
+    system._final_segments = [FinalSegmentCoverage(0, 20 * rate, "先列出问题", True, cut_in_pause=True)]
+    system._finalized_audio_len = 20 * rate
+    data = np.ones(24 * rate, dtype=np.int16)
 
     result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
 
@@ -427,3 +450,80 @@ def test_chinese_pieces_meet_without_a_space_and_latin_words_keep_theirs():
     assert system._join_transcript_parts(["用 Claude", "写一个脚本"]) == "用 Claude 写一个脚本"
     assert system._join_transcript_parts(["重新排一下优先级。", "Z 核心"]) == "重新排一下优先级。Z 核心"
     assert system._join_transcript_parts(["要用中文", "Claude"]) == "要用中文 Claude"
+
+
+def test_words_repeated_across_a_pause_cut_are_kept():
+    from main import FinalSegmentCoverage, VoiceInputSystem
+
+    system = object.__new__(VoiceInputSystem)
+    after_pause = [FinalSegmentCoverage(0, 1, "第一步打开设置。", True, cut_in_pause=True)]
+    assert system._join_segments(after_pause, "设置里找到快捷键") == "第一步打开设置。设置里找到快捷键"
+    after_pause = [FinalSegmentCoverage(0, 1, "好的。", True, cut_in_pause=True)]
+    assert system._join_segments(after_pause, "好的，我们开始吧") == "好的。好的，我们开始吧"
+    # after a forced cut the next piece re-read one second, so the repeat is the overlap and is merged
+    forced = [FinalSegmentCoverage(0, 1, "第一步打开设置", True)]
+    assert system._join_segments(forced, "打开设置里找到快捷键") == "第一步打开设置里找到快捷键"
+
+
+def _speculating_system(pcm):
+    system = _audio_system(pcm)
+    system._speculative_final = None
+    system._speech_scan = (0, 0.0, 0)
+    return system
+
+
+def _speech(seconds, rate=FakeAudio.sample_rate):
+    return np.where(np.arange(int(seconds * rate)) % 400 < 200, 3000, -3000).astype(np.int16)
+
+
+def test_a_pause_after_speech_starts_a_background_guess_once():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    pcm = np.concatenate([_speech(3), np.zeros(int(0.4 * rate), np.int16)])
+    system = _speculating_system(pcm)
+    assert VoiceInputSystem._speculation_due(system, 3 * rate) is None          # still talking
+    assert VoiceInputSystem._speculation_due(system, len(pcm)) == len(pcm)      # 0.4 s of quiet
+    system._speculative_final = (len(pcm), "第一句")
+    assert VoiceInputSystem._speculation_due(system, len(pcm)) is None          # nothing new said
+
+
+def test_no_guess_for_recordings_that_use_pieces():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    pcm = np.concatenate([_speech(21), np.zeros(rate, np.int16)])
+    system = _speculating_system(pcm)
+    assert VoiceInputSystem._speculation_due(system, len(pcm)) is None
+
+
+def test_the_guess_is_the_final_text_when_only_silence_follows_it():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    data = np.concatenate([np.ones(5 * rate, np.int16), np.zeros(rate, np.int16)])
+    system = _system()
+    system._speculative_final = (5 * rate, "已经识别好的整句")
+    system._transcribe_audio = lambda audio, **_kw: ("", False)
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+    assert result.text == "已经识别好的整句"
+    assert result.final_source == "speculative_full"
+    assert result.coverage_ok is True
+
+
+def test_words_after_the_guess_make_the_whole_recording_be_recognized_again():
+    from main import VoiceInputSystem
+
+    rate = FakeAudio.sample_rate
+    data = np.ones(8 * rate, np.int16)
+    system = _system()
+    system._speculative_final = (5 * rate, "前半句")
+    calls = []
+    def transcribe(audio, return_activity=False, **_kw):
+        calls.append(len(audio))
+        return ("后半句", True) if return_activity else "整句"
+    system._transcribe_audio = transcribe
+    result = VoiceInputSystem._transcribe_final_result(system, data, buffer_start_sample=0, total_samples=len(data))
+    assert result.text == "整句"
+    assert result.final_source == "full_pcm"
+    assert calls == [3 * rate, 8 * rate]
