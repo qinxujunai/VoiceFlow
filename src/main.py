@@ -62,6 +62,9 @@ class FinalSegmentCoverage:
     end_sample: int
     text: str
     speech: bool
+    # True when the segment was cut inside a pause the speaker made: the next piece can start
+    # exactly there, with no re-recognized overlap to merge (overlaps duplicated words at seams).
+    cut_in_pause: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,13 +95,43 @@ class _InitWorker(threading.Thread):
                 self.on_error(e)
 
 
+def _cjk_seam(left_char, right_char):
+    """True when two transcript pieces need no space: Chinese meets Chinese, or a piece ends in Chinese punctuation."""
+    def cjk(char):
+        return ("\u3040" <= char <= "\u30ff" or "\u3400" <= char <= "\u9fff" or "\u3000" <= char <= "\u303f"
+                or "\uff00" <= char <= "\uffef" or "\U00020000" <= char <= "\U0003134f")
+    return (cjk(left_char) and not left_char.isalnum()) or (cjk(left_char) and cjk(right_char))
+
+
 class VoiceInputSystem:
     STREAM_PREVIEW_POLL_SECONDS = 0.04
     STREAM_PREVIEW_BLOCK_SECONDS = 0.1
     FINAL_SEGMENT_SECONDS = 18.0
     FINAL_SEGMENT_OVERLAP_SECONDS = 1.0
     FINAL_SEGMENT_HOLD_SECONDS = 0.32
+    # From 20 s the final text is the cached pieces plus the tail. Below that the whole recording is
+    # recognized, because pieces cost about 2.5 points of character errors on 15-20 s dictation
+    # (docs/stop-latency-evaluation-2026-10-26.md); the wait there is cut by speculation instead.
     SEGMENTED_FINAL_MIN_SECONDS = 20.0
+    # Below SEGMENTED_FINAL_MIN_SECONDS, once the speaker has been quiet this long after speech, the
+    # whole recording so far is recognized in the background. If stop comes before any new speech,
+    # that result is the final text: same accuracy as recognizing at stop, without the wait.
+    SPECULATIVE_PAUSE_SECONDS = 0.3
+    # The guess sees only 0.3 s after the last word; SenseVoice ends a sentence better with more silence
+    # after it, so the guess is recognized with this much silence appended (the recording is not changed).
+    SPECULATIVE_TAIL_PAD_SECONDS = 0.6
+    # At stop the tail after the guess is checked for speech; a longer tail is not worth checking.
+    SPECULATIVE_TAIL_CHECK_SECONDS = 1.5
+    # Below this length no pieces are recognized while recording: under SEGMENTED_FINAL_MIN_SECONDS they
+    # are not used, and they would hold the recognizer when stop comes. From here they are ready by 20 s.
+    PIECES_FROM_SECONDS = 14.0
+    # A piece is at least 4 s of speech: shorter pieces lose too much context (2 s pieces cost
+    # about 3 points of character errors in the same evaluation).
+    FINAL_SEGMENT_MIN_SECONDS = 4.0
+    # The preview recognizer reports a pause about half a second after it began, by which time the
+    # next phrase may have started (measured: 0.93 s median, 1.17 s max after the pause began).
+    # The cut moves back to the quietest 200 ms within this window.
+    PAUSE_CUT_SEARCH_SECONDS = 1.6
     PREVIEW_ENDPOINT_LIMIT = 256
     FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
     FINALIZING_DELAY_SECONDS = 0.35
@@ -146,6 +179,11 @@ class VoiceInputSystem:
         self._last_trigger_to_feedback_ms = None
         self._final_segments = []
         self._finalized_audio_len = 0
+        self._speculative_final = None
+        self._speech_scan = (0, float("inf"), 0)
+        # Bumped on every reset; a cache worker writes only while its own epoch is current, so a guess or
+        # piece from a cancelled recording can never land in the next one.
+        self._final_cache_epoch = 0
         self._final_cache_lock = threading.Lock()
         self._final_cache_state_lock = threading.Lock()
         self._final_cache_idle = threading.Event()
@@ -911,6 +949,9 @@ class VoiceInputSystem:
         with self._final_cache_lock:
             self._final_segments = []
             self._finalized_audio_len = 0
+            self._speculative_final = None
+            self._speech_scan = (0, float("inf"), 0)
+            self._final_cache_epoch = getattr(self, "_final_cache_epoch", 0) + 1
         endpoint_lock = getattr(self, "_preview_endpoint_lock", None)
         if endpoint_lock is not None:
             with endpoint_lock:
@@ -941,6 +982,7 @@ class VoiceInputSystem:
         hold_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_HOLD_SECONDS)
         stable_len = max(0, total_samples - hold_samples)
         endpoint = self._next_stable_endpoint(finalized_audio_len, stable_len)
+        overlap_samples = 0 if self._last_cut_in_pause() else overlap_samples
         if endpoint is not None:
             start = max(0, finalized_audio_len - overlap_samples)
             return start, endpoint
@@ -949,6 +991,114 @@ class VoiceInputSystem:
         start = max(0, finalized_audio_len - overlap_samples)
         end = finalized_audio_len + segment_samples
         return start, end
+
+    def _last_cut_in_pause(self):
+        segments, _ = self._snapshot_final_cache(tail_parts=1)
+        return bool(segments) and getattr(segments[-1], "cut_in_pause", False)
+
+    def _quiet_cut(self, start_sample, endpoint_sample):
+        """Where to cut at a reported pause: (sample, in_pause).
+
+        The endpoint arrives late, so look back for the quietest 200 ms, never so far back that the piece
+        is shorter than FINAL_SEGMENT_MIN_SECONDS. It counts as a pause only if that stretch is clearly
+        quieter than the rest of the window; otherwise keep the endpoint and treat it as a forced cut,
+        so the next piece re-reads the usual overlap.
+        """
+        rate = self.audio.sample_rate
+        endpoint_sample = int(endpoint_sample)
+        _, finalized = self._snapshot_final_cache()
+        low = max(
+            max(int(start_sample), int(finalized)) + int(rate * self.FINAL_SEGMENT_MIN_SECONDS),
+            endpoint_sample - int(rate * self.PAUSE_CUT_SEARCH_SECONDS),
+        )
+        window = int(rate * 0.2)
+        try:
+            audio = np.asarray(self._audio_snapshot(low, endpoint_sample), dtype=np.float32).reshape(-1)
+        except Exception:
+            return endpoint_sample, False
+        if len(audio) <= window * 2:
+            return endpoint_sample, False
+        low = endpoint_sample - len(audio)  # the snapshot may start later if older audio was discarded
+        energy = np.convolve(np.square(audio), np.ones(window, dtype=np.float32), "valid") / window
+        quietest = int(np.argmin(energy))
+        # A pause: the quietest 200 ms is near silence, or at least 15 dB below the speech in the window
+        # (its loud part: the pause itself may fill most of the window). A syllable-level dip is not.
+        quiet = energy[quietest] <= max((32768 * 0.002) ** 2, float(np.percentile(energy, 90)) * 0.03)
+        if not quiet:
+            return endpoint_sample, False
+        return low + quietest + window // 2, True
+
+    # Speech level tracking for speculation: frames of 100 ms; a frame is speech when its energy is at
+    # least 8x (9 dB) the noise floor (the quietest recent frame, allowed to drift up 1 % per frame) and
+    # above a fixed floor (or loud enough on its own). Measuring against the noise, not the loudest frame, keeps one cough or click
+    # from hiding quieter speech. A pause is SPECULATIVE_PAUSE_SECONDS since the last speech frame.
+    SPEECH_FRAME_SECONDS = 0.1
+    SPEECH_ENERGY_FLOOR = (32768 * 0.01) ** 2
+    SPEECH_ENERGY_CERTAIN = (32768 * 0.03) ** 2  # -30 dBFS: speech even before a noise floor is known
+
+    def _scan_speech(self, total_samples):
+        """Update (scanned_until, noise floor energy, end of the last speech frame) up to total_samples."""
+        scanned, noise, last_speech = getattr(self, "_speech_scan", (0, float("inf"), 0))
+        frame = int(self.audio.sample_rate * self.SPEECH_FRAME_SECONDS)
+        end = scanned + (max(0, int(total_samples) - scanned) // frame) * frame
+        if end > scanned:
+            audio = np.asarray(self._audio_snapshot(scanned, end), dtype=np.float32).reshape(-1)
+            usable = (len(audio) // frame) * frame
+            if usable:
+                energy = np.mean(np.square(audio[:usable].reshape(-1, frame)), axis=1)
+                for index, value in enumerate(energy):
+                    noise = min(float(value), noise * 1.01)
+                    if value >= self.SPEECH_ENERGY_FLOOR and (
+                            value >= max(noise, 1.0) * 8 or value >= self.SPEECH_ENERGY_CERTAIN):
+                        last_speech = scanned + (index + 1) * frame
+            scanned = end
+        self._speech_scan = (scanned, noise, last_speech)
+        return self._speech_scan
+
+    def _speculation_due(self, total_samples):
+        """The sample to recognize up to now, or None: a short recording, a fresh pause, speech since the last guess."""
+        rate = self.audio.sample_rate
+        total_samples = int(total_samples)
+        if total_samples >= int(rate * self.SEGMENTED_FINAL_MIN_SECONDS):
+            return None
+        _, _, last_speech = self._scan_speech(total_samples)
+        if not last_speech or total_samples - last_speech < int(rate * self.SPECULATIVE_PAUSE_SECONDS):
+            return None
+        speculative = getattr(self, "_speculative_final", None)
+        if speculative is not None and speculative[0] >= last_speech:
+            return None
+        return total_samples
+
+    def _speculative_result(self, data, total_samples):
+        """Use the background result when nothing but silence follows it; None means recognize at stop."""
+        speculative = getattr(self, "_speculative_final", None)
+        if speculative is None:
+            return None
+        end_sample, text = speculative
+        rate = self.audio.sample_rate
+        if (not text or end_sample > len(data) or len(data) != total_samples
+                or total_samples >= int(rate * self.SEGMENTED_FINAL_MIN_SECONDS)):
+            return None
+        try:
+            _, _, last_speech = self._scan_speech(total_samples)  # the loop is idle after the handoff
+        except Exception:
+            return None
+        if last_speech > end_sample:
+            return None  # the speaker went on after the guess: recognize everything, without a wasted check
+        tail = data[end_sample:]
+        if len(tail) > int(rate * self.SPECULATIVE_TAIL_CHECK_SECONDS):
+            return None  # a long tail costs as much to check as to recognize everything
+        if len(tail):
+            tail_text, tail_speech = self._transcribe_audio(tail, return_activity=True)
+            if tail_speech or (tail_text or "").strip():
+                return None  # any speech after the guess, even a syllable the recognizer missed
+        return FinalTranscriptionResult(
+            text=text,
+            captured_samples=total_samples,
+            covered_samples=total_samples,
+            coverage_ok=True,
+            final_source="speculative_full",
+        )
 
     def _note_preview_endpoint(self, sample_index):
         sample_index = max(0, int(sample_index))
@@ -960,6 +1110,13 @@ class VoiceInputSystem:
                 self._preview_endpoint_samples.append(sample_index)
                 if len(self._preview_endpoint_samples) > self.PREVIEW_ENDPOINT_LIMIT:
                     del self._preview_endpoint_samples[:-self.PREVIEW_ENDPOINT_LIMIT]
+
+    def _is_preview_endpoint(self, sample_index):
+        lock = getattr(self, "_preview_endpoint_lock", None)
+        if lock is None:
+            return False
+        with lock:
+            return int(sample_index) in self._preview_endpoint_samples
 
     def _consume_preview_endpoint(self, sample_index):
         lock = getattr(self, "_preview_endpoint_lock", None)
@@ -978,7 +1135,7 @@ class VoiceInputSystem:
         lock = getattr(self, "_preview_endpoint_lock", None)
         if lock is None:
             return None
-        minimum = finalized_audio_len + int(self.audio.sample_rate * 2.0)
+        minimum = finalized_audio_len + int(self.audio.sample_rate * self.FINAL_SEGMENT_MIN_SECONDS)
         maximum = min(
             stable_len,
             finalized_audio_len + int(self.audio.sample_rate * self.FINAL_SEGMENT_SECONDS),
@@ -1002,7 +1159,7 @@ class VoiceInputSystem:
             bool(text and text.strip()),
         )
 
-    def _commit_final_segment(self, text, start_sample, end_sample, speech):
+    def _commit_final_segment(self, text, start_sample, end_sample, speech, *, cut_in_pause=False):
         with self._final_cache_lock:
             self._final_segments.append(
                 FinalSegmentCoverage(
@@ -1010,6 +1167,7 @@ class VoiceInputSystem:
                     end_sample=max(0, int(end_sample)),
                     text=(text or "").strip(),
                     speech=bool(speech),
+                    cut_in_pause=bool(cut_in_pause),
                 )
             )
             self._finalized_audio_len = max(self._finalized_audio_len, int(end_sample))
@@ -1025,14 +1183,34 @@ class VoiceInputSystem:
             parts = self._final_segments if tail_parts is None else self._final_segments[-tail_parts:]
             return list(parts), self._finalized_audio_len
 
-    def _join_transcript_parts(self, parts):
+    def _join_transcript_parts(self, parts, *, after_pause=()):
+        """Join recognized pieces. A piece that follows a cut inside a pause holds only new speech, so it is
+        appended as is: the overlap merge would delete words the speaker really repeated (「设置。设置里」).
+        `after_pause[i]` is True when parts[i] starts at such a cut."""
         joined = ""
-        for part in parts:
+        for index, part in enumerate(parts):
             part = (part or "").strip()
             if not part:
                 continue
-            joined = self._merge_transcript_pair(joined, part) if joined else part
+            if not joined:
+                joined = part
+                continue
+            fresh = index < len(after_pause) and after_pause[index]
+            merged = f"{joined.rstrip()} {part}" if fresh else self._merge_transcript_pair(joined, part)
+            # Chinese pieces meet without a space (it showed as 「取了。 明天」); Latin words keep theirs.
+            if merged == f"{joined.rstrip()} {part}" and _cjk_seam(joined.rstrip()[-1], part[0]):
+                merged = joined.rstrip() + part
+            joined = merged
         return joined.strip()
+
+    def _join_segments(self, segments, tail=None):
+        """Join cached segments (and the stop tail): each piece after a pause cut is appended without merging."""
+        parts = [self._segment_text(segment) for segment in segments]
+        after_pause = [False] + [bool(getattr(previous, "cut_in_pause", False)) for previous in segments[:-1]]
+        if tail is not None:
+            parts.append(tail)
+            after_pause.append(bool(segments) and bool(getattr(segments[-1], "cut_in_pause", False)))
+        return self._join_transcript_parts(parts, after_pause=after_pause)
 
     def _merge_transcript_pair(self, left, right):
         left = (left or "").rstrip()
@@ -1143,12 +1321,13 @@ class VoiceInputSystem:
                 )
 
             overlap_samples = int(self.audio.sample_rate * self.FINAL_SEGMENT_OVERLAP_SECONDS)
+            if getattr(segments[-1], "cut_in_pause", False):
+                overlap_samples = 0
             tail_start = max(buffer_start_sample, finalized_audio_len - overlap_samples)
             tail = data[tail_start - buffer_start_sample:]
             tail_end = buffer_start_sample + len(data)
             tail_text, tail_has_speech = self._transcribe_audio(tail, return_activity=True)
-            parts = [self._segment_text(segment) for segment in segments]
-            text = self._join_transcript_parts(parts + [tail_text])
+            text = self._join_segments(segments, tail_text)
             committed = getattr(self, "_latest_text", "")
             suspiciously_short = (
                 bool(committed)
@@ -1179,6 +1358,10 @@ class VoiceInputSystem:
                 final_source="segments_plus_tail",
             )
 
+        if buffer_start_sample == 0:
+            speculative = self._speculative_result(data, total_samples)
+            if speculative is not None:
+                return speculative
         source = "full_pcm" if buffer_start_sample == 0 else "incomplete_pcm"
         result = self._transcribe_complete_pcm(data, total_samples, source)
         if (
@@ -1294,13 +1477,15 @@ class VoiceInputSystem:
                     pass
 
         def final_cache_loop():
+            epoch = getattr(self, "_final_cache_epoch", 0)
             while not stop_event.is_set():
                 try:
                     total_samples = self._audio_sample_count()
                     _, finalized_len = self._snapshot_final_cache()
-                    segment_range = self._next_final_segment_range(
-                        total_samples,
-                        finalized_len,
+                    segment_range = (
+                        self._next_final_segment_range(total_samples, finalized_len)
+                        if total_samples >= int(self.audio.sample_rate * self.PIECES_FROM_SECONDS)
+                        else None
                     )
                     if segment_range is not None:
                         with self._final_cache_state_lock:
@@ -1308,7 +1493,12 @@ class VoiceInputSystem:
                                 break
                             self._final_cache_idle.clear()
                         try:
-                            segment_start, segment_end = segment_range
+                            segment_start, endpoint_end = segment_range
+                            segment_end, at_pause = (
+                                self._quiet_cut(segment_start, endpoint_end)
+                                if self._is_preview_endpoint(endpoint_end)
+                                else (endpoint_end, False)
+                            )
                             segment = self._audio_snapshot(segment_start, segment_end)
                             transcription = self._transcribe_audio(
                                 segment, blocking=False, return_activity=True,
@@ -1320,19 +1510,20 @@ class VoiceInputSystem:
                             if (
                                 not has_speech or segment_text
                             ):
+                                if stop_event.is_set() or epoch != getattr(self, "_final_cache_epoch", 0):
+                                    break
                                 natural_endpoint = self._consume_preview_endpoint(
-                                    segment_end
+                                    endpoint_end
                                 )
                                 self._commit_final_segment(
                                     segment_text,
                                     segment_start,
                                     segment_end,
                                     has_speech,
+                                    cut_in_pause=at_pause,
                                 )
                                 segments, covered_to = self._snapshot_final_cache()
-                                authoritative = self._join_transcript_parts(
-                                    [self._segment_text(item) for item in segments]
-                                )
+                                authoritative = self._join_segments(segments)
                                 if (
                                     natural_endpoint
                                     and authoritative
@@ -1346,6 +1537,23 @@ class VoiceInputSystem:
                                             covered_end_sample=covered_to,
                                         )
                                     )
+                        finally:
+                            self._final_cache_idle.set()
+                    elif (speculate_to := self._speculation_due(total_samples)) is not None:
+                        with self._final_cache_state_lock:
+                            if stop_event.is_set():
+                                break
+                            self._final_cache_idle.clear()
+                        try:
+                            audio = np.asarray(self._audio_snapshot(0, speculate_to), dtype=np.int16).reshape(-1)
+                            guess = self._transcribe_audio(
+                                np.concatenate([audio, np.zeros(int(self.audio.sample_rate * self.SPECULATIVE_TAIL_PAD_SECONDS), np.int16)]),
+                                blocking=False,
+                            )
+                            if guess is not None and len(audio) == speculate_to:
+                                with self._final_cache_lock:
+                                    if not stop_event.is_set() and epoch == getattr(self, "_final_cache_epoch", 0):
+                                        self._speculative_final = (speculate_to, (guess or "").strip())
                         finally:
                             self._final_cache_idle.set()
                 except Exception:
