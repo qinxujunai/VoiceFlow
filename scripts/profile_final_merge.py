@@ -32,7 +32,7 @@ def main():
     for segments in (4, 34, 200):
         parts = [f"第{index:05d}段" + "本地听写保留完整内容与尾部" * 8 + f"结束{index:05d}。"
                  for index in range(segments)]
-        expected = " ".join(parts)
+        expected = "".join(parts)  # pieces ending in Chinese punctuation join without a space
         assert system._join_transcript_parts(parts) == expected
         timings = []
         for _ in range(args.samples):

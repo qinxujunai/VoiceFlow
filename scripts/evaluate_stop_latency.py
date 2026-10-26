@@ -1,22 +1,25 @@
-"""Stop latency: how long after the stop key the final text is ready, and what it costs in accuracy.
+"""Long dictation (from SEGMENTED_FINAL_MIN_SECONDS): pieces cut at pauses while recording, plus the tail.
 
 Drives VoiceFlow's own progressive final cache and stop path (src/main.py: _next_final_segment_range,
 _quiet_cut, _commit_final_segment, _transcribe_final_result) with the real preview recognizer and SenseVoice,
-one 100 ms block at a time, and compares with recognizing the whole recording at stop.
+one 100 ms block at a time, on 30-38 s dictations made of four utterances, and compares with recognizing the
+whole recording at stop. Pass another src directory (e.g. an older checkout) as the last argument to compare.
 Results: docs/stop-latency-evaluation-2026-10-26.md. Needs a display for Qt imports (xvfb-run on Linux).
 
-    python scripts/evaluate_stop_latency.py <sensevoice dir> <streaming preview dir> <samples dir with meta.json>
+    python scripts/evaluate_stop_latency.py <sensevoice dir> <streaming preview dir> <samples dir> [noise dBFS] [src dir]
 """
 import sys, wave, time, json, threading, statistics as st
 from pathlib import Path
 import numpy as np
 import sherpa_onnx
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, sys.argv.pop(5) if len(sys.argv) > 5 else str(Path(__file__).resolve().parents[1] / "src"))
 from streaming_transcriber import OnlinePreviewTranscriber
 import main as vf
 
 SR = 16000
 SV, PREVIEW, SAMPLES = (Path(a) for a in sys.argv[1:4])
+# Optional microphone noise floor in dBFS (e.g. -50): the generated pauses are digital silence otherwise.
+NOISE_DBFS = float(sys.argv[4]) if len(sys.argv) > 4 else None
 
 
 def norm(s):
@@ -36,9 +39,20 @@ def cer(hyp, ref):
 
 meta = json.load(open(SAMPLES / "meta.json", encoding="utf-8"))
 def load(n):
-    with wave.open(str(SAMPLES / n)) as f: return np.frombuffer(f.readframes(f.getnframes()), np.int16)
+    with wave.open(str(SAMPLES / n)) as f: x = np.frombuffer(f.readframes(f.getnframes()), np.int16)
+    if NOISE_DBFS is None:
+        return x
+    noise = np.random.default_rng(len(x)).normal(0, 32768 * 10 ** (NOISE_DBFS / 20), len(x))
+    return np.clip(x + noise, -32768, 32767).astype(np.int16)
+def gap(n):
+    if NOISE_DBFS is None:
+        return np.zeros(n, np.int16)
+    return np.random.default_rng(n).normal(0, 32768 * 10 ** (NOISE_DBFS / 20), n).astype(np.int16)
+
+
 items = [(m['wav'], load(m['wav']), m['reference']) for m in meta]
-items += [(f"{a[0]}+{b[0]}", np.concatenate([a[1], np.zeros(int(.8*SR), np.int16), b[1]]), a[2]+'，'+b[2]) for a, b in zip(items[::2], items[1::2])]
+items = [('+'.join(n for n, _, _ in group), np.concatenate(sum(([x, gap(int(.8*SR))] for _, x, _ in group), [])),
+          '，'.join(r for _, _, r in group)) for group in (items[0:4], items[4:8], items[8:12], items[2:6], items[6:10])]
 R = sherpa_onnx.OfflineRecognizer.from_sense_voice(model=str(SV/'model.int8.onnx'), tokens=str(SV/'tokens.txt'), use_itn=True, num_threads=2)
 def decode(x):
     s = R.create_stream(); s.accept_waveform(SR, np.asarray(x).astype(np.float32)/32768); R.decode_stream(s); return s.result.text
@@ -65,16 +79,20 @@ for name, x, ref in items:
         rng = s._next_final_segment_range(s._audio_sample_count(), s._snapshot_final_cache()[1])
         if rng:
             start, endpoint_end = rng
-            at_pause = s._is_preview_endpoint(endpoint_end)
-            end = s._quiet_cut(start, endpoint_end) if at_pause else endpoint_end
+            if hasattr(s, '_quiet_cut'):
+                end, at_pause = s._quiet_cut(start, endpoint_end) if s._is_preview_endpoint(endpoint_end) else (endpoint_end, False)
+            else:  # code before 2026-10-26
+                end, at_pause = endpoint_end, False
             text, speech = s._transcribe_audio(s._audio_snapshot(start, end), return_activity=True)
             s._consume_preview_endpoint(endpoint_end)
-            s._commit_final_segment(text, start, end, speech, cut_in_pause=at_pause)
+            if hasattr(s, '_quiet_cut'):
+                s._commit_final_segment(text, start, end, speech, cut_in_pause=at_pause)
+            else:
+                s._commit_final_segment(text, start, end, speech)
     t0 = time.perf_counter(); res = s._transcribe_final_result(x, buffer_start_sample=0, total_samples=len(x)); t = time.perf_counter() - t0
     t0 = time.perf_counter(); whole = decode(x); tw = time.perf_counter() - t0
     rows.append(dict(name=name, sec=round(len(x)/SR, 1), source=res.final_source, pieces=len(s._final_segments), coverage=res.coverage_ok,
                      stop_ms=round(t*1000), whole_ms=round(tw*1000), cer=round(cer(res.text, ref), 3), cer_whole=round(cer(whole, ref), 3), text=res.text))
 for r in rows: print(json.dumps(r, ensure_ascii=False))
-single = len(meta)
-for label, rs in (('single utterances', rows[:single]), ('two joined', rows[single:])):
+for label, rs in (('30-38 s dictation', rows),):
     print(label, {k: round(st.mean(r[k] for r in rs), 3) for k in ('stop_ms', 'whole_ms', 'cer', 'cer_whole')}, 'all covered:', all(r['coverage'] for r in rs))
