@@ -365,7 +365,12 @@ class NativeCapsuleView(QWidget):
                 QColor(255, 69, 58, 44) if self.state.mode in {"listening", "streaming"} else QColor(255, 255, 255, 24))
         painter.setPen(QPen(tint, 2.0 if high_contrast else 0.5))
         painter.drawRoundedRect(rect, 17, 17)
-        mark_x = rect.x() + 16
+        shown, _ = self._visible_graphemes(self.state.visible)
+        visible_width = QFontMetricsF(self.font()).horizontalAdvance("".join(shown))
+        # Center the indicator and text together while the content fits.
+        # Long, cropped captions keep the established left edge.
+        content_shift = max(0.0, (rect.width() - 54.0 - visible_width) / 2.0) if shown else 0.0
+        mark_x = rect.x() + 16 + content_shift
         center_y = rect.center().y()
         if self.state.mode in {"processing", "settling"}:
             painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -389,7 +394,11 @@ class NativeCapsuleView(QWidget):
                     height = max(5, height)
                 painter.drawRoundedRect(QRectF(mark_x + (6 if high_contrast else 4) * index,
                                               center_y - height / 2, 4 if high_contrast else 2, height), 1, 1)
-        text_rect = QRectF(rect.x() + 38, rect.y(), max(0.0, rect.width() - 50), rect.height())
+        if self.state.mode == "final_text":
+            text_x = rect.x() + max(12.0, (rect.width() - visible_width) / 2.0)
+        else:
+            text_x = rect.x() + 38 + content_shift
+        text_rect = QRectF(text_x, rect.y(), max(0.0, rect.right() - text_x - 12), rect.height())
         now = time.perf_counter()
         motion = self._motion_enabled and not high_contrast
         if self._crossfade_from is not None and motion:
