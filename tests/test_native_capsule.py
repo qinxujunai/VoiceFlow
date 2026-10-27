@@ -424,3 +424,42 @@ def test_recording_indicator_stays_fixed_as_text_grows(monkeypatch):
         assert len(set(positions)) == 1
     finally:
         view.close()
+
+
+def test_streaming_width_tracks_text_without_large_empty_steps(monkeypatch):
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: True)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication, QFontMetricsF
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.state.show_label("streaming", "some text")
+        view._retarget_width(1.0)
+        required = 62.0 + QFontMetricsF(view.font()).horizontalAdvance(view.state.text)
+        assert view._target_width <= max(view.MIN_WIDTH, required) + 1
+    finally:
+        view.close()
+
+
+def test_width_animation_keeps_moving_when_retargeted(monkeypatch):
+    import capsule_native
+    monkeypatch.setattr(capsule_native, "system_animations_enabled", lambda: True)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view._width = 100.0
+        view._target_width = 200.0
+        view._width_last_at = 10.0
+        monkeypatch.setattr(capsule_native.time, "perf_counter", lambda: 10.016)
+        view._animate()
+        first = view._width
+        view._target_width = 210.0
+        view._width_changed_at = 10.016
+        monkeypatch.setattr(capsule_native.time, "perf_counter", lambda: 10.032)
+        view._animate()
+        assert 100 < first < view._width < 210
+        assert view._width - first > 3.0
+    finally:
+        view.close()
