@@ -99,7 +99,7 @@ def _finalization_fixture(tmp_path, *, clipboard_fails=False, ledger_fails=False
         show_delivery_state=lambda status, *_args: observations["states"].append(status),
         show_error=lambda message: observations["errors"].append(message),
         show_canceled=lambda: observations["states"].append("canceled"),
-        hide_after=lambda _delay: None,
+        hide_after=lambda delay: observations.setdefault("hide_delays", []).append(delay),
         complete_onboarding=lambda: None,
     )
     system.history = HistoryStore(tmp_path / "history.jsonl")
@@ -348,3 +348,30 @@ def test_live_sentence_end_policy_produces_one_final_for_capsule_clipboard_and_h
     assert finals == ["会议结束。"]
     assert observed["clipboard"] == finals[0]
     assert system.history.last()["corrected_text"] == finals[0]
+
+
+def test_silent_recording_stops_as_canceled_without_discarding_recovery(tmp_path):
+    from main import FinalTranscriptionResult
+
+    system, observed, recovery, pcm, _text, session_id = _finalization_fixture(tmp_path)
+    silence = np.zeros_like(pcm)
+    system.session.stop = lambda: SimpleNamespace(audio_data=silence, total_samples=len(silence), start_sample=0, duration=0.1)
+    system._speech_gate_enabled = True
+    system._speech_rms_threshold = 0.002
+    system._speech_min_active_ms = 90
+    system._transcribe_final_result = lambda *_args, **_kwargs: FinalTranscriptionResult(text="", captured_samples=len(silence), covered_samples=len(silence), coverage_ok=True, final_source="full_pcm")
+    system._on_record_stop()
+    assert observed["states"] == ["canceled"]
+    assert not observed["errors"]
+    assert observed["hide_delays"] == [800]
+    assert [entry.session_id for entry in recovery.list_recoverable()] == [session_id]
+    assert not observed["clipboard"]
+
+
+def test_empty_audio_failure_dismisses_prompt_and_keeps_recovery(tmp_path):
+    system, observed, recovery, pcm, _text, session_id = _finalization_fixture(tmp_path)
+    system.session.stop = lambda: SimpleNamespace(audio_data=np.empty(0, dtype=np.int16), total_samples=len(pcm), start_sample=0, duration=0.1)
+    system._on_record_stop()
+    assert observed["errors"]
+    assert observed["hide_delays"]
+    assert [entry.session_id for entry in recovery.list_recoverable()] == [session_id]

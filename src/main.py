@@ -610,6 +610,7 @@ class VoiceInputSystem:
                     "未能读取录音。请打开设置查看可恢复录音，并检查麦克风。" if retained
                     else "没有收到声音，请检查麦克风后重试。"
                 )
+                self.overlay.hide_after(3600)
                 return
 
             cache_handoff_started = time.perf_counter()
@@ -781,10 +782,16 @@ class VoiceInputSystem:
                     self._recovery_journal = None
                 self._recording_state.mark_recoverable()
                 self._recording_state.acknowledge_recovery()
-                self.overlay.show_error(
-                    "没有识别到文字。请打开设置查看可恢复录音，或检查麦克风后重试。" if retained
-                    else "没有识别到文字，请检查麦克风后重试。"
-                )
+                if (final_result.coverage_ok
+                        and getattr(self, "_speech_gate_enabled", False)
+                        and not self._contains_speech(data)):
+                    self.overlay.show_canceled()
+                    self.overlay.hide_after(800)
+                else:
+                    self.overlay.show_error(
+                        "没有识别到文字。请打开设置查看可恢复录音，或检查麦克风后重试。" if retained
+                        else "没有识别到文字，请检查麦克风后重试。"
+                    )
 
         except Exception as e:
             finalizing_done.set()
