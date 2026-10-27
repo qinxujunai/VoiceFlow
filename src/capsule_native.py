@@ -162,6 +162,7 @@ class NativeCapsuleView(QWidget):
         self._width_start = self._width
         self._target_width = self._width
         self._width_changed_at = 0.0
+        self._width_last_at = time.perf_counter()
         self._levels = [0.45] * 3
         self._level_starts = self._levels[:]
         self._level_targets = self._levels[:]
@@ -193,6 +194,7 @@ class NativeCapsuleView(QWidget):
             self.state.prepare_recording(*args)
             self._width = self._width_start = self._target_width = self.MIN_WIDTH
             self._width_changed_at = now
+            self._width_last_at = now
             self._levels = [0.45] * 3
             self._level_starts = self._levels[:]
             self._level_targets = self._levels[:]
@@ -272,12 +274,14 @@ class NativeCapsuleView(QWidget):
 
     def _retarget_width(self, now):
         text_width = QFontMetricsF(self.font()).horizontalAdvance(self.state.text)
-        # Reserve room in small steps so each new glyph does not restart growth.
+        # Track content rather than jumping in large width steps.
         required = 62.0 + text_width
-        target = min(self.MAX_WIDTH, max(self.MIN_WIDTH, 96.0 + max(0, math.ceil((required - 96.0) / 48.0)) * 48.0)) if self.state.text else self.MIN_WIDTH
+        target = min(self.MAX_WIDTH, max(self.MIN_WIDTH, required)) if self.state.text else self.MIN_WIDTH
         if self.state.mode == "streaming":
             target = max(self._target_width, target, 96.0)
         if target != self._target_width:
+            if abs(self._width - self._target_width) <= 0.05:
+                self._width_last_at = now
             self._width_start = self._width
             self._target_width = target
             self._width_changed_at = now
@@ -303,8 +307,12 @@ class NativeCapsuleView(QWidget):
         if self.state.advance(now=now):
             self._retarget_width(now)
             self._update_accessible_name()
-        progress = min(1.0, max(0.0, (now - self._width_changed_at) / 0.18))
-        self._width = self._width_start + (self._target_width - self._width_start) * (1 - (1 - progress) ** 3)
+        # A time-based filter keeps moving when successive words retarget the width.
+        elapsed = min(0.1, max(0.0, now - self._width_last_at))
+        self._width_last_at = now
+        self._width += (self._target_width - self._width) * (1 - math.exp(-elapsed / 0.06))
+        if abs(self._width - self._target_width) <= 0.05:
+            self._width = self._target_width
         progress = min(1.0, max(0.0, (now - self._levels_changed_at) / 0.09))
         self._levels = [a + (b - a) * progress for a, b in zip(self._level_starts, self._level_targets)]
         if self._crossfade_from is not None and now - self._crossfade_at >= FINAL_CROSSFADE:

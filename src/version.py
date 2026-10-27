@@ -1,7 +1,7 @@
 """Single source of truth for the public version and traceable build revision."""
 
 APP_VERSION = "0.3.11"
-BUILD_ID = "261028.1"
+BUILD_ID = "261028.2"
 WINDOWS_REVISION = 1
 
 
