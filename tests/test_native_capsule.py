@@ -376,3 +376,26 @@ def test_streaming_frame_paints_text_and_reports_the_first_preview(monkeypatch):
         assert painted == [7]
     finally:
         view.close()
+
+
+@pytest.mark.parametrize("mode,text", [("canceled", "已取消"), ("streaming", "你好"), ("final_text", "已复制到剪贴板")])
+def test_short_capsule_content_is_visually_centered(monkeypatch, mode, text):
+    monkeypatch.setattr("capsule_native.system_high_contrast_enabled", lambda: False)
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: False)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.resize(400, 48)
+        view.state.show_label(mode, text)
+        view._width = 240.0
+        view.show()
+        app.processEvents()
+        frame = view.grab().toImage()
+        xs = [x for x in range(80, 320) if any(frame.pixelColor(x, y).lightness() > 150 for y in range(14, 34))]
+        assert xs
+        assert abs((min(xs) + max(xs)) / 2 - 200) <= 7
+    finally:
+        view.close()
