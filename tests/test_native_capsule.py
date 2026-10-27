@@ -394,8 +394,33 @@ def test_short_capsule_content_is_visually_centered(monkeypatch, mode, text):
         view.show()
         app.processEvents()
         frame = view.grab().toImage()
-        xs = [x for x in range(80, 320) if any(frame.pixelColor(x, y).lightness() > 150 for y in range(14, 34))]
+        xs = [x for x in range(80, 320) if any(frame.pixelColor(x, y).lightness() > 200 for y in range(14, 34))]
         assert xs
         assert abs((min(xs) + max(xs)) / 2 - 200) <= 7
+    finally:
+        view.close()
+
+
+def test_recording_indicator_stays_fixed_as_text_grows(monkeypatch):
+    monkeypatch.setattr("capsule_native.system_high_contrast_enabled", lambda: False)
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: False)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.resize(400, 48)
+        view._width = 240.0
+        positions = []
+        for text in ("你", "你好", "这是更长的文字内容"):
+            view.state.show_label("streaming", text)
+            view.show()
+            app.processEvents()
+            frame = view.grab().toImage()
+            red = [x for x in range(80, 320) if any((c := frame.pixelColor(x, y)).red() > 180 and c.red() > c.green() * 1.8 for y in range(14, 34))]
+            assert red
+            positions.append((min(red), max(red)))
+        assert len(set(positions)) == 1
     finally:
         view.close()
