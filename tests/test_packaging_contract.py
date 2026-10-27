@@ -588,3 +588,15 @@ def test_generated_icon_includes_macos_and_png_assets():
 
     assert icns.read_bytes().startswith(b"icns")
     assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_installed_candidate_upgrades_from_previous_stable_0310():
+    import yaml
+
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "windows-quality.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["installed-candidate"]["steps"]
+    script = next(step["run"] for step in steps if step.get("name") == "Verify and exercise the uploaded installer")
+    assert "gh release download v0.3.10" in script
+    assert "VoiceFlow-0.3.10-Windows-x64.exe" in script
+    assert r"VoiceFlow-0\.3\.10-Windows-x64\.exe" in script
+    assert "-PreviousInstallerPath $previousInstaller" in script

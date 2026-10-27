@@ -197,12 +197,12 @@ jobs:
           if ((Get-Item $installer).Length -ne $asset.size) { throw 'Candidate size mismatch' }
           $previous = Join-Path $env:RUNNER_TEMP 'previous-release'
           New-Item -ItemType Directory $previous | Out-Null
-          gh release download v0.3.9 --repo $env:GITHUB_REPOSITORY --dir $previous --pattern 'VoiceFlow-0.3.9-Windows-x64.exe' --pattern SHA256SUMS.txt
+          gh release download v0.3.10 --repo $env:GITHUB_REPOSITORY --dir $previous --pattern 'VoiceFlow-0.3.10-Windows-x64.exe' --pattern SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Previous release download failed' }
-          $previousInstaller = Join-Path $previous 'VoiceFlow-0.3.9-Windows-x64.exe'
+          $previousInstaller = Join-Path $previous 'VoiceFlow-0.3.10-Windows-x64.exe'
           $previousHash = (Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
           $previousLines = @(Get-Content (Join-Path $previous 'SHA256SUMS.txt') | Where-Object {
-            $_ -match '^([0-9a-fA-F]{64})\s+[* ]?VoiceFlow-0\.3\.9-Windows-x64\.exe\s*$'
+            $_ -match '^([0-9a-fA-F]{64})\s+[* ]?VoiceFlow-0\.3\.10-Windows-x64\.exe\s*$'
           })
           if ($previousLines.Count -ne 1 -or ($previousLines[0] -split '\s+')[0].ToLowerInvariant() -ne $previousHash) {
             throw 'Previous installer checksum mismatch'
