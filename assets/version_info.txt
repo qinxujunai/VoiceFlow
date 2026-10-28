@@ -21,7 +21,7 @@ VSVersionInfo(
           StringStruct('LegalCopyright', 'Copyright (c) VoiceFlow contributors'),
           StringStruct('OriginalFilename', 'VoiceFlow.exe'),
           StringStruct('ProductName', 'VoiceFlow'),
-          StringStruct('ProductVersion', '0.3.11+261028.2')
+          StringStruct('ProductVersion', '0.3.11+261028.3')
         ]
       )
     ]),

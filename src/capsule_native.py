@@ -404,7 +404,9 @@ class NativeCapsuleView(QWidget):
         if self.state.mode == "final_text":
             text_x = rect.x() + max(12.0, (rect.width() - visible_width) / 2.0)
         else:
-            text_x = max(rect.x() + 38, rect.center().x() - visible_width / 2)
+            text_left = rect.x() + 38
+            text_right = rect.right() - 12
+            text_x = max(text_left, (text_left + text_right - visible_width) / 2)
         text_rect = QRectF(text_x, rect.y(), max(0.0, rect.right() - text_x - 12), rect.height())
         now = time.perf_counter()
         motion = self._motion_enabled and not high_contrast
