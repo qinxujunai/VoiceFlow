@@ -18,6 +18,8 @@ The prior same-machine synthetic stop-to-paste P95 measurements were 323.766 / 2
 
 [Dependency review](../licenses/release-review-0.3.11.md), [sign-off](../release/v0.3.11/RELEASE_SIGNOFF.json), SBOM, provenance, notices, checksums, five matching LGPL source archives, build inputs and a sanitized verification bundle accompany the public release. Exact-build Qt Python, Qt native-resource and pynput replacement tests passed; 87 PE files and 758 imports had zero missing. The installer is unsigned; no public macOS artifact or comparative accuracy improvement is claimed.
 
+Tag creation also started a separate Release rebuild [40649222704](https://github.com/qinxujunai/VoiceFlow/actions/runs/40649222704); it was canceled to preserve the already reviewed exact installed installer. It is not a passing release-build workflow.
+
 An earlier candidate lacking models was labeled invalid and its workflow canceled. The following candidate's isolated job failed because its checksum asset was absent; the final candidate had a valid checksum and passed. Preserve these historical failures, not as current delivery failures.
 
 ## Local recovery

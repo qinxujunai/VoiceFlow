@@ -16,7 +16,7 @@
 - [中文使用帮助](help.zh-CN.md) · [English help](help.en.md)
 - [中文开发文档](development.zh-CN.md) · [Development](development.en.md)
 - [质量标准](product-quality-standard.md) · [质量门](quality-gate.md) · [模型策略](model-strategy.md)
-- [第三方声明](../THIRD_PARTY_NOTICES.md) · [当前依赖审查](../licenses/release-review-0.3.10.md) · [对应 LGPL 源码](../licenses/LGPL-SOURCE.md)
+- [第三方声明](../THIRD_PARTY_NOTICES.md) · [当前依赖审查](../licenses/release-review-0.3.11.md) · [对应 LGPL 源码](../licenses/LGPL-SOURCE.md)
 
 ## 整理范围
 
@@ -64,7 +64,9 @@
 | [docs/release-notes-v0.1.0.md](release-notes-v0.1.0.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/release-performance-evidence-2026-08-11.md](release-performance-evidence-2026-08-11.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/release-validation-0.3.9.md](release-validation-0.3.9.md) | Historical release evidence; dated results retained | 2026-10-22 |
-| [docs/release-validation-0.3.10.md](release-validation-0.3.10.md) | Current release evidence | 2026-10-22 |
+| [docs/release-validation-0.3.10.md](release-validation-0.3.10.md) | Historical release evidence | 2026-10-22 |
+| [docs/release-validation-0.3.11-20261028.md](release-validation-0.3.11-20261028.md) | Current release evidence | 2026-10-28 |
+| [docs/release-notes-0.3.11.md](release-notes-0.3.11.md) | Release notes | 2026-10-28 |
 | [docs/release-notes-0.3.10.md](release-notes-0.3.10.md) | Release notes | 2026-10-22 |
 | [docs/resource-profile-2026-07-28.md](resource-profile-2026-07-28.md) | Historical evidence / release notes | 2026-10-22 |
 | [docs/runtime-boundary.md](runtime-boundary.md) | Current contract / guide | 2026-10-22 |
@@ -100,3 +102,5 @@
 - [release/v0.3.9/RELEASE_NOTES.md](../release/v0.3.9/RELEASE_NOTES.md)
 
 - [release/v0.3.10/RELEASE_NOTES.md](../release/v0.3.10/RELEASE_NOTES.md)
+
+- [release/v0.3.11/RELEASE_NOTES.md](../release/v0.3.11/RELEASE_NOTES.md)
