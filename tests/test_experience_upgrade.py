@@ -105,7 +105,7 @@ def test_faithful_spacing_preserves_words_and_technical_text():
     assert normalize_dictation_spacing("how are you") == "how are you"
 
 
-def test_native_capsule_expands_in_steps_instead_of_retargeting_each_character(monkeypatch):
+def test_native_capsule_expands_with_text_without_large_steps(monkeypatch):
     from capsule_native import NativeCapsuleView
     from qt_compat import QApplication
 
@@ -117,8 +117,8 @@ def test_native_capsule_expands_in_steps_instead_of_retargeting_each_character(m
     first = view._target_width
     view.state.show_final("你好", 1)
     view._retarget_width(.048)
-    assert first == view._target_width
-    assert view._target_width <= view.MAX_WIDTH
+    assert first <= view._target_width <= view.MAX_WIDTH
+    assert view._target_width - first < 48
     view.close()
 
 

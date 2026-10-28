@@ -396,7 +396,8 @@ def test_short_capsule_content_is_visually_centered(monkeypatch, mode, text):
         frame = view.grab().toImage()
         xs = [x for x in range(80, 320) if any(frame.pixelColor(x, y).lightness() > 200 for y in range(14, 34))]
         assert xs
-        assert abs((min(xs) + max(xs)) / 2 - 200) <= 7
+        expected_center = 200 if mode == "final_text" else 213
+        assert abs((min(xs) + max(xs)) / 2 - expected_center) <= 7
     finally:
         view.close()
 
@@ -461,5 +462,27 @@ def test_width_animation_keeps_moving_when_retargeted(monkeypatch):
         view._animate()
         assert 100 < first < view._width < 210
         assert view._width - first > 3.0
+    finally:
+        view.close()
+
+
+@pytest.mark.parametrize("width", [128.0, 160.0, 240.0, 312.0])
+def test_short_text_stays_centered_in_right_area_at_each_width(monkeypatch, width):
+    monkeypatch.setattr("capsule_native.system_high_contrast_enabled", lambda: False)
+    monkeypatch.setattr("capsule_native.system_animations_enabled", lambda: False)
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.resize(400, 48)
+        view.state.show_label("streaming", "你好")
+        view._width = width
+        view.show()
+        app.processEvents()
+        frame = view.grab().toImage()
+        xs = [x for x in range(400) if any(frame.pixelColor(x, y).lightness() > 200 for y in range(14, 34))]
+        assert xs
+        assert abs((min(xs) + max(xs)) / 2 - 213) <= 7
     finally:
         view.close()
