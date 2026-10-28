@@ -1,13 +1,25 @@
-# VoiceFlow 0.3.11 validation handoff — 2026-10-28
+# VoiceFlow 0.3.11 release and handoff — 2026-10-28
 
-Status: **not released**. The current installed candidate is build 261028.3, source commit `dfde0e2` (full commit recorded in its build provenance). The offline installer SHA-256 is `0b200ecb27eead9adba33cc63f53a0360aef497044a5c690bda73e5ca72b241a`. A public Release or website update must not be inferred from this candidate.
+## Current delivery
 
-The speech indicator is anchored to the left edge; short text is centered within the region to its right as the capsule changes width. Width targets now track text continuously and animation follows successive targets. Prior user feedback noted excessive right space and uneven expansion; the user confirmed the final build looks good and is usable. This confirmation does not establish each required scripted recording and screenshot on the final artifact.
+Windows **0.3.11 / build 261028.3** is published as [v0.3.11](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.11). Frozen source commit `dfde0e2bce61f6627acf3e0ef2da4f188245bf6f`; later documentation and website commits do not change the installed executable. Installer SHA-256 `0b200ecb27eead9adba33cc63f53a0360aef497044a5c690bda73e5ca72b241a`, 306756611 bytes. Installed program files (493), seven models and seven protected data files were hash-verified before application start.
 
-The release verifier passed with 862 tests. Native Chinese text renders at four capsule widths were captured locally. The installed payload (493 files), seven model files and seven protected data files matched before application start. The same installer was uploaded as draft `v0.3.11-candidate.1.6`, and isolated Windows workflow run 40646034963 passed: the same installer was checked for fresh install, 0.3.10 upgrade, and retained data after uninstall.
+[Website](https://qinxujunai.github.io/VoiceFlow/) deployment [40649233063](https://github.com/qinxujunai/VoiceFlow/actions/runs/40649233063) succeeded; the live page shows 0.3.11, the revised Chinese copy, and points to the exact public installer. Anonymous full download SHA-256 matches the installed candidate. Website metadata, source and installed build remain separate states; recheck them before future releases.
 
-Do not publish until the exact artifact has passed required human speech and visual acceptance, isolated Windows installation/upgrade/uninstall, and complete artifact-bound license review/sign-off and all other release gates. The earlier 261028.1 candidate is superseded; its isolated run failed because its checksum asset was absent. The 261027.3 candidate passed its isolated workflow but is also superseded. Preserve these results.
+## Changes and verification
 
-Local-only evidence is under `E:/01_Projects/AI_core/release-evidence-20261027/`. The most recent pre-install user-data backup is `voice-data-before-right-center-upgrade.zip` in that directory. It contains private data; do not upload it. User speech content is not recorded here. The prior local state is preserved on branch `backup/local-20261027`; earlier installer candidates are retained in the local evidence directory.
+Silent dictation cancels without leaving an error; real capture failure retains its separate recovery path. The waveform stays anchored to the capsule's left edge, text is centered within the right-hand area, and width adjusts smoothly as text grows. The user confirmed the final installed layout and usability. Chinese text render captures at four widths are retained locally. The full `scripts/verify.py --release` passed with **862 tests**; site language/motion checks passed (3). The [exact-installer Windows run 40646034963](https://github.com/qinxujunai/VoiceFlow/actions/runs/40646034963) passed fresh installation, 0.3.10 upgrade, uninstall, and user-data retention. Hosted Windows has development tools; it is not a pristine consumer machine.
 
-User testing of the installed final build recorded a 44.964-second run with `segments_plus_tail` and a 14.292-second run with `speculative_full`; the user confirmed the interface was acceptable. Do not infer from this that all three scripted acceptance cases, their individual feedback, and screenshots were captured on this exact build. Earlier testing was performed on superseded builds.
+User testing on the final build included a 44.964-second run (`segments_plus_tail`) and a 14.292-second run (`speculative_full`). The user accepted the result and explicitly directed release without further repeated testing. Separate screenshots and individually recorded feedback for all three originally requested utterances were not captured; no such evidence is implied. Programmatic capsule images are not natural-speech screenshots.
+
+The prior same-machine synthetic stop-to-paste P95 measurements were 323.766 / 288.492 / 386.296 ms versus historical 426.809 / 454.219 / 541.246 ms for 0–10 s / 10–60 s / 120 s. They predate the final UI build and are not a new exact-build measurement or an accuracy claim.
+
+## Artifact review and limitations
+
+[Dependency review](../licenses/release-review-0.3.11.md), [sign-off](../release/v0.3.11/RELEASE_SIGNOFF.json), SBOM, provenance, notices, checksums, five matching LGPL source archives, build inputs and a sanitized verification bundle accompany the public release. Exact-build Qt Python, Qt native-resource and pynput replacement tests passed; 87 PE files and 758 imports had zero missing. The installer is unsigned; no public macOS artifact or comparative accuracy improvement is claimed.
+
+An earlier candidate lacking models was labeled invalid and its workflow canceled. The following candidate's isolated job failed because its checksum asset was absent; the final candidate had a valid checksum and passed. Preserve these historical failures, not as current delivery failures.
+
+## Local recovery
+
+Original local changes are preserved on branch `backup/local-20261027`; prior candidates and evidence are under `E:/01_Projects/AI_core/release-evidence-20261027/`. `voice-data-before-right-center-upgrade.zip` is the latest pre-install user-data backup and contains private data; do not publish it. The former local `master` preserves superseded trial commits; use fetched `origin/master` as the authority.
