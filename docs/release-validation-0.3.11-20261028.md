@@ -24,4 +24,4 @@ An earlier candidate lacking models was labeled invalid and its workflow cancele
 
 ## Local recovery
 
-Original local changes are preserved on branch `backup/local-20261027`; prior candidates and evidence are under `E:/01_Projects/AI_core/release-evidence-20261027/`. `voice-data-before-right-center-upgrade.zip` is the latest pre-install user-data backup and contains private data; do not publish it. The former local `master` preserves superseded trial commits; use fetched `origin/master` as the authority.
+Original local changes are preserved on branch `backup/local-20261027`; prior candidates and evidence are under `E:/01_Projects/AI_core/release-evidence-20261027/`. `voice-data-before-right-center-upgrade.zip` is the latest pre-install user-data backup and contains private data; do not publish it. Superseded local trial commits are preserved on `backup/local-master-20261028-pre-cloud`; local `master` tracks the fetched `origin/master`.
