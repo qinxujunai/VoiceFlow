@@ -1,11 +1,11 @@
 # VoiceFlow documentation / 文档索引
 
-> Documentation sync: **2026-10-22**. This index separates current guidance from historical evidence. 原始决策、测试和发布时间保持不变；整理日期不代表重新测试。
+> Documentation sync: **2026-10-28**. This index separates current guidance from historical evidence. 原始决策、测试和发布时间保持不变；整理日期不代表重新测试。
 
 ## 后续智能体从这里开始
 
 1. 先读 [AGENTS.md](../AGENTS.md) 和 [产品/架构设计](../DESIGN.md)，再读对应模块的现行契约。
-2. 当前已核对的公开 Windows 版本为 **0.3.10 / build 261022.1 / PE 0.3.10.1**。先看 [发布与本机验收](release-validation-0.3.10.md)、[精确安装包签署](../release/v0.3.10/RELEASE_SIGNOFF.json) 和 [Release 附件](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.10)。版本状态会变化，执行前重新核对。
+2. 当前已核对的公开 Windows 版本为 **0.3.11 / build 261028.3 / PE 0.3.11.1**。先看 [发布与本机验收](release-validation-0.3.11-20261028.md)、[精确安装包签署](../release/v0.3.11/RELEASE_SIGNOFF.json) 和 [Release 附件](https://github.com/qinxujunai/VoiceFlow/releases/tag/v0.3.11)。版本状态会变化，执行前重新核对。
 3. 日常行为以源码和实际运行进程为准；发布身份以版本标签、安装包哈希和安装后 EXE 为准。仓库文档更新不会自动改变已安装程序。
 4. 历史文档中的“当前”“候选”“未完成”仅指原记录时点；不要拿旧候选的许可阻断或旧测试数字代替最新签署。历史性能不代表本次重新测量，也不能证明自然语音准确率提升。
 5. 保持离线优先、忠实整理、独立预览与终稿、剪贴板/历史恢复、一个保存事务和关闭设置继续驻留托盘。不要恢复滚动窗口重识别、隐藏猜词替换或用户端模型选择器。

@@ -1,6 +1,6 @@
 # AGENTS.md -- VoiceFlow
 
-> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
+> Documentation sync: **2026-10-28** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
 
 Start documentation work at `docs/README.md`. It separates current contracts,
 dated release verification, superseded designs and archived measurements.
@@ -30,14 +30,22 @@ to swap engines without the quality gates below.
 
 ## Known Issues And Owner-Only Steps
 
-- Windows 0.3.10/build 261022.1 is released with the exact installer sign-off,
-  corresponding LGPL sources and installed-machine verification. See
-  `docs/release-validation-0.3.10.md`. Future artifacts still require their own
-  sign-off; this release does not approve different dependency or installer bytes.
+- Windows 0.3.11/build 261028.3 is published with artifact-bound sign-off, LGPL
+  sources, installed-machine and isolated Windows verification. See
+  `docs/release-validation-0.3.11-20261028.md`. Future artifacts require their
+  own review; this sign-off does not approve different dependency or installer bytes.
 - Unsigned installer; Windows 10/11 only; no public accuracy figures until enough authorized
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-10-28, Codex**: published Windows 0.3.11 from frozen `dfde0e2`; exact
+  installer SHA-256 `0b200ecb27eead9adba33cc63f53a0360aef497044a5c690bda73e5ca72b241a`.
+  Full suite 862 passed, exact candidate Windows fresh/upgrade/uninstall passed,
+  LGPL review and replacement checks completed, user accepted the installed UI,
+  and Pages plus anonymous exact download were verified. Individual recordings
+  and screenshots are not fully documented; user explicitly authorized release
+  without repeating them. Details and rollback: `docs/release-validation-0.3.11-20261028.md`.
 
 - **2026-10-26, Claude**: CI was red since `01befe5` (my 2026-10-25 lock bump): anyio 4.15.1 needs
   typing_extensions >= 4.16.0 on Python < 3.15, and the Windows lock pinned 4.15.0 (I had checked with pip on 3.13 only).
