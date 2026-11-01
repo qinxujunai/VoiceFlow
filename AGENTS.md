@@ -1,6 +1,6 @@
 # AGENTS.md -- VoiceFlow
 
-**One committer only (owner's rule, 2026-11-02, every repository, every future commit)**: author and committer are both `qinxujunai <266454737+qinxujunai@users.noreply.github.com>` — for agents (Claude, Codex, …), scheduled workflows (never `github-actions[bot]`) and merges alike. No `Co-Authored-By`, `Claude-Session` or any tool attribution in messages. Do not merge in the GitHub web UI (it makes GitHub the committer); merge locally and push.
+**One committer only (owner's rule, 2026-11-02, every repository, every future commit)**: author and committer are both `qinxujunai <266454737+qinxujunai@users.noreply.github.com>` — for agents (Claude, Codex, …), scheduled workflows (never `github-actions[bot]`) and merges alike. No `Co-Authored-By`, `Claude-Session` or any tool attribution in messages. Do not merge in the GitHub web UI (it makes GitHub the committer); merge locally and push. On 2026-11-02 the whole history was rewritten to this one identity (file contents unchanged); old commit IDs quoted in docs map to new ones in `docs/commit-map-2026-11-02.txt`. Version tags still point at the pre-rewrite commits (same contents) because the cloud session cannot push tags.
 
 > Documentation sync: **2026-10-28** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
 
