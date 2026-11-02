@@ -1,6 +1,6 @@
 # AGENTS.md -- VoiceFlow
 
-**One committer only (owner's rule, 2026-11-02, every repository, every future commit)**: author and committer are both `qinxujunai <266454737+qinxujunai@users.noreply.github.com>` — for agents (Claude, Codex, …), scheduled workflows (never `github-actions[bot]`) and merges alike. No `Co-Authored-By`, `Claude-Session` or any tool attribution in messages. Do not merge in the GitHub web UI (it makes GitHub the committer); merge locally and push. On 2026-11-02 the whole history was rewritten to this one identity (file contents unchanged); old commit IDs quoted in docs map to new ones in `docs/commit-map-2026-11-02.txt`. Version tags still point at the pre-rewrite commits (same contents) because the cloud session cannot push tags.
+**One committer only (owner's rule, 2026-11-02, every repository, every future commit)**: author and committer are both `qinxujunai <266454737+qinxujunai@users.noreply.github.com>` — for agents (Claude, Codex, …), scheduled workflows (never `github-actions[bot]`) and merges alike. No `Co-Authored-By`, `Claude-Session` or any tool attribution in messages. Do not merge in the GitHub web UI (it makes GitHub the committer); merge locally and push. On 2026-11-02 the whole history was rewritten to this one identity (file contents unchanged); old commit IDs quoted in docs map to new ones in `docs/commit-map-2026-11-02.txt`. On the same day the version tags were moved to the rewritten commits (same names; annotated tags keep their messages and dates, tagger qinxujunai); Releases and their assets are unchanged.
 
 > Documentation sync: **2026-10-28** · Current contract / guide. Synchronization date is not a new test date. [Current index](docs/README.md).
 
@@ -40,6 +40,17 @@ to swap engines without the quality gates below.
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-11-02, Claude**: with the owner's approval, moved all 17 version tags to
+  their rewritten commits (identical trees; e.g. `v0.3.11` -> `4bf5d84`). The 9
+  annotated tags were recreated with their original messages and dates, tagger
+  qinxujunai. One atomic push; each tag was updated only if GitHub still held its
+  old value (`--force-with-lease`). Also updated line 3 of this file and the first
+  line of `docs/commit-map-2026-11-02.txt`. Verified: `git ls-remote --tags origin`
+  peels every tag to its mapped new commit; all 22 Releases kept the same name,
+  tag, draft state, publish date, notes length and asset count (90 assets).
+  Rollback: the old tag values are kept as local refs
+  `refs/backup/tags-before-move-20261102/*` in the owner's clone (not pushed).
 
 - **2026-10-28, Codex**: published Windows 0.3.11 from frozen `dfde0e2`; exact
   installer SHA-256 `0b200ecb27eead9adba33cc63f53a0360aef497044a5c690bda73e5ca72b241a`.
