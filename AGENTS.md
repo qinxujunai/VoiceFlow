@@ -36,14 +36,39 @@ to swap engines without the quality gates below.
 
 ## Known Issues And Owner-Only Steps
 
-- Windows 0.3.11/build 261028.3 is published with artifact-bound sign-off, LGPL
-  sources, installed-machine and isolated Windows verification. See
-  `docs/release-validation-0.3.11-20261028.md`. Future artifacts require their
-  own review; this sign-off does not approve different dependency or installer bytes.
+- Windows 0.3.12/build 261103.1 is published with artifact-bound sign-off, LGPL
+  sources and isolated Windows verification; the owner directed publication without
+  hand-testing the installed build. See `docs/release-validation-0.3.12.md`. Future
+  artifacts require their own review; this sign-off does not approve different
+  dependency or installer bytes.
+- Build only from a virtual environment installed from `requirements.lock` (compare
+  `pip freeze` with the lock first): on 2026-11-03 the venv recreated on 2026-11-02 had
+  drifted in 15 packages and a first 0.3.12 build packaged cffi 2.1.1.
 - Unsigned installer; Windows 10/11 only; no public accuracy figures until enough authorized
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-11-03, Claude**: published Windows 0.3.12 / build 261103.1 from frozen `fb1312c`
+  (release materials and site copy `d286a8a`); installer SHA-256
+  `9495f143a7c4f5da0c43d962d34d70658e35cb9f3756112019af853efa343b27`, 306907346 bytes.
+  An independent review of `706d409..d4f4f59` found sound-alike matching rewriting ordinary
+  English, problem notices hidden after a sent paste, a dropped hold release leaving the
+  microphone on and split terms crossing line breaks; fixed with failing-then-passing tests,
+  then Codex's additions above. The repo venv had drifted from `requirements.lock` in 15
+  packages; the first build (cffi 2.1.1) was discarded, the lock reinstalled and the app
+  rebuilt. Verified: `scripts/verify.py --release` 926 tests; only the EXE differs among 87 PE
+  files versus signed 0.3.11; 87 PE / 758 imports resolved; Qt Python, Qt native and pynput
+  replacement probes; LGPL bundle unchanged; exact-installer isolated run 41617554295 (fresh,
+  0.3.11 upgrade, uninstall with data retained); `check_release_compliance.py`; eleven Release
+  digests and an anonymous download; tag rebuild 41621550448 canceled; Pages 41621567304
+  live with 0.3.12 and the hold-to-talk FAQ. Not done: the owner's installed copy at
+  `D:\Apps\VoiceFlow` stays 0.3.11; the personal site and job site still describe hold to talk
+  as a development build (copy-locked, owner to decide). Follow-ups: a press held while the
+  previous dictation finishes starts nothing and shows nothing; Right Ctrl held plus Esc opens
+  Start; home text says hold to talk in taps-only mode; accidental holds leave recoverable
+  recordings; CI installers include staged models twice. Details:
+  `docs/release-validation-0.3.12.md`.
 
 - **2026-11-03, Codex**: continued the staged 0.3.12 review fixes without discarding Claude's changes. Independent review reproduced a release-during-key-validation race; added ordered press reservations and regressions for that race, duplicate release and callback failure. History now distinguishes confirmed paste from dispatched paste. Windows quality and release builds now include and verify the pinned punctuation model; the installed-candidate gate requires a live punctuation worker. Verified 926 tests on Windows, version consistency and model distribution decisions; independent review rechecked the changed paths. The owner reported short, paused 15 s and 30 s+ microphone tests were normal on the prior running source build; this does not establish acceptance of a later installer. The staged snapshot before this work is under `tests_runtime/handoff-20261103-codex/` (local only). Release, exact-artifact and CI outcomes must be recorded separately after verification.
 
