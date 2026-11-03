@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-11-03",
+  "app_version": "0.3.12",
+  "build_id": "261103.1",
+  "source_commit": "fb1312c64c7d63940fd6393feee433d82710c1b9",
+  "verification_workflow_commit": "fb1312c64c7d63940fd6393feee433d82710c1b9",
+  "source_inputs_sha256": "bc48f2268f6418e13310e0b241bf22efc28d83809e771d7b021e1701aa21fede",
+  "installer": {
+    "name": "VoiceFlow-0.3.12-Windows-x64.exe",
+    "bytes": 306907346,
+    "sha256": "9495f143a7c4f5da0c43d962d34d70658e35cb9f3756112019af853efa343b27",
+    "pe_identity": {
+      "file_version": "0.3.12.1",
+      "product_version": "0.3.12",
+      "text_file_version": "0.3.12+261103.1"
+    }
+  },
+  "application": {
+    "sha256": "b50024faed8660c2df4135f9ddd3f51e424861d32d0d0248ba62328bcdb92c81",
+    "pe_identity": {
+      "file_version": "0.3.12.1",
+      "product_version": "0.3.12+261103.1",
+      "text_file_version": "0.3.12.1"
+    }
+  },
+  "native_asr": {
+    "extension_sha256": "e9adfb09dd79d8ed341ba4534e91cd4580370d2166206472c3d27ce88390e588",
+    "onnxruntime_sha256": "756c938b0f2d14c45c7ad469c6429041d7e905ee6c6ad6049aa67ce937567e97"
+  },
+  "model_manifest_sha256": "3082ae7bd67a55382b3d99fbb6ed4f2a07fc8e9e17d10a76b94a31ffd5fe5049",
+  "license_review_record_sha256": "9eb4f77f4eab38241547c0fe3d2123c7e353e812e08e19bf2529d9e5c7350922",
+  "provenance_sha256": "061ad79a117fa38a87beffa619d28554d5cc3944e50ad0cd96901e9205b9e62b",
+  "sbom_sha256": "0488f83220594d98fb42cbcb59d07c5603f34f1bb7df375a74382d5e0c2732cf",
+  "notices_sha256": "19c3daf6d175ac29019bf3ae6400cc08135011643c6cba4a68a3987265f77038",
+  "lgpl_sources_sha256": "5137f59bab8df5002446cf2a8910b2105eb3eed6876574c09769857f7160e816",
+  "build_inputs_sha256": "9eb2da553159a0a7ee613894b6e2eec830fa2a25ff3b2efa3adc3f680243e3c9",
+  "verification_bundle_sha256": "d5a8dbc4df1b120bbcf6f6fa240438c49193e96eb846836997dc1caf5686d237",
+  "exact_installer_ci_url": "https://github.com/qinxujunai/VoiceFlow/actions/runs/41617554295",
+  "checks": {
+    "version": "0.3.12",
+    "build_id": "261103.1",
+    "source_commit": "fb1312c64c7d63940fd6393feee433d82710c1b9",
+    "installer_sha256": "9495f143a7c4f5da0c43d962d34d70658e35cb9f3756112019af853efa343b27",
+    "application_sha256": "b50024faed8660c2df4135f9ddd3f51e424861d32d0d0248ba62328bcdb92c81",
+    "local_tests_passed": 926,
+    "release_verify_passed": true,
+    "package_comparison": {
+      "baseline": "signed 0.3.11 provenance",
+      "package_files": 494,
+      "changed_native_or_exe": [
+        "VoiceFlow.exe"
+      ],
+      "unchanged_dll_pyd": 86,
+      "base_library_members_identical": 155,
+      "installer_models": 7,
+      "venv_restored_to_lock": "15 drifted packages reinstalled at their locked versions before the final build"
+    },
+    "isolated_windows": {
+      "tag": "v0.3.12-candidate.1.1",
+      "installed_upgrade_uninstall_passed": true,
+      "installer": "VoiceFlow-0.3.12-Windows-x64.exe",
+      "sha256": "9495f143a7c4f5da0c43d962d34d70658e35cb9f3756112019af853efa343b27",
+      "bytes": 306907346
+    },
+    "ci_url": "https://github.com/qinxujunai/VoiceFlow/actions/runs/41617554295",
+    "native_imports": {
+      "pe_files": 87,
+      "imports": 758,
+      "missing": 0
+    },
+    "replacement_tests": {
+      "qt-python": {
+        "passed": true,
+        "exe_sha256": "b50024faed8660c2df4135f9ddd3f51e424861d32d0d0248ba62328bcdb92c81",
+        "scope": "actual frozen workers import Qt Python library modules and run offscreen widget/timer in owned package copies; source replacement markers only; native DLL paths verified, no different DLL build substituted; not system accessibility, foreground UI or full license approval"
+      },
+      "qt-native": {
+        "passed": true,
+        "exe_sha256": "b50024faed8660c2df4135f9ddd3f51e424861d32d0d0248ba62328bcdb92c81",
+        "scope": "actual frozen baseline and version-resource-modified Qt Core library load in an owned copy with offscreen widget/timer; proves loading a changed native DLL, not a separately rebuilt ABI-compatible Qt, installed behavior or full LGPL compliance"
+      },
+      "pynput": {
+        "passed": true,
+        "exe_sha256": "b50024faed8660c2df4135f9ddd3f51e424861d32d0d0248ba62328bcdb92c81",
+        "scope": "actual frozen workers import library modules in owned package copies; source replacement marker only; no input listeners, UI, microphone or clipboard; not installed-product hotkey acceptance or full license review"
+      }
+    },
+    "human_acceptance": "Owner dictated with a real microphone on an earlier 0.3.12 development source build (short, paused 15 s and 30 s+ recordings) and directed publication without hand-testing the installed build. No human acceptance of this exact installer is claimed.",
+    "limits": [
+      "Owner-directed publication without installed-build hand testing; do not claim human acceptance of this installer.",
+      "Hosted Windows runner contains development tools, not a pristine consumer machine.",
+      "Unsigned Windows installer.",
+      "Natural speech holdout and comparative accuracy not established."
+    ]
+  },
+  "limits": [
+    "Owner-directed publication without installed-build hand testing; do not claim human acceptance of this installer.",
+    "Hosted Windows runner contains development tools, not a pristine consumer machine.",
+    "Unsigned Windows installer.",
+    "Natural speech holdout and comparative accuracy not established."
+  ]
+}
