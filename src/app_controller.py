@@ -111,6 +111,9 @@ class AppController:
             "restore_history": on_restore_history,
         }
         self._action_in_flight = False
+        self._action_name = None
+        self._action_triggered_at = None
+        self._pending_record_release = None
         self._action_queue: queue.Queue = queue.Queue(maxsize=1)
         self._action_worker = threading.Thread(
             target=self._run_actions,
@@ -216,10 +219,17 @@ class AppController:
         return self._enqueue(
             "record_toggle",
             lambda: self._call("record", triggered_at),
+            triggered_at=triggered_at,
         )
 
     def release_recording(self, pressed_at, released_at, *, wait_s=2.0) -> ActionResult:
         """Hold to talk released. Runs after a start still in flight instead of answering 请稍候."""
+        with self._lock:
+            if self._action_in_flight and self._action_name == "record_toggle":
+                if pressed_at != self._action_triggered_at:
+                    return ActionResult(False, "", "not_recording")
+                self._pending_record_release = (pressed_at, released_at)
+                return ActionResult(True, "", "")
         deadline = time.perf_counter() + wait_s
         while True:
             with self._lock:
@@ -356,16 +366,20 @@ class AppController:
         self._emit_status(message)
         return ActionResult(False, message, code)
 
-    def _enqueue(self, name: str, callback: Callable) -> ActionResult:
+    def _enqueue(self, name: str, callback: Callable, *, triggered_at=None) -> ActionResult:
         with self._lock:
             if self._action_in_flight:
                 return self._reject("稍等一下", "action_busy", name)
             self._action_in_flight = True
+            self._action_name = name
+            self._action_triggered_at = triggered_at
         try:
             self._action_queue.put_nowait((name, callback))
         except queue.Full:
             with self._lock:
                 self._action_in_flight = False
+                self._action_name = None
+                self._action_triggered_at = None
             return self._reject("稍等一下", "action_busy", name)
         return ActionResult(True, "", "")
 
@@ -395,8 +409,20 @@ class AppController:
                         },
                     )
             finally:
-                with self._lock:
-                    self._action_in_flight = False
+                while True:
+                    with self._lock:
+                        pending = self._pending_record_release
+                        self._pending_record_release = None
+                        if pending is None:
+                            self._action_in_flight = False
+                            self._action_name = None
+                            self._action_triggered_at = None
+                            break
+                    try:
+                        self._call("record_release", *pending)
+                    except Exception:
+                        logger.exception("action_failed action=record_release")
+                        self._emit_status("没有完成，再试一次")
                 self._action_queue.task_done()
 
     def _call(self, name: str, *args):

@@ -123,7 +123,8 @@ def test_dispatched_paste_fades_silently_like_a_confirmed_insertion():
             view.present("delivery", [status, generation])
             assert view._dismiss_at is not None
             assert view.state.text == "终稿"
-            assert view.accessibleName() == "文字已输入"
+            expected = "文字已输入" if status == "landed_confirmed" else "文字已复制，已尝试粘贴"
+            assert view.accessibleName() == expected
     finally:
         view.close()
 

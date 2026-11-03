@@ -45,6 +45,8 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-11-03, Codex**: fixed a slow-start hold-release race and a second-key interference case; silent delivery accessibility now distinguishes a dispatched paste from confirmed insertion. The product-site demo no longer fades short preview text; current download and development-build descriptions are explicitly separated. Independent review reproduced both races and verified the second fix in an in-memory simulation. Real microphone and installed-build checks remain necessary before a 0.3.12 release. Changes are in this commit; see the Git history and test results for verification.
+
 - **2026-11-03, Claude**: owner-approved polish (this commit). Silent finish for a sent paste, a
   quiet start and cancel, shorter copy without 「请」; hold to talk plus tap, with 设置 → 按键方式;
   seam punctuation in long and mixed Chinese-English dictation; split and sound-alike dictionary

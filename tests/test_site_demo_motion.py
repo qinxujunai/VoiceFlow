@@ -70,3 +70,10 @@ def test_demo_has_no_replay_control():
     site = Path(__file__).resolve().parents[1] / "site"
     assert 'id="demo-replay"' not in (site / "index.html").read_text(encoding="utf-8")
     assert "demoReplay" not in (site / "app.js").read_text(encoding="utf-8")
+
+
+def test_short_demo_transcript_is_not_faded():
+    css = (Path(__file__).resolve().parents[1] / "site/styles.css").read_text(encoding="utf-8")
+    import re
+    rule = re.search(r"#demo-transcript\{([^}]*)\}", css).group(1)
+    assert "mask-image" not in rule

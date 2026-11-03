@@ -167,3 +167,47 @@ def test_release_stops_only_the_recording_that_press_started():
     system._recording_state.current = RecordingState.IDLE
     system._on_record_release(5.0, 5.9)
     assert stops == [5.6]
+
+
+def test_release_during_slow_start_is_not_lost():
+    from app_controller import AppController
+
+    started, finish = threading.Event(), threading.Event()
+    calls = []
+
+    def record(triggered_at):
+        started.set()
+        finish.wait(2)
+        controller.mark_recording()
+
+    controller = AppController(on_record_toggle=record,
+        on_record_release=lambda pressed, released: calls.append((pressed, released)))
+    controller.mark_ready()
+    assert controller.toggle_recording(1.0).accepted
+    assert started.wait(1)
+    controller.release_recording(1.0, 1.5, wait_s=0.02)
+    finish.set()
+    assert _wait_until(lambda: calls == [(1.0, 1.5)])
+
+
+def test_other_key_release_cannot_replace_the_starting_key():
+    from app_controller import AppController
+
+    started, finish = threading.Event(), threading.Event()
+    calls = []
+
+    def record(triggered_at):
+        started.set()
+        finish.wait(2)
+        controller.mark_recording()
+
+    controller = AppController(on_record_toggle=record,
+        on_record_release=lambda pressed, released: calls.append((pressed, released)))
+    controller.mark_ready()
+    assert controller.toggle_recording(1.0).accepted
+    assert started.wait(1)
+    controller.release_recording(1.0, 1.5, wait_s=0.02)
+    controller.release_recording(2.0, 2.5, wait_s=0.02)
+    finish.set()
+    assert _wait_until(lambda: bool(calls))
+    assert calls == [(1.0, 1.5)]

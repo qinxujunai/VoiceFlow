@@ -241,7 +241,7 @@ class NativeCapsuleView(QWidget):
                 self._dismiss_at = None
                 if status in SILENT_DELIVERY_STATUSES:
                     self._dismiss_at = now
-                    announcement = "文字已输入"
+                    announcement = "文字已输入" if status == "landed_confirmed" else "文字已复制，已尝试粘贴"
                 elif status == "recovery_saved_clipboard_unavailable":
                     self.state.show_label("recovery", "已保存在最近转录")
                     announcement = "文字已保存，可在最近转录中复制"
