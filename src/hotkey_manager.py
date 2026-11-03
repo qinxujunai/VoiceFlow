@@ -1,5 +1,7 @@
 """
-快捷键：F2 / 鼠标侧键 / 右 Ctrl 切换录音（按一下开始，再按一下停止），Esc 取消。
+快捷键：F2 / 鼠标侧键 / 右 Ctrl。按住说话、松开结束；或者轻按开始、再按一下结束。Esc 取消。
+
+trigger_mode: auto（默认，按住超过 HOLD_TO_TALK_S 松开即结束，轻按则切换）或 toggle（只用轻按切换）。
 """
 
 import os
@@ -13,6 +15,9 @@ from pynput import keyboard as pynput_keyboard
 
 
 class HotkeyManager:
+    # A press held this long is hold-to-talk: releasing it stops the recording it started.
+    HOLD_TO_TALK_S = 0.3
+    TRIGGER_MODES = ("auto", "toggle")
 
     def __init__(self, config_path=None, callbacks=None, platform_name=None):
         if config_path is None:
@@ -30,11 +35,16 @@ class HotkeyManager:
             self.ptt_keys = [ptt_raw.lower().strip()]
         self.ptt_key = self.ptt_keys[0]  # primary key for display
         self.cancel_key = hk_cfg.get("cancel", "escape").lower().strip()
+        self.trigger_mode = "auto"
+        self.set_trigger_mode(hk_cfg.get("trigger_mode", "auto"))
+        self.hold_to_talk_s = self.HOLD_TO_TALK_S
 
         self.callbacks = callbacks or {}
         self.platform_name = platform_name or sys.platform
         self._lock = threading.Lock()
         self._pressed_triggers = set()
+        # source -> perf_counter of a press that started a recording (hold-to-talk candidates)
+        self._start_presses = {}
         self._accepting_intents = True
         # Keep at most one tap waiting behind the callback that is currently
         # changing recording state. A long finalization must never replay a
@@ -70,9 +80,15 @@ class HotkeyManager:
         self._handle_trigger(source, pressed=True)
         self._handle_trigger(source, pressed=False)
 
+    def set_trigger_mode(self, mode):
+        mode = str(mode or "auto").lower().strip()
+        self.trigger_mode = mode if mode in self.TRIGGER_MODES else "auto"
+
     def _handle_trigger(self, source, pressed):
         """Accept physical key edges while rejecting only held-key repeats."""
         source = str(source).lower().strip()
+        now = time.perf_counter()
+        pressed_at = None
         with self._lock:
             if not self._accepting_intents:
                 return False
@@ -82,28 +98,48 @@ class HotkeyManager:
                 self._pressed_triggers.add(source)
             else:
                 self._pressed_triggers.discard(source)
+                pressed_at = self._start_presses.pop(source, None)
+                if (pressed_at is None or self.trigger_mode != "auto"
+                        or now - pressed_at < self.hold_to_talk_s):
+                    return False
+        if not pressed:
+            # Hold to talk: this release stops the recording that its press started.
+            try:
+                self._intent_queue.put_nowait(("release", pressed_at, now))
+            except queue.Full:
                 return False
+            return True
         can_toggle = self.callbacks.get("can_record_toggle")
         if can_toggle and not can_toggle():
             return False
+        is_recording = self.callbacks.get("is_recording")
+        starts_recording = not (is_recording and is_recording())
         try:
-            self._intent_queue.put_nowait(time.perf_counter())
+            self._intent_queue.put_nowait(("toggle", now))
         except queue.Full:
             return False
+        if starts_recording:
+            with self._lock:
+                self._start_presses[source] = now
         return True
 
     def _dispatch_intents(self):
         while True:
-            triggered_at = self._intent_queue.get()
+            intent = self._intent_queue.get()
             try:
-                if triggered_at is None:
+                if intent is None:
                     return
+                if intent[0] == "release":
+                    callback = self.callbacks.get("on_record_release")
+                    if callback:
+                        callback(intent[1], intent[2])
+                    continue
                 can_toggle = self.callbacks.get("can_record_toggle")
                 if can_toggle and not can_toggle():
                     continue
                 callback = self.callbacks.get("on_record_toggle")
                 if callback:
-                    callback(triggered_at)
+                    callback(intent[1])
             finally:
                 self._intent_queue.task_done()
 

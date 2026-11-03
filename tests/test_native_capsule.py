@@ -110,7 +110,25 @@ def test_new_recording_cancels_previous_width_and_level_animation():
     view.close()
 
 
-def test_dispatched_paste_retains_truthful_fallback_until_insertion_is_confirmed():
+def test_dispatched_paste_fades_silently_like_a_confirmed_insertion():
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        for generation, status in enumerate(("clipboard_verified_paste_dispatched", "landed_confirmed"), 1):
+            view.present("prepare_recording", [generation])
+            view.present("final", ["终稿", generation])
+            view.present("delivery", [status, generation])
+            assert view._dismiss_at is not None
+            assert view.state.text == "终稿"
+            assert view.accessibleName() == "文字已输入"
+    finally:
+        view.close()
+
+
+def test_only_a_paste_that_could_not_be_sent_says_how_to_paste():
     from capsule_native import NativeCapsuleView
     from qt_compat import QApplication
 
@@ -119,14 +137,25 @@ def test_dispatched_paste_retains_truthful_fallback_until_insertion_is_confirmed
     try:
         view.present("prepare_recording", [1])
         view.present("final", ["终稿", 1])
-        view.present("delivery", ["clipboard_verified_paste_dispatched", 1])
+        view.present("delivery", ["clipboard_verified_only", 1])
         assert view._dismiss_at is None
-        assert view.state.text == "已复制到剪贴板"
-        assert "未出现" in view.accessibleName()
-        view.present("final", ["终稿", 1])
-        view.present("delivery", ["landed_confirmed", 1])
+        assert view.state.text == "已复制，按 Ctrl+V 粘贴"
+        assert "Ctrl+V" in view.accessibleName()
+    finally:
+        view.close()
+
+
+def test_dismiss_fades_out_without_a_label():
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.present("prepare_recording", [1])
+        view.present("dismiss", [])
         assert view._dismiss_at is not None
-        assert view.accessibleName() == "文字已输入"
+        assert view.state.text == ""
     finally:
         view.close()
 

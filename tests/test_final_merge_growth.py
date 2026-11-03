@@ -30,7 +30,8 @@ def original_merge(left, right):
     right_chars, ends = normalized(right)
     for size in range(min(len(left_chars), len(right_chars), 80), 1, -1):
         if left_chars[-size:] == right_chars[:size]:
-            return left + right[ends[size - 1]:]
+            # 2026-11-03: the junction takes the right piece's punctuation, not the left piece's own end stop.
+            return left.rstrip("，。！？；：、,.!?;: ") + right[ends[size - 1]:]
     return f"{left} {right}"
 
 

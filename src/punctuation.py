@@ -74,6 +74,48 @@ def lexical_skeleton(text: str) -> str:
     )
 
 
+_UNIT_RE = re.compile(r"[A-Za-z0-9]+(?:['’_-][A-Za-z0-9]+)*|[^\s，。！？；：、,.!?;:]")
+_CJK_RE = re.compile(r"[㐀-鿿豈-﫿]")
+
+
+def _units_and_gaps(text: str):
+    units, gaps, end = [], [], 0
+    for match in _UNIT_RE.finditer(text):
+        gaps.append(text[end:match.start()])
+        units.append(match.group())
+        end = match.end()
+    gaps.append(text[end:])
+    return units, gaps
+
+
+def _merge_punctuation(source: str, candidate: str) -> str | None:
+    """Rebuilt punctuation where Chinese is involved; the recognizer's own between two Latin words.
+
+    Words, digits, case and spacing always come from the source. Returns None when the two texts do
+    not hold the same words in the same order.
+    """
+    units, source_gaps = _units_and_gaps(source)
+    candidate_units, candidate_gaps = _units_and_gaps(candidate)
+    if [unit.casefold() for unit in units] != [unit.casefold() for unit in candidate_units]:
+        return None
+    pieces = [source_gaps[0]]
+    for index, unit in enumerate(units):
+        pieces.append(unit)
+        following = units[index + 1] if index + 1 < len(units) else ""
+        source_gap = source_gaps[index + 1]
+        if not (_CJK_RE.fullmatch(unit) or _CJK_RE.fullmatch(following)):
+            pieces.append(source_gap)
+            continue
+        marks = "".join(character for character in candidate_gaps[index + 1] if not character.isspace())
+        if not marks:
+            pieces.append("".join(character for character in source_gap if character.isspace()))
+        elif marks[-1] in ",.!?;:" and following and not _CJK_RE.fullmatch(following):
+            pieces.append(marks + " ")
+        else:
+            pieces.append(marks)
+    return "".join(pieces).strip()
+
+
 class FinalPunctuationRestorer:
     """Accept punctuation only when every lexical character is preserved."""
 
@@ -90,7 +132,13 @@ class FinalPunctuationRestorer:
             candidate = str(self.backend(source) or "").strip()
         except Exception:
             return source
-        if (lexical_skeleton(candidate) != lexical_skeleton(source)
-                or _LATIN_WORD_RE.findall(candidate) != _LATIN_WORD_RE.findall(source)):
+        if (lexical_skeleton(candidate).casefold() != lexical_skeleton(source).casefold()
+                or [word.casefold() for word in _LATIN_WORD_RE.findall(candidate)]
+                != [word.casefold() for word in _LATIN_WORD_RE.findall(source)]):
             return source
-        return candidate or source
+        # The model also re-cases and re-punctuates English, where it is unreliable: keep it only
+        # where Chinese is involved (2026-11-03, mixed dictation kept seam full stops otherwise).
+        merged = _merge_punctuation(source, candidate)
+        if not merged or lexical_skeleton(merged) != lexical_skeleton(source):
+            return source
+        return merged

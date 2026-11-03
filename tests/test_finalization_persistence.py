@@ -163,7 +163,7 @@ def test_partial_final_is_identified_and_original_pcm_remains_recoverable(tmp_pa
 
     assert observed["clipboard"] == text
     assert [entry.session_id for entry in recovery.list_recoverable()] == [session_id]
-    assert observed["errors"] and "部分文字" in observed["errors"][-1]
+    assert observed["errors"] and "一部分" in observed["errors"][-1]
     assert "设置" in observed["errors"][-1]
     assert system.history.read_recent(1)[0]["coverage_ok"] is False
 
@@ -181,7 +181,7 @@ def test_no_recognized_text_preserves_actual_pcm_and_explains_recovery(tmp_path)
 
     assert [entry.session_id for entry in recovery.list_recoverable()] == [session_id]
     assert observed["clipboard"] == ""
-    assert observed["errors"] and "没有识别到文字" in observed["errors"][-1]
+    assert observed["errors"] and "没听清" in observed["errors"][-1]
     assert "设置" in observed["errors"][-1]
 
 
@@ -290,7 +290,7 @@ def test_history_failure_is_contained_and_keeps_clipboard_ledger_and_pcm(
     assert pending.is_file()
     assert np.array_equal(recovery.read_pcm(session_id), pcm)
     messages = "\n".join(observed["errors"])
-    assert "历史" in messages and "未保存" in messages
+    assert "历史" in messages and "没存上" in messages
     assert "已复制" in messages or "剪贴板" in messages
     assert "录音已完整保存" not in messages
 
@@ -363,7 +363,7 @@ def test_silent_recording_stops_as_canceled_without_discarding_recovery(tmp_path
     system._on_record_stop()
     assert observed["states"] == ["canceled"]
     assert not observed["errors"]
-    assert observed["hide_delays"] == [800]
+    assert observed["hide_delays"] == [140]
     assert [entry.session_id for entry in recovery.list_recoverable()] == [session_id]
     assert not observed["clipboard"]
 

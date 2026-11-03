@@ -120,5 +120,5 @@ def test_unreadable_recovery_at_startup_does_not_blame_working_hotkeys(monkeypat
     system._on_overlay_ready()
 
     assert len(errors) == 1
-    assert "录音" in errors[0] and "读取" in errors[0]
+    assert "录音" in errors[0] and "读不出来" in errors[0]
     assert "快捷键" not in errors[0]

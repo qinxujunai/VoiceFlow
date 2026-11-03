@@ -24,6 +24,11 @@ from settings_store import is_autostart_enabled
 from runtime_services import ModelState
 from platform_utils import trigger_summary
 from punctuation import SENTENCE_END_CHOICES, apply_sentence_end
+
+TRIGGER_MODE_CHOICES = (
+    ("按住说话，或轻按开关", "auto"),
+    ("只用轻按开关", "toggle"),
+)
 from dictation_preferences import application_preserves_format, normalize_app_id, PreferencesChangedError
 
 logger = logging.getLogger("voiceflow.ui")
@@ -44,7 +49,7 @@ class PreferencesMixin:
         self.home_ready_title.setWordWrap(True)
         self.home_ready_title.setObjectName("commandTitle")
         self.home_ready_subtitle = QLabel(
-            f"按 {trigger_summary()} 开始说话，再按一次停止。录音与识别在本机完成。"
+            f"按住 {trigger_summary()} 说话，松开就输入；也可以轻按开始，再按一次结束。录音和识别都在本机完成。"
         )
         self.home_ready_subtitle.setObjectName("commandSubtitle")
         self.home_ready_subtitle.setWordWrap(True)
@@ -64,8 +69,8 @@ class PreferencesMixin:
         onboarding_layout = QVBoxLayout(self.onboarding_panel)
         onboarding_layout.setContentsMargins(0, 0, 0, 0)
         onboarding_help = QLabel(
-            "首次使用：把光标放到其他应用的输入位置，按快捷键说一句话，再按一次停止。"
-            "检查文字是否正确出现；没有出现时，可在目标位置按 Ctrl+V。"
+            "首次使用：把光标放在要输入的位置，按住快捷键说一句话，松开就会输入。"
+            "文字没有出现时，在那里按 Ctrl+V。"
         )
         onboarding_help.setWordWrap(True)
         onboarding_layout.addWidget(onboarding_help)
@@ -122,13 +127,18 @@ class PreferencesMixin:
         self.language_combo.setAccessibleName("识别语言")
         self.microphone_combo = QComboBox()
         self.microphone_combo.setAccessibleName("麦克风")
-        self.language_combo.setObjectName("fieldValue")
-        self.microphone_combo.setObjectName("fieldValue")
+        self.trigger_mode_combo = QComboBox()
+        self.trigger_mode_combo.setAccessibleName("按键方式")
+        for label, value in TRIGGER_MODE_CHOICES:
+            self.trigger_mode_combo.addItem(label, value)
+        for combo in (self.language_combo, self.microphone_combo, self.trigger_mode_combo):
+            combo.setObjectName("fieldValue")
         field_labels = [
             add_row(fields, row, name, value)
             for row, (name, value) in enumerate((
                 ("识别语言", self.language_combo),
                 ("麦克风", self.microphone_combo),
+                ("按键方式", self.trigger_mode_combo),
             ))
         ]
         self.autostart_check = QCheckBox(
@@ -230,10 +240,10 @@ class PreferencesMixin:
         self._save_bar = footer
         outer.addWidget(footer)
         self._settings_grids = [
-            (fields, field_labels[:2], (self.language_combo, self.microphone_combo)),
-            (format_fields, field_labels[2:], (self.dictation_scope_combo, self.sentence_end_combo)),
+            (fields, field_labels[:3], (self.language_combo, self.microphone_combo, self.trigger_mode_combo)),
+            (format_fields, field_labels[3:], (self.dictation_scope_combo, self.sentence_end_combo)),
         ]
-        for widget in (self.language_combo, self.microphone_combo):
+        for widget in (self.language_combo, self.microphone_combo, self.trigger_mode_combo):
             widget.currentIndexChanged.connect(self._settings_changed)
         for widget in (self.autostart_check, self.preserve_format_check):
             widget.toggled.connect(self._settings_changed)
@@ -302,7 +312,7 @@ class PreferencesMixin:
 
     def _settings_values(self):
         return (self.language_combo.currentData(), self.microphone_combo.currentData(), self.autostart_check.isChecked(),
-                copy.deepcopy(self._preferences_draft))
+                copy.deepcopy(self._preferences_draft), self.trigger_mode_combo.currentData())
 
     def _settings_dirty(self):
         return self._settings_baseline is not None and self._settings_values() != self._settings_baseline
@@ -358,6 +368,8 @@ class PreferencesMixin:
         selected_index = self.microphone_combo.findData(selected_device)
         self.microphone_combo.setCurrentIndex(max(0, selected_index))
         self.autostart_check.setChecked(is_autostart_enabled(self.paths))
+        mode = config.get("hotkeys", {}).get("trigger_mode", "auto")
+        self.trigger_mode_combo.setCurrentIndex(max(0, self.trigger_mode_combo.findData(mode)))
 
     def _save_settings(self):
         config = self._load_config()
@@ -372,6 +384,7 @@ class PreferencesMixin:
             "language": self.language_combo.currentData(),
             "device_index": self.microphone_combo.currentData(),
             "autostart": self.autostart_check.isChecked(),
+            "trigger_mode": self.trigger_mode_combo.currentData(),
             "expected_config": self._config_snapshot,
             "expected_preferences": {key: copy.deepcopy(self._dictation_preferences_snapshot[key]) for key in ("schema_version", "global", "apps")},
             "preferences": copy.deepcopy(self._preferences_draft),
@@ -405,7 +418,8 @@ class PreferencesMixin:
         self._config_snapshot = payload["config_text"]
         self._dictation_preferences_snapshot = copy.deepcopy(payload["preferences"])
         # Keep any edits made while the save worker was running as a new draft.
-        self._settings_baseline = (payload["language"], payload["device_index"], payload["autostart"], copy.deepcopy(payload["preferences"]))
+        self._settings_baseline = (payload["language"], payload["device_index"], payload["autostart"],
+                                   copy.deepcopy(payload["preferences"]), payload["trigger_mode"])
         self._settings_changed()
         self._set_status_badge("已保存。设备设置重启后生效。" if payload["restart_required"] else "已保存，下一次听写生效。")
 

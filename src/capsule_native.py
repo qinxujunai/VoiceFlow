@@ -11,6 +11,7 @@ from qt_compat import (
     QImage, QLinearGradient,
 )
 from platform_utils import system_high_contrast_enabled
+from ui_state import SILENT_DELIVERY_STATUSES
 
 
 def system_animations_enabled():
@@ -238,18 +239,21 @@ class NativeCapsuleView(QWidget):
                 self.state.generation = generation
                 self.state.pending.clear()
                 self._dismiss_at = None
-                if status == "landed_confirmed":
+                if status in SILENT_DELIVERY_STATUSES:
                     self._dismiss_at = now
                     announcement = "文字已输入"
                 elif status == "recovery_saved_clipboard_unavailable":
-                    self.state.show_label("recovery", "已保存")
+                    self.state.show_label("recovery", "已保存在最近转录")
                     announcement = "文字已保存，可在最近转录中复制"
                 elif status == "delivery_failed":
-                    self.state.show_label("error", "复制和保存未完成")
-                    announcement = "复制和保存未完成，请查看可恢复的录音"
+                    self.state.show_label("error", "没有完成，录音已保留")
+                    announcement = "没有完成，录音已保留，可在设置里找回"
                 else:
-                    self.state.show_label("final_ready", "已复制到剪贴板")
-                    announcement = "文字已复制；如果未出现，请在目标位置按 Ctrl+V"
+                    self.state.show_label("final_ready", "已复制，按 Ctrl+V 粘贴")
+                    announcement = "没能直接输入，文字已复制，按 Ctrl+V 粘贴"
+        elif command == "dismiss":
+            self.state.pending.clear()
+            self._dismiss_at = now
         elif command == "label":
             self.state.show_label(*args)
         elif command == "reset":
@@ -360,7 +364,13 @@ class NativeCapsuleView(QWidget):
         high_contrast = self._high_contrast_active
         foreground = self.palette().windowText().color() if high_contrast else QColor("#f5f5f7")
         if self._dismiss_at is not None and self._motion_enabled and not high_contrast:
-            painter.setOpacity(max(0.0, 1 - (time.perf_counter() - self._dismiss_at) / 0.12))
+            # Fade out while settling 4 % smaller around the centre (ease-out).
+            progress = min(1.0, (time.perf_counter() - self._dismiss_at) / 0.12)
+            painter.setOpacity(max(0.0, 1 - progress))
+            scale = 1 - 0.04 * progress * (2 - progress)
+            painter.translate(self.width() / 2, self.height() / 2)
+            painter.scale(scale, scale)
+            painter.translate(-self.width() / 2, -self.height() / 2)
         rect = QRectF((self.width() - self._width) / 2, (self.height() - self.HEIGHT) / 2, self._width, self.HEIGHT)
         painter.setPen(Qt.PenStyle.NoPen)
         if not high_contrast:

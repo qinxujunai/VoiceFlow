@@ -4,6 +4,7 @@ VoiceFlow — 本地语音转文字。F2 切换录音，Esc 取消。
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -32,6 +33,7 @@ from text_cleaner import TextCleaner
 from history_store import HistoryStore
 from recording_session import RecordingSession
 from recording_state import RecordingState, RecordingStateMachine
+from ui_state import SILENT_DELIVERY_STATUSES
 from runtime_logging import configure_runtime_logging
 from audio_activity import (
     find_speech_onset,
@@ -95,6 +97,11 @@ class _InitWorker(threading.Thread):
                 self.on_error(e)
 
 
+# A piece's own closing stop at a pause cut (not an ellipsis, not an abbreviation such as "etc.").
+_SEAM_STOP_RE = re.compile(r"(?<![.。…])[.。]$(?<!\betc\.)(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bvs\.)(?<!\bMr\.)(?<!\bMrs\.)"
+                           r"(?<!\bMs\.)(?<!\bDr\.)(?<!\bProf\.)", re.IGNORECASE)
+
+
 def _cjk_seam(left_char, right_char):
     """True when two transcript pieces need no space: Chinese meets Chinese, or a piece ends in Chinese punctuation."""
     def cjk(char):
@@ -136,8 +143,8 @@ class VoiceInputSystem:
     FINAL_CACHE_HANDOFF_TIMEOUT_SECONDS = 3.0
     FINALIZING_DELAY_SECONDS = 0.35
     SUCCESS_DISMISS_MS = 140
-    CLIPBOARD_ONLY_HOLD_MS = 1040
-    RECOVERY_SAVED_HOLD_MS = 1740
+    CLIPBOARD_ONLY_HOLD_MS = 2400
+    RECOVERY_SAVED_HOLD_MS = 2400
 
     def __init__(self, config_path=None, *, paths=None, register_hotkeys=True):
         self._register_hotkeys = register_hotkeys
@@ -213,6 +220,7 @@ class VoiceInputSystem:
         self._last_dictation_app = ""
         self.controller = AppController(
             on_record_toggle=self._on_record_toggle,
+            on_record_release=self._on_record_release,
             on_cancel=self._on_record_cancel,
             on_copy_last=self._copy_last_text,
             on_repaste_last=self._repaste_last_text,
@@ -268,7 +276,7 @@ class VoiceInputSystem:
         self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
-                raise RuntimeError("请先结束当前听写或数据操作")
+                raise RuntimeError("先结束当前听写")
             self.output_handler.clear_pending()
             count = self.history.clear()
             self._forget_retained_text()
@@ -278,7 +286,7 @@ class VoiceInputSystem:
         self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
-                raise RuntimeError("请先结束当前听写或数据操作")
+                raise RuntimeError("先结束当前听写")
             entry = self.history.find_entry(entry_id)
             if entry is None:
                 return None
@@ -297,7 +305,7 @@ class VoiceInputSystem:
         self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
-                raise RuntimeError("请先结束当前听写或数据操作")
+                raise RuntimeError("先结束当前听写")
             return self.history.restore_entry(token)
 
     def _delete_recovery_session(self, session_id):
@@ -445,7 +453,10 @@ class VoiceInputSystem:
 
     def _save_settings(self, draft):
         from settings_store import save_settings_transaction
-        return save_settings_transaction(self.paths, self.dictation_preferences, draft)
+        result = save_settings_transaction(self.paths, self.dictation_preferences, draft)
+        if getattr(self, "hotkey_mgr", None) is not None and result.get("trigger_mode"):
+            self.hotkey_mgr.set_trigger_mode(result["trigger_mode"])
+        return result
 
     def _final_text_options(self, target=None):
         preferences = getattr(self, "dictation_preferences", None)
@@ -500,6 +511,15 @@ class VoiceInputSystem:
         elif state is RecordingState.IDLE:
             self._on_record_start(triggered_at)
 
+    def _on_record_release(self, pressed_at, released_at):
+        """Hold to talk: releasing the key stops the recording that its press started."""
+        if (self._recording_state.current is RecordingState.RECORDING
+                and getattr(self, "_recording_trigger_at", None) == pressed_at):
+            self._on_record_stop(released_at)
+
+    def _is_recording(self):
+        return self._recording_state.current is RecordingState.RECORDING
+
     def _can_record_toggle(self):
         return self._recording_state.current in {
             RecordingState.IDLE,
@@ -512,6 +532,7 @@ class VoiceInputSystem:
         try:
             self._stream_generation += 1
             generation = self._stream_generation
+            self._recording_trigger_at = triggered_at
             self._active_session_id = uuid.uuid4().hex
             self._recovery_fault_handled_session = None
             self._last_trigger_to_feedback_ms = None
@@ -607,8 +628,8 @@ class VoiceInputSystem:
                 self._recording_state.mark_recoverable()
                 self._recording_state.acknowledge_recovery()
                 self.overlay.show_error(
-                    "未能读取录音。请打开设置查看可恢复录音，并检查麦克风。" if retained
-                    else "没有收到声音，请检查麦克风后重试。"
+                    "录音没读出来，已保留在设置里" if retained
+                    else "没有收到声音，检查一下麦克风"
                 )
                 self.overlay.hide_after(3600)
                 return
@@ -749,25 +770,25 @@ class VoiceInputSystem:
                 )
                 if not history_saved:
                     destination = (
-                        "文字已复制到剪贴板。" if delivery.clipboard_verified else
-                        "文字已另行保存，下次启动可恢复。" if delivery.reason != "pending_write_failed" else
-                        "复制和保存均未完成，请查看可恢复录音。"
+                        "文字已复制" if delivery.clipboard_verified else
+                        "文字另存了，下次打开可恢复" if delivery.reason != "pending_write_failed" else
+                        "文字没能复制和保存，录音已保留"
                     )
-                    self.overlay.show_error("历史未保存。" + destination)
+                    self.overlay.show_error("历史没存上，" + destination)
                 elif getattr(self.audio, "recovery_error", None):
                     destination = (
-                        "文字已复制，也保存在历史中。" if delivery.clipboard_verified
-                        else "文字保存在历史中，可打开历史复制。"
+                        "文字已复制，历史里也有" if delivery.clipboard_verified
+                        else "文字在历史里，可以从那里复制"
                     )
-                    self.overlay.show_error("录音保存中断。" + destination)
+                    self.overlay.show_error("录音没存完整，" + destination)
                 elif not final_result.coverage_ok:
                     destination = (
-                        "已复制到剪贴板。" if delivery.clipboard_verified else
-                        "保存在历史中。"
+                        "已复制，" if delivery.clipboard_verified else
+                        "已存进历史，"
                     )
                     self.overlay.show_error(
-                        "只找回部分文字，" + destination
-                        + "请打开设置查看可恢复录音。"
+                        "只识别出一部分，" + destination
+                        + "完整录音在设置里"
                     )
                 if delivered_completely:
                     self._recording_state.mark_complete()
@@ -786,11 +807,11 @@ class VoiceInputSystem:
                         and getattr(self, "_speech_gate_enabled", False)
                         and not self._contains_speech(data)):
                     self.overlay.show_canceled()
-                    self.overlay.hide_after(800)
+                    self.overlay.hide_after(self.SUCCESS_DISMISS_MS)
                 else:
                     self.overlay.show_error(
-                        "没有识别到文字。请打开设置查看可恢复录音，或检查麦克风后重试。" if retained
-                        else "没有识别到文字，请检查麦克风后重试。"
+                        "没听清，录音已保留在设置里" if retained
+                        else "没听清，再说一次"
                     )
 
         except Exception as e:
@@ -1203,6 +1224,9 @@ class VoiceInputSystem:
                 joined = part
                 continue
             fresh = index < len(after_pause) and after_pause[index]
+            if fresh and _SEAM_STOP_RE.search(joined.rstrip()) and part[:1].isascii() and part[:1].islower():
+                # The recognizer ends every piece with a stop; before a lowercase word the sentence goes on.
+                joined = joined.rstrip()[:-1]
             merged = f"{joined.rstrip()} {part}" if fresh else self._merge_transcript_pair(joined, part)
             # Chinese pieces meet without a space (it showed as 「取了。 明天」); Latin words keep theirs.
             if merged == f"{joined.rstrip()} {part}" and _cjk_seam(joined.rstrip()[-1], part[0]):
@@ -1252,7 +1276,9 @@ class VoiceInputSystem:
         max_normalized_overlap = min(len(left_chars), len(right_chars), 80)
         for size in range(max_normalized_overlap, 1, -1):
             if left_chars[-size:] == right_chars[:size]:
-                return left + right[right_ends[size - 1]:]
+                # The right piece heard across the junction, so its punctuation there wins over the
+                # stop the left piece put at its own end: 「into.」+「Into the」 -> 「into the」.
+                return left.rstrip("，。！？；：、,.!?;: ") + right[right_ends[size - 1]:]
         return f"{left} {right}"
 
     def _should_use_segmented_final(
@@ -1440,7 +1466,7 @@ class VoiceInputSystem:
         return True
 
     def _delivery_hold_ms(self, output_status, _duration):
-        if output_status == "landed_confirmed":
+        if output_status in SILENT_DELIVERY_STATUSES:
             return self.SUCCESS_DISMISS_MS
         if output_status == "clipboard_verified_only":
             return self.CLIPBOARD_ONLY_HOLD_MS
@@ -1607,7 +1633,7 @@ class VoiceInputSystem:
                 if hasattr(self, "output_handler"):
                     self.output_handler.cancel_target_tracking()
                 self.overlay.show_canceled()
-                self.overlay.hide_after(800)
+                self.overlay.hide_after(self.SUCCESS_DISMISS_MS)
                 self._restore_audio_ready()
             except Exception as error:
                 self._recording_state.mark_error()
@@ -1615,7 +1641,7 @@ class VoiceInputSystem:
                     "取消录音失败，请退出并重新启动 VoiceFlow",
                     error_code="recording_cancel_failed",
                 )
-                self.overlay.show_error("取消失败，请重新启动")
+                self.overlay.show_error("没能取消，重新打开 VoiceFlow")
                 logger.exception("recording cancellation failed")
                 raise
             finally:
@@ -1626,7 +1652,7 @@ class VoiceInputSystem:
         self._require_data_ready()
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
-                self.overlay.show_error("请先结束当前听写或数据操作")
+                self.overlay.show_error("先结束当前听写")
                 return "busy"
             return self._copy_idle_last_text()
 
@@ -1636,7 +1662,7 @@ class VoiceInputSystem:
             try:
                 last = self.history.last()
             except (OSError, ValueError):
-                self.overlay.show_error("暂时无法读取历史，请查看可恢复录音。")
+                self.overlay.show_error("历史暂时读不出来，录音已保留")
                 return
             text = (last.get("corrected_text") or last.get("clean_text", "")) if last else ""
         if text:
@@ -1667,7 +1693,7 @@ class VoiceInputSystem:
             return {"ok": False, "error": str(error)}
         with self._recording_state.idle_operation() as claimed:
             if not claimed:
-                return {"ok": False, "error": "请先结束当前听写或数据操作"}
+                return {"ok": False, "error": "先结束当前听写"}
             return self._recover_idle_session(session_id)
 
     def _recover_idle_session(self, session_id):
@@ -1705,7 +1731,7 @@ class VoiceInputSystem:
         if not history_saved:
             destination = ("文字已复制到剪贴板，录音已继续保留" if delivery.clipboard_verified
                            else "剪贴板暂时不可用，录音已继续保留")
-            return {"ok": False, "error": "历史未保存。" + destination}
+            return {"ok": False, "error": "历史没存上，" + destination}
         if not delivery.clipboard_verified:
             return {"ok": False, "error": "剪贴板暂时不可用，文字已保存在历史中，录音已继续保留"}
         self.output_handler.acknowledge_delivery(f"recovered-{session_id}")
@@ -1762,7 +1788,7 @@ class VoiceInputSystem:
         except Exception:
             self.controller.mark_hotkeys("error")
             logger.exception("global hotkeys unavailable")
-            self.overlay.show_error("快捷键不可用，请从托盘菜单开始听写")
+            self.overlay.show_error("快捷键不可用，从托盘菜单开始听写")
 
         def on_done():
             try:
@@ -1777,7 +1803,7 @@ class VoiceInputSystem:
                     recoverable = self._recovery_store.list_recoverable()
                 except OSError:
                     logger.exception("recoverable recordings could not be read at startup")
-                    self.overlay.show_error("可恢复录音暂时无法读取，请检查数据目录权限后重试。")
+                    self.overlay.show_error("可恢复的录音读不出来，检查数据目录权限")
                     return
                 if recoverable:
                     self.overlay.show_recovery_available(len(recoverable))
@@ -1786,7 +1812,7 @@ class VoiceInputSystem:
                 print("  说点什么吧", flush=True)
             except Exception as e:
                 print(f"[错误] {e}", flush=True)
-                self.overlay.show_error("启动未完成，请打开设置运行检查。")
+                self.overlay.show_error("没有准备好，打开设置检查一下")
 
         def on_error(e):
             import traceback
@@ -1795,7 +1821,7 @@ class VoiceInputSystem:
                 str(e),
                 error_code="runtime_initialization_failed",
             )
-            self.overlay.show_error("需要处理，请重新打开 VoiceFlow")
+            self.overlay.show_error("需要重新打开 VoiceFlow")
             logger.error(
                 "runtime initialization failed",
                 exc_info=(type(e), e, e.__traceback__),
@@ -1915,7 +1941,9 @@ class VoiceInputSystem:
             config_path=self.config_path,
             callbacks={
                 "on_record_toggle": self.controller.toggle_recording,
+                "on_record_release": self.controller.release_recording,
                 "can_record_toggle": self.controller.can_accept_recording_intent,
+                "is_recording": self._is_recording,
                 "on_record_cancel": self.controller.cancel_recording,
             },
         )
@@ -1962,7 +1990,7 @@ class VoiceInputSystem:
                     logger.exception("service cleanup failed: %s", name)
         if failed:
             self._shutdown_started = False
-            raise RuntimeError("退出未完成，请从托盘重试。")
+            raise RuntimeError("没能退出，从托盘再试一次")
 
 
 # ---- 测试 ----

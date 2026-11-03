@@ -44,7 +44,7 @@ def test_failed_delivery_never_claims_copied_or_saved():
     view = NativeCapsuleView()
     view.present("delivery", ["delivery_failed", 1])
     assert view.state.mode == "error"
-    assert "未完成" in view.state.text
+    assert "没有完成" in view.state.text
     assert "已复制" not in view.accessibleName()
     assert "已保存" not in view.accessibleName()
     view.close()

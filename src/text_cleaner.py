@@ -12,6 +12,18 @@ import os
 from vocabulary import Vocabulary
 
 
+_LATIN_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]+(?![A-Za-z0-9_])")
+
+
+def _sound_key(word: str) -> tuple[str, int]:
+    """Consonant skeleton and syllable count: 「cloud」 and 「Claude」 share (kld, 1); 「cloudy」 has 2 syllables."""
+    w = word.lower().replace("ph", "f").replace("ck", "k").replace("q", "k").replace("x", "ks")
+    w = re.sub(r"c(?=[eiy])", "s", w).replace("c", "k")
+    syllables = len(re.findall(r"[aeiouy]+", re.sub(r"e$", "", w)))
+    consonants = re.sub(r"(.)\1+", r"\1", w[0] + re.sub(r"[aeiouyhw]", "", w[1:]))
+    return consonants, max(1, syllables)
+
+
 class TextCleaner:
     """ASR 输出文本清理器。所有规则通过 config.yaml 控制开关。"""
 
@@ -37,6 +49,7 @@ class TextCleaner:
         # --- 修正词表：音近词 → 正确形式 ---
         self.corrections = self._build_corrections(base_dir)
         self.term_normalizations = self._build_term_normalizations()
+        self.term_sounds = self._build_term_sounds()
         self._corrections_signature = self._correction_files_signature()
 
         # --- 标点 ---
@@ -69,19 +82,58 @@ class TextCleaner:
         return tuple(signature)
 
     def _build_term_normalizations(self):
-        """Build safe, token-boundary spelling normalization for ASCII terms."""
+        """Build safe, token-boundary spelling normalization for ASCII terms.
+
+        A term may also be heard split where its own words or capitals meet:
+        「open AI」 -> OpenAI, 「chat gpt」 -> ChatGPT, 「git hub」 -> GitHub.
+        """
         if not self.vocabulary:
             return []
         terms = []
         for term in self.vocabulary.terms:
             if not term.isascii() or not any(char.isalpha() for char in term):
                 continue
+            parts = [part for word in re.split(r"[\s-]+", term)
+                     for part in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", word)]
+            if len(parts) > 1 and "".join(parts) == re.sub(r"[\s-]", "", term):
+                body = r"[\s-]*".join(re.escape(part) for part in parts)
+            else:
+                body = re.escape(term)
             pattern = re.compile(
-                rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])",
+                rf"(?<![A-Za-z0-9_]){body}(?![A-Za-z0-9_])",
                 re.IGNORECASE,
             )
             terms.append((term, pattern))
         return sorted(terms, key=lambda item: len(item[0]), reverse=True)
+
+    def _build_term_sounds(self):
+        """Multi-word ASCII terms whose every word has three or more letters, keyed by sound."""
+        if not self.vocabulary:
+            return []
+        sounds = []
+        for term in self.vocabulary.terms:
+            words = term.split()
+            if (len(words) > 1 and term.isascii()
+                    and all(word.isalpha() and len(word) >= 3 for word in words)):
+                sounds.append((term, [_sound_key(word) for word in words]))
+        return sounds
+
+    def _restore_misheard_terms(self, text: str) -> str:
+        """「cloud code」 -> Claude Code: same consonants and syllables, word for word."""
+        for term, keys in self.term_sounds:
+            size = len(keys)
+            tokens = list(_LATIN_TOKEN_RE.finditer(text))
+            # Right to left, so a replacement never moves the windows still to be checked.
+            for start in range(len(tokens) - size, -1, -1):
+                window = tokens[start:start + size]
+                gaps = [text[a.end():b.start()] for a, b in zip(window, window[1:])]
+                if any(not gap or gap.strip() for gap in gaps):
+                    continue
+                if [_sound_key(token.group()) for token in window] != keys:
+                    continue
+                if text[window[0].start():window[-1].end()] != term:
+                    text = text[:window[0].start()] + term + text[window[-1].end():]
+        return text
 
     def _reload_corrections_if_changed(self):
         if not self.vocabulary:
@@ -92,6 +144,7 @@ class TextCleaner:
         self.vocabulary.reload()
         self.corrections = self._build_corrections(self.base_dir)
         self.term_normalizations = self._build_term_normalizations()
+        self.term_sounds = self._build_term_sounds()
         self._corrections_signature = signature
 
     @staticmethod
@@ -168,6 +221,8 @@ class TextCleaner:
             text = text.replace(wrong, correct)
         for term, pattern in self.term_normalizations:
             text = pattern.sub(lambda _match, value=term: value, text)
+        if self.term_sounds:
+            text = self._restore_misheard_terms(text)
         return text
 
     def _add_punctuation(self, text: str) -> str:

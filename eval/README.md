@@ -48,8 +48,20 @@ character error rate, cleaned character error rate, term hits, and missed terms.
    ```
 5. Re-run the benchmark and compare raw CER vs clean CER plus missed terms.
 
-Important: plain word-list files such as `builtin-ai.txt`, `ai-terms.txt`, and
-`user-dictionary.txt` are loaded as vocabulary terms for evaluation and future
-work, but the current SenseVoice runtime does not use them as ASR hotword
-injection. Today, only `wrong=correct` pairs in `corrections.txt` and built-in
-TextCleaner mappings change final output.
+Important: plain word-list files such as `builtin-ai.txt` and `user-dictionary.txt`
+are not ASR hotword injection. Since 2026-11-03 the cleaner uses them to restore a
+term the recognizer split at its own word or capital boundaries (「open AI」 → OpenAI)
+and, for multi-word terms, one heard by sound word for word (「cloud code」 → Claude
+Code). `wrong=correct` pairs in `corrections.txt` still apply first.
+
+## Real-path accuracy
+
+`scripts/evaluate_asr.py` recognizes each file in one pass, which SenseVoice is not
+built for beyond about 30 s. To score what the user actually gets (pause cuts,
+seams, punctuation worker and delivery cleanup), run:
+
+```bat
+venv\Scripts\python.exe scripts\evaluate_dictation.py --manifest eval\private\local.jsonl --show-pieces
+```
+
+It reports MER (each Chinese character and each English word is one token).

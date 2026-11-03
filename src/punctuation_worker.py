@@ -38,7 +38,9 @@ def _punctuation_worker_main(commands, responses, model_path):
                 # for Chinese prose, retaining paragraphs and lexical punctuation.
                 paragraphs = []
                 for paragraph in source.split("\n"):
-                    bare = re.sub(r"[，。！？；：,.!?;:]", "", paragraph)
+                    # A stop between two Latin words becomes a space, so 「AItranser。And」 stays two words.
+                    bare = re.sub(r"(?<=[A-Za-z0-9])[，。！？；：,.!?;:]+(?=[A-Za-z0-9])", " ", paragraph)
+                    bare = re.sub(r"[，。！？；：,.!?;:]", "", bare)
                     paragraphs.append(engine.add_punctuation(bare) if bare.strip() else paragraph)
                 responses.put({"kind": "result", "text": "\n".join(paragraphs)})
             except Exception:

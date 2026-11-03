@@ -633,7 +633,7 @@ class _SettingsWindow(PreferencesMixin, DictionaryMixin, HistoryMixin, Diagnosti
         all_ready = model_ready and microphone_ready
         self.home_ready_title.setText("开口，文字就位。")
         self.home_ready_subtitle.setText(
-            f"按 {trigger_summary()} 开始说话，再按一次停止。录音与识别在本机完成。"
+            f"按住 {trigger_summary()} 说话，松开就输入；也可以轻按开始，再按一次结束。录音和识别都在本机完成。"
             if all_ready
             else "选择可用麦克风并确认本地识别可用后，即可开始听写。"
         )
@@ -1047,7 +1047,7 @@ class OverlayWindow:
                 if not result:
                     raise RuntimeError("settings unavailable")
             except Exception:
-                self.show_error("标点设置未保存，请重试或检查磁盘空间")
+                self.show_error("标点设置没保存上，再试一次")
             finally:
                 self._tray_sentence_save_in_progress = False
 
@@ -1192,7 +1192,7 @@ class OverlayWindow:
                 action.setEnabled(enabled)
             if self._tray:
                 self._tray.setToolTip(self._quit_tooltip)
-            self.show_error("退出未完成，请从托盘重试。")
+            self.show_error("没能退出，从托盘再试一次")
             return
         if self._tray:
             self._tray.setVisible(False)
@@ -1270,10 +1270,8 @@ class OverlayWindow:
             )
 
     def show_processing(self):
+        # Startup preparation shows on the tray icon only; a key press meanwhile answers "正在准备".
         self._tray_state(TRAY_ICON_PROCESSING)
-        if self._native("processing"):
-            return
-        self._js("showProcessing()")
 
     def show_settling(self, session_id):
         self._tray_state(TRAY_ICON_PROCESSING)
@@ -1314,11 +1312,9 @@ class OverlayWindow:
         self.hide_after(3600)
 
     def show_canceled(self):
+        # Esc, a stray press or a recording without speech: the capsule simply fades away.
         self._tray_state(TRAY_ICON_IDLE)
-        display = display_for_state(UiState.CANCELED)
-        if self._native("label", display.css_class, display.label):
-            return
-        self._js(f"showState({json.dumps(display.css_class)}, {json.dumps(display.label, ensure_ascii=False)})")
+        self._native("dismiss")
 
     def show_idle(self):
         self._tray_state(TRAY_ICON_IDLE)

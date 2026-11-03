@@ -46,6 +46,7 @@ class AppController:
         self,
         *,
         on_record_toggle: Callable | None = None,
+        on_record_release: Callable | None = None,
         on_cancel: Callable | None = None,
         on_copy_last: Callable | None = None,
         on_repaste_last: Callable | None = None,
@@ -87,6 +88,7 @@ class AppController:
         self._status_sink = on_status
         self._callbacks = {
             "record": on_record_toggle,
+            "record_release": on_record_release,
             "cancel": on_cancel,
             "copy_last": on_copy_last,
             "repaste_last": on_repaste_last,
@@ -216,6 +218,22 @@ class AppController:
             lambda: self._call("record", triggered_at),
         )
 
+    def release_recording(self, pressed_at, released_at, *, wait_s=2.0) -> ActionResult:
+        """Hold to talk released. Runs after a start still in flight instead of answering 请稍候."""
+        deadline = time.perf_counter() + wait_s
+        while True:
+            with self._lock:
+                busy = self._action_in_flight
+            if not busy or time.perf_counter() >= deadline:
+                break
+            time.sleep(0.01)
+        if self.phase is not RuntimePhase.RECORDING:
+            return ActionResult(False, "", "not_recording")
+        return self._enqueue(
+            "record_release",
+            lambda: self._call("record_release", pressed_at, released_at),
+        )
+
     def cancel_recording(self):
         return self._enqueue("cancel", lambda: self._call("cancel"))
 
@@ -341,14 +359,14 @@ class AppController:
     def _enqueue(self, name: str, callback: Callable) -> ActionResult:
         with self._lock:
             if self._action_in_flight:
-                return self._reject("请稍候", "action_busy", name)
+                return self._reject("稍等一下", "action_busy", name)
             self._action_in_flight = True
         try:
             self._action_queue.put_nowait((name, callback))
         except queue.Full:
             with self._lock:
                 self._action_in_flight = False
-            return self._reject("请稍候", "action_busy", name)
+            return self._reject("稍等一下", "action_busy", name)
         return ActionResult(True, "", "")
 
     def _run_actions(self):
@@ -363,7 +381,7 @@ class AppController:
                     callback()
                 except Exception:
                     logger.exception("action_failed action=%s", name)
-                    self._emit_status("需要处理")
+                    self._emit_status("没有完成，再试一次")
                 finally:
                     logger.info(
                         "action finished",

@@ -59,6 +59,7 @@ STT
 Supabase
 Tailwind
 Token
+Transformer
 Transformers
 TTS
 TypeScript

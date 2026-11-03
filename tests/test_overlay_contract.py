@@ -279,9 +279,10 @@ def test_settings_do_not_expose_model_choice_or_download_controls():
 def test_history_does_not_expose_internal_output_status_codes():
     overlay = _settings_source()
 
-    assert '"clipboard_verified_paste_dispatched": "已复制，输入未确认"' in overlay
-    assert '"landed_confirmed": "已输入"' in overlay
+    assert '"clipboard_verified_paste_dispatched": "已粘贴"' in overlay
+    assert '"landed_confirmed": "已粘贴"' in overlay
     assert '"clipboard_verified_only": "已复制"' in overlay
+    assert "未确认" not in overlay
     assert 'status = self._output_status_label' in overlay
 
 
@@ -685,7 +686,8 @@ def test_overlay_has_processing_settling_spinner_and_final_checkmark():
     assert "border-right: 1.8px solid var(--green);" in html
     assert "border-bottom: 1.8px solid var(--green);" in html
     assert "def show_done(self):" not in overlay
-    assert 'self._js("showProcessing()")' in overlay
+    # Startup preparation no longer drives the capsule (2026-11-03); see test_startup_and_cancel_do_not_put_words_in_the_capsule.
+    assert 'self._js("showProcessing()")' not in overlay
     assert "showDone()" not in overlay
 
 
@@ -867,13 +869,37 @@ def test_success_dismisses_quietly_while_fallback_states_remain_visible():
     assert "FINAL_REPLACEMENT_DWELL_MS" not in html
     assert "SUCCESS_DISMISS_MS = 140" in main
     assert "FINAL_TEXT_HOLD_SHORT_MS" not in main
-    assert "CLIPBOARD_ONLY_HOLD_MS = 1040" in main
-    assert "RECOVERY_SAVED_HOLD_MS = 1740" in main
+    assert "CLIPBOARD_ONLY_HOLD_MS = 2400" in main
+    assert "RECOVERY_SAVED_HOLD_MS = 2400" in main
     hold_start = main.index("def _delivery_hold_ms")
     hold_end = main.index("def _active_engine_name", hold_start)
     hold = main[hold_start:hold_end]
-    assert 'if output_status == "landed_confirmed"' in hold
+    assert "if output_status in SILENT_DELIVERY_STATUSES" in hold
     assert "return self.SUCCESS_DISMISS_MS" in hold
+
+
+def test_a_sent_paste_is_dismissed_as_fast_as_a_confirmed_one():
+    import main as vf
+
+    system = object.__new__(vf.VoiceInputSystem)
+    confirmed = system._delivery_hold_ms("landed_confirmed", 3.0)
+
+    assert system._delivery_hold_ms("clipboard_verified_paste_dispatched", 3.0) == confirmed
+    assert system._delivery_hold_ms("clipboard_verified_only", 3.0) >= 2000
+
+
+def test_startup_and_cancel_do_not_put_words_in_the_capsule():
+    overlay = (ROOT / "src" / "overlay_webview.py").read_text(encoding="utf-8")
+    main = (ROOT / "src" / "main.py").read_text(encoding="utf-8")
+    processing = overlay.split("def show_processing(self):", 1)[1].split("def show_settling", 1)[0]
+    canceled = overlay.split("def show_canceled(self):", 1)[1].split("def show_idle", 1)[0]
+
+    assert "_native(" not in processing and "_js(" not in processing
+    assert "TRAY_ICON_PROCESSING" in processing
+    assert '_native("dismiss")' in canceled
+    assert "UiState.CANCELED" not in canceled
+    assert "self.overlay.show_canceled()\n                    self.overlay.hide_after(self.SUCCESS_DISMISS_MS)" in main
+    assert "self.overlay.show_canceled()\n                self.overlay.hide_after(self.SUCCESS_DISMISS_MS)" in main
 
 
 def test_empty_capture_preserves_recovery_and_does_not_claim_user_cancel():

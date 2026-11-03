@@ -116,14 +116,14 @@ class HistoryMixin:
 
     def _output_status_label(self, status):
         return {
-            "landed_confirmed": "已输入",
-            "clipboard_verified_paste_dispatched": "已复制，输入未确认",
+            "landed_confirmed": "已粘贴",
+            "clipboard_verified_paste_dispatched": "已粘贴",
             "clipboard_verified_only": "已复制",
             "recovery_saved_clipboard_unavailable": "已保存",
-            "clipboard_copied_paste_sent": "已复制，输入未确认",
+            "clipboard_copied_paste_sent": "已粘贴",
             "clipboard_copied_integrity_warning": "已复制",
             "fallback": "已复制",
-            "typed": "输入未确认",
+            "typed": "已输入",
             "error": "失败",
             "unknown": "未知",
         }.get(status, "未知")

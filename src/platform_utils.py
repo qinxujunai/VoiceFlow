@@ -107,4 +107,4 @@ def trigger_instruction(platform_name: str | None = None) -> str:
     platform_value = sys.platform if platform_name is None else platform_name
     if platform_value == "darwin":
         return "按 F2 或从托盘菜单开始说话，再触发一次完成。"
-    return "按 F2 开始说话，再按一次完成。"
+    return "按住 F2 说话，松开就输入；也可以轻按开始，再按一次结束。"

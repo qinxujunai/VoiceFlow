@@ -24,6 +24,10 @@ Each has a reason; change one only after writing the new reason here.
 | Under 20 s the final text is the whole recording; after 0.3 s of quiet following speech it is recognized in the background (`_speculation_due`, 0.6 s silence pad) and used at stop if no speech came after it (`_speculative_result`: noise-floor speech tracker rescanned at stop, then the tail must be non-speech by the ASR worker's VAD and at most 1.5 s); workers write only within their reset epoch | Same accuracy as recognizing at stop (within noise). Stopping 0.8-1.2 s after the last word: wait 0.03-0.40 s instead of 0.45-0.81 s; stopping 0.2 s after: never slower than before. Extra CPU while recording: one background recognition per pause. Using pause-cut pieces from 12 s instead was rejected: about 2.5 points more character errors. Evidence: `docs/stop-latency-evaluation-2026-10-26.md` | 2026-10-26 |
 | From 20 s, pieces are cut in the speaker's pause (`_quiet_cut`, verified quiet), at least 4 s, and a piece after a pause cut starts at the cut and is appended without the overlap merge (`_join_segments`); Chinese seams have no space | Cuts at the late endpoint split words, the 1 s overlap duplicated them, and the merge deleted words really repeated across a seam. 30-38 s dictation: 12.7 % -> 11.8 % character errors, stop wait 0.16 s -> 0.21 s (the tail no longer overlaps but starts at an earlier cut) | 2026-10-26 |
 | Capsule preview stays append-only with the current bilingual model; no lighter-colour tentative tail | Measured: the unconfirmed guess would appear only ~80 ms earlier; every candidate model emits every 0.6-0.7 s. The 2023-02-20 bilingual model previews closer to the final text but doubles preview CPU and adds ~140 MB | 2026-10-26 |
+| A sent paste (`clipboard_verified_paste_dispatched`) ends like a confirmed one: the capsule fades out without words (`ui_state.SILENT_DELIVERY_STATUSES`). Only a paste that could not be sent says 「已复制，按 Ctrl+V 粘贴」 (2.4 s). Startup shows no capsule; Esc, a stray press or no speech fade out without 「已取消」 | Owner, 2026-11-03: 「已复制到剪贴板」 held for 1 s after every successful paste was noise, because UIA read-back fails in most apps (browsers, WeChat, Electron). History and logs still record the true status, and the text always stays in the clipboard and history | 2026-11-03 |
+| Hold to talk: a press held 0.3 s or longer that started a recording stops it on release; a tap still toggles. `hotkeys.trigger_mode: auto` (default) or `toggle`, set in 设置 → 按键方式 | Owner, 2026-11-03. Doubao IME (hold Right Alt), CapsWriter-Offline (hold CapsLock) and Handy (hold or tap) all work this way. The release waits up to 2 s for a start still in flight instead of answering 「稍等一下」, and stops only the recording its own press started | 2026-11-03 |
+| Seams in long dictation: an overlap junction takes the next piece's punctuation; a pause-cut stop before a lowercase word is dropped; final punctuation is rebuilt wherever a gap touches Chinese, also in mixed paragraphs, while English keeps the recognizer's punctuation and case | The owner's 73 s mixed recording showed 「时间的。话呢」 and 「into. the」. The worker stripped 「AItranser。And」 into one word, so the guard returned the whole paragraph unchanged. Measured with `scripts/evaluate_dictation.py` | 2026-11-03 |
+| Dictionary terms also match split at their own word or capital boundaries (「open AI」 → OpenAI) and, for multi-word terms whose words all have 3+ letters, by sound word for word (「cloud code」 → Claude Code: same consonants and syllables) | The word lists were loaded but changed nothing beyond exact case; single words are never matched by sound | 2026-11-03 |
 | A public release needs the artifact-bound license review (`licenses/release-review-<version>.md`, LGPL sources) and installed verification | Compliance gate in `scripts/check_release_compliance.py` is fail-closed by design; do not bypass it in CI | 0.3.9 release |
 
 The stack is already the mature choice for offline dictation on Windows (sherpa-onnx with
@@ -40,6 +44,19 @@ to swap engines without the quality gates below.
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-11-03, Claude**: owner-approved polish (this commit). Silent finish for a sent paste, a
+  quiet start and cancel, shorter copy without 「请」; hold to talk plus tap, with 设置 → 按键方式;
+  seam punctuation in long and mixed Chinese-English dictation; split and sound-alike dictionary
+  terms; `scripts/evaluate_dictation.py` measures recordings through the real final path and
+  delivery text preparation. Verified: full suite 896 passed (Windows); new tests
+  `tests/test_hold_to_talk.py`, `tests/test_mixed_punctuation.py`, `tests/test_term_matching.py`
+  failed before the change. Owner's private 73 s mixed recording (`eval/private/`, not in Git):
+  12 pieces, full coverage, stop wait about 40 ms, MER 7.7 % against a cross-checked reference;
+  seam stops gone, 「cloud codeopen AItranser」 still glued by SenseVoice. The owner chose to keep
+  SenseVoice and not compare models. Not done: an independent review agent (this session's
+  subagents failed with model_not_found) and real-microphone and installed-build checks; both
+  are required before 0.3.12. Not released.
 
 - **2026-11-02, Claude**: with the owner's approval, moved all 17 version tags to
   their rewritten commits (identical trees; e.g. `v0.3.11` -> `4bf5d84`). The 9
@@ -126,7 +143,7 @@ to swap engines without the quality gates below.
 
 ## Project Identity
 
-VoiceFlow is a Windows local-first dictation layer. Press **F2**, **Right Ctrl**, or a mouse side button to start recording, press again to stop, and cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
+VoiceFlow is a Windows local-first dictation layer. Hold **F2**, **Right Ctrl**, or a mouse side button and release to stop, or tap to start and tap again to stop; cleaned text is copied to the clipboard and pasted at the current cursor. Press **Esc** to cancel.
 
 The current target is stability: no orphan processes, working tray exit, complete final transcription, clipboard fallback, and truthful docs.
 
@@ -209,8 +226,9 @@ on the recording action path. Preview PCM blocks are at most 100 ms.
   VoiceFlow's own non-input window, or no valid foreground window). The start
   target is diagnostic context only; transient UIA unknown/group nodes are not
   a clipboard-only gate.
-- Only reliable verification of inserted final text means confirmed success.
-  Input event dispatch remains unverified and must retain recovery guidance.
+- Logs and history keep reliable verification of inserted text distinct from a sent
+  paste. The capsule treats a sent paste as done (owner, 2026-11-03); recovery stays
+  possible because the text always remains in the clipboard and history.
 - Recovery PCM is temporary local state. Delete it only after verified
   clipboard delivery plus history, or after an explicit user delete action.
 - Final output must cover the complete stopped audio; streaming preview is only preview.
@@ -228,6 +246,7 @@ on the recording action path. Preview PCM blocks are at most 100 ms.
 ```yaml
 hotkeys:
   push_to_talk: ["f2", "xbutton1", "xbutton2", "right_ctrl"]
+  trigger_mode: auto   # hold to talk or tap to toggle; "toggle" = taps only
   cancel: "escape"
 ```
 
@@ -351,8 +370,8 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   width/level/fade animation before showing the Qt window. Hide first, then reset
   offscreen. All timers belong to the Qt thread. Normal stop freezes the sample
   boundary, invalidates preview without joining workers, and replaces draft with
-  the authoritative final text in place. Confirmed insertion fades silently; fallback
-  and failure retain their truthful labels. Never call `show_result(text)` for a
+  the authoritative final text in place. A sent or confirmed paste fades silently;
+  a paste that could not be sent and failures keep their labels. Never call `show_result(text)` for a
   normal recording stop.
 
 - **Streaming text replay and reverse motion.** The online recognizer owns one
@@ -369,8 +388,8 @@ Match the existing code as if the same person wrote every line. Indentation, nam
   signal cancellation and transfer ownership; it must not join worker threads.
   Session guards prevent stale preview work from updating settling, final, or
   delivery states. The capsule replaces the draft with final text in place.
-  Reliably confirmed insertion fades out silently; unverified dispatch and clipboard-only show
-  `已复制到剪贴板`, and durable recovery shows `已保存`. Never restore the
+  A sent paste, confirmed or not, fades out silently; clipboard-only shows
+  `已复制，按 Ctrl+V 粘贴`, and durable recovery shows `已保存在最近转录`. Never restore the
   character-count summary or claim paste success.
 
 - **Recording color stability.** Draft and authoritative provenance remains internal.

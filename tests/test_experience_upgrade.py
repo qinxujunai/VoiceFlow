@@ -55,6 +55,26 @@ def transaction(tmp_path, monkeypatch):
     return paths, store, payload, autostart
 
 
+def test_trigger_mode_is_saved_in_the_same_transaction(transaction):
+    from settings_store import save_settings_transaction
+
+    paths, store, payload, _autostart = transaction
+    paths.config_file.write_text(paths.config_file.read_text(encoding="utf-8")
+                                 + 'hotkeys:\n  push_to_talk: ["f2"]  # keys\n', encoding="utf-8")
+    payload["expected_config"] = paths.config_file.read_text(encoding="utf-8")
+    payload["trigger_mode"] = "toggle"
+
+    result = save_settings_transaction(paths, store, payload)
+
+    saved = paths.config_file.read_text(encoding="utf-8")
+    assert result["trigger_mode"] == "toggle"
+    assert yaml.safe_load(saved)["hotkeys"] == {"push_to_talk": ["f2"], "trigger_mode": "toggle"}
+    assert '  push_to_talk: ["f2"]  # keys' in saved
+    payload["expected_config"], payload["trigger_mode"] = saved, "sideways"
+    with pytest.raises(ValueError):
+        save_settings_transaction(paths, store, payload)
+
+
 def test_unified_save_commits_all_settings(transaction):
     from settings_store import save_settings_transaction
 

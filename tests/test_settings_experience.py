@@ -72,7 +72,7 @@ def test_primary_status_pages_hide_model_and_thread_implementation_details():
         assert "离线模型" not in block
         assert "识别线程" not in block
     assert 'self.home_model = QLabel("本地识别 · 正在检查")' in home
-    assert "录音与识别在本机完成" in home
+    assert "录音和识别都在本机完成" in home
 
 
 def test_sidebar_version_is_two_lines_and_the_shell_avoids_a_double_border():
@@ -207,8 +207,9 @@ def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
     source = _settings_source()
     labels = _block(source, "def _output_status_label", "def _format_timestamp")
 
-    assert '"clipboard_verified_paste_dispatched": "已复制，输入未确认"' in labels
-    assert '"landed_confirmed": "已输入"' in labels
+    assert '"clipboard_verified_paste_dispatched": "已粘贴"' in labels
+    assert '"landed_confirmed": "已粘贴"' in labels
+    assert "未确认" not in labels
     assert '"clipboard_verified_only": "已复制"' in labels
     assert '"recovery_saved_clipboard_unavailable": "已保存"' in labels
     assert "已复制并发送粘贴" not in labels

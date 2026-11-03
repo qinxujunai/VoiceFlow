@@ -16,6 +16,11 @@ class UiState(str, Enum):
     CANCELED = "canceled"
 
 
+# A sent paste ends like a confirmed one: the capsule fades out without words.
+# Only a paste that could not be sent says how to paste (owner's decision, 2026-11-03).
+SILENT_DELIVERY_STATUSES = frozenset({"landed_confirmed", "clipboard_verified_paste_dispatched"})
+
+
 @dataclass(frozen=True)
 class UiDisplay:
     label: str

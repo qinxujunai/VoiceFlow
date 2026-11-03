@@ -16,7 +16,7 @@ Windows 10 / 11 · Works offline · No sign-in
 
 ![VoiceFlow product demo](docs/voiceflow-demo.svg)
 
-Place your cursor in a text field. Press **F2** to start and again to finish.
+Place your cursor in a text field. Hold **F2** while you speak and release to finish, or tap it to start and tap again to finish.
 Your voice becomes text on your computer. Recording and recognition stay local.
 
 ## Why VoiceFlow
