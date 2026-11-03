@@ -1,13 +1,13 @@
 # Using VoiceFlow
 
-> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+> Documentation sync: **2026-11-03** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
 
 [Back to the product](../README.en.md)
 
 ## Start speaking
 
-Place your cursor in a text field. Press **F2** to start, then press **F2** again to finish.
-Right Ctrl and mouse side buttons also work. Esc cancels a recording without producing text.
+Place your cursor in a text field. Hold **F2** while you speak and release to finish, or press **F2** once to start and again to finish.
+Right Ctrl and mouse side buttons work the same way. Esc cancels a recording without producing text. To use taps only, change 按键方式 in settings.
 
 If the text does not appear, press **Ctrl+V** to paste. Your dictation also stays in local history, ready to revisit and copy.
 Some apps, administrator windows and input method states require manual paste.

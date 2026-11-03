@@ -64,6 +64,14 @@ class SupervisedPunctuation:
         self._ready = False
         self._lock = threading.Lock()
 
+    @property
+    def worker_pid(self):
+        process = self._process
+        try:
+            return process.pid if self._ready and process is not None and process.is_alive() else None
+        except (ValueError, OSError):
+            return None
+
     def load(self):
         with self._lock:
             if self._process is not None:

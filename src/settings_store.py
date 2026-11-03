@@ -171,10 +171,11 @@ def update_trigger_mode(config_path: str | Path, mode: str) -> None:
         raise ValueError("invalid trigger mode")
     path = Path(config_path)
     text = path.read_text(encoding="utf-8")
-    section = re.search(r"(?m)^hotkeys:\s*$", text)
+    # Section headers may carry an inline comment: 「hotkeys:  # 快捷键」.
+    section = re.search(r"(?m)^hotkeys:[ \t]*(?:#[^\n]*)?$", text)
     if not section:
         raise KeyError("missing hotkeys section")
-    next_top = re.search(r"(?m)^\S[^:]*:\s*$", text[section.end():])
+    next_top = re.search(r"(?m)^[^\s#][^:\n]*:[ \t]*(?:#[^\n]*)?$", text[section.end():])
     end = section.end() + next_top.start() if next_top else len(text)
     replacement = f"  trigger_mode: {mode}"
     block, count = re.subn(

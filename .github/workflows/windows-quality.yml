@@ -42,11 +42,13 @@ jobs:
           path: |
             models/sensevoice
             models/streaming-preview
+            models/punctuation
           key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
       - name: Download and verify pinned runtime models
         run: |
           python scripts/download_models.py --engine sensevoice
           python scripts/download_models.py --engine streaming-preview
+          python scripts/download_models.py --engine punctuation
       - name: Unit and contract tests
         run: python -m pytest tests -q
       - name: Lifecycle stability gate
@@ -79,11 +81,13 @@ jobs:
           path: |
             models/sensevoice
             models/streaming-preview
+            models/punctuation
           key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
       - name: Download and verify pinned runtime models
         run: |
           python scripts/download_models.py --engine sensevoice
           python scripts/download_models.py --engine streaming-preview
+          python scripts/download_models.py --engine punctuation
       - name: Build onedir application
         run: python -m PyInstaller VoiceFlow.spec --noconfirm
       - name: Verify native Qt package boundary
@@ -112,11 +116,11 @@ jobs:
         shell: pwsh
         run: |
           $innoCompiler = ./scripts/prepare_inno_compiler.ps1 -ToolchainRoot (Join-Path $env:RUNNER_TEMP "VoiceFlow-build-tools")
-          & $innoCompiler /DINCLUDE_SENSEVOICE=1 /DINCLUDE_STREAMING_PREVIEW=1 installer\VoiceFlow.iss
+          & $innoCompiler /DINCLUDE_SENSEVOICE=1 /DINCLUDE_STREAMING_PREVIEW=1 /DINCLUDE_PUNCTUATION=1 installer\VoiceFlow.iss
           if ($LASTEXITCODE -ne 0) { throw "Installer build failed with exit code $LASTEXITCODE" }
       - name: Smoke full offline installer
         shell: pwsh
-        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview
+        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview -RequirePunctuation
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: VoiceFlow-windows-unsigned
@@ -197,12 +201,12 @@ jobs:
           if ((Get-Item $installer).Length -ne $asset.size) { throw 'Candidate size mismatch' }
           $previous = Join-Path $env:RUNNER_TEMP 'previous-release'
           New-Item -ItemType Directory $previous | Out-Null
-          gh release download v0.3.10 --repo $env:GITHUB_REPOSITORY --dir $previous --pattern 'VoiceFlow-0.3.10-Windows-x64.exe' --pattern SHA256SUMS.txt
+          gh release download v0.3.11 --repo $env:GITHUB_REPOSITORY --dir $previous --pattern 'VoiceFlow-0.3.11-Windows-x64.exe' --pattern SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Previous release download failed' }
-          $previousInstaller = Join-Path $previous 'VoiceFlow-0.3.10-Windows-x64.exe'
+          $previousInstaller = Join-Path $previous 'VoiceFlow-0.3.11-Windows-x64.exe'
           $previousHash = (Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
           $previousLines = @(Get-Content (Join-Path $previous 'SHA256SUMS.txt') | Where-Object {
-            $_ -match '^([0-9a-fA-F]{64})\s+[* ]?VoiceFlow-0\.3\.10-Windows-x64\.exe\s*$'
+            $_ -match '^([0-9a-fA-F]{64})\s+[* ]?VoiceFlow-0\.3\.11-Windows-x64\.exe\s*$'
           })
           if ($previousLines.Count -ne 1 -or ($previousLines[0] -split '\s+')[0].ToLowerInvariant() -ne $previousHash) {
             throw 'Previous installer checksum mismatch'

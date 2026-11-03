@@ -38,7 +38,7 @@ class DictionaryMixin:
         layout.addLayout(
             self._section_header(
                 "词典",
-                "英文术语会规范大小写；明确纠错不会改变你的原意。",
+                "英文术语会规范大小写，拆开的写法也会合上；明确纠错不会改变你的原意。",
             )
         )
 
@@ -230,7 +230,7 @@ class DictionaryMixin:
         if readonly:
             self.dictionary_input.setPlaceholderText("内置术语不可编辑")
             self.dictionary_hint.setText(
-                "内置术语随 VoiceFlow 更新；识别到相同英文时会规范大小写。"
+                "内置术语随 VoiceFlow 更新；相同或拆开的英文会改成这里的写法，多词术语也认读音相近的说法。"
             )
         elif corrections:
             self.dictionary_input.setPlaceholderText("识别成")
@@ -241,7 +241,7 @@ class DictionaryMixin:
         else:
             self.dictionary_input.setPlaceholderText("添加专有词")
             self.dictionary_hint.setText(
-                "添加人名、品牌或项目名；英文会规范大小写，误识别请使用确定性纠错。"
+                "添加人名、品牌或项目名；英文会规范大小写、合上拆开的写法，误识别请使用确定性纠错。"
             )
         self._update_dictionary_count()
         self._filter_dictionary()

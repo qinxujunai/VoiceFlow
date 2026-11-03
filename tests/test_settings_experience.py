@@ -160,6 +160,9 @@ def test_dictionary_copy_explains_what_each_entry_can_reliably_change():
 
     assert "英文术语会规范大小写" in dictionary
     assert "误识别请使用确定性纠错" in rendering
+    # Terms also join split writing and, for multi-word terms, close-sounding words (2026-11-03).
+    assert "拆开" in dictionary and "拆开" in rendering
+    assert "读音相近" in rendering
     assert '"词典已保存" if not self._dictionary_dirty' in saving
     assert "词典已保存，重启后生效" not in saving
 
@@ -207,8 +210,9 @@ def test_history_uses_the_same_short_truthful_status_words_as_the_capsule():
     source = _settings_source()
     labels = _block(source, "def _output_status_label", "def _format_timestamp")
 
-    assert '"clipboard_verified_paste_dispatched": "已粘贴"' in labels
+    assert '"clipboard_verified_paste_dispatched": "已发送粘贴"' in labels
     assert '"landed_confirmed": "已粘贴"' in labels
+    assert '"clipboard_copied_paste_sent": "已发送粘贴"' in labels
     assert "未确认" not in labels
     assert '"clipboard_verified_only": "已复制"' in labels
     assert '"recovery_saved_clipboard_unavailable": "已保存"' in labels

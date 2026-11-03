@@ -764,31 +764,34 @@ class VoiceInputSystem:
                 elif self._recovery_journal is not None:
                     self._recovery_journal.close_interrupted()
                     self._recovery_journal = None
-                self.overlay.show_delivery_state(output_status, final_generation)
-                self.overlay.hide_after(
-                    self._delivery_hold_ms(output_status, duration)
-                )
+                notice = None
                 if not history_saved:
                     destination = (
                         "文字已复制" if delivery.clipboard_verified else
                         "文字另存了，下次打开可恢复" if delivery.reason != "pending_write_failed" else
                         "文字没能复制和保存，录音已保留"
                     )
-                    self.overlay.show_error("历史没存上，" + destination)
+                    notice = "历史没存上，" + destination
                 elif getattr(self.audio, "recovery_error", None):
                     destination = (
                         "文字已复制，历史里也有" if delivery.clipboard_verified
                         else "文字在历史里，可以从那里复制"
                     )
-                    self.overlay.show_error("录音没存完整，" + destination)
+                    notice = "录音没存完整，" + destination
                 elif not final_result.coverage_ok:
                     destination = (
                         "已复制，" if delivery.clipboard_verified else
                         "已存进历史，"
                     )
-                    self.overlay.show_error(
-                        "只识别出一部分，" + destination
-                        + "完整录音在设置里"
+                    notice = "只识别出一部分，" + destination + "完整录音在设置里"
+                self.overlay.show_delivery_state(output_status, final_generation)
+                if notice:
+                    # Even after a sent paste, a problem stays on screen long enough to read.
+                    self.overlay.show_error(notice)
+                    self.overlay.hide_after(3600)
+                else:
+                    self.overlay.hide_after(
+                        self._delivery_hold_ms(output_status, duration)
                     )
                 if delivered_completely:
                     self._recording_state.mark_complete()
@@ -1834,6 +1837,7 @@ class VoiceInputSystem:
             "audio": getattr(self, "audio", None),
             "preview": getattr(self, "preview_transcriber", None),
             "final": getattr(self, "transcriber", None),
+            "punctuation": getattr(self, "punctuation_worker", None),
         }
         return {
             name: getattr(worker, "worker_pid", None)

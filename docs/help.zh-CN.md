@@ -1,13 +1,13 @@
 # 使用 VoiceFlow
 
-> Documentation sync: **2026-10-22** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
+> Documentation sync: **2026-11-03** · Current contract / guide. Synchronization date is not a new test date. [Current index](README.md).
 
 [返回产品首页](../README.md)
 
 ## 开始听写
 
-把光标放进输入框，按 **F2** 开始，说完再按 **F2**。
-右 Ctrl 和鼠标侧键也可以开始、停止；Esc 取消当前录音，不输出文字。
+把光标放进输入框，按住 **F2** 说话，松开就输入；也可以按一下 **F2** 开始，说完再按一下。
+右 Ctrl 和鼠标侧键用法相同；Esc 取消当前录音，不输出文字。只想用轻按开关，可以在设置的「按键方式」里改。
 
 文字没有自动出现时，按 **Ctrl+V** 粘贴。听写结果也会留在本地历史里，方便回看和复制。
 部分应用、管理员窗口或输入法状态需要手动粘贴。

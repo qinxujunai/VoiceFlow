@@ -295,6 +295,48 @@ def test_history_failure_is_contained_and_keeps_clipboard_ledger_and_pcm(
     assert "录音已完整保存" not in messages
 
 
+@pytest.mark.parametrize("problem", ["history", "recording", "coverage"])
+def test_a_problem_after_a_sent_paste_is_shown_long_enough_to_read(tmp_path, problem):
+    from delivery import DeliveryResult
+    from main import FinalTranscriptionResult
+
+    system, _observed, _recovery, pcm, text, _session_id = _finalization_fixture(tmp_path)
+    events = []
+    system.overlay.show_delivery_state = lambda status, *_args: events.append(("delivery", status))
+    system.overlay.show_error = lambda message: events.append(("error", message))
+    system.overlay.hide_after = lambda delay: events.append(("hide_after", delay))
+    clipboard_only = system.output_handler.deliver
+
+    def sent_paste(value, **kwargs):
+        # The usual result in browsers and WeChat: Ctrl+V was sent, insertion could not be read back.
+        result = clipboard_only(value, **kwargs)
+        return DeliveryResult(
+            clipboard_verified=result.clipboard_verified, paste_dispatched=True, clipboard_only=False,
+            recovery_saved=False, reason="paste_dispatched", attempts=result.attempts,
+            text_sha256=result.text_sha256, target_evidence=result.target_evidence,
+        )
+
+    system.output_handler.deliver = sent_paste
+    if problem == "history":
+        system.history.path.mkdir()
+    elif problem == "recording":
+        system.audio.recovery_error = "fixture disk full"
+    else:
+        system._transcribe_final_result = lambda *_args, **_kwargs: FinalTranscriptionResult(
+            text=text, captured_samples=len(pcm), covered_samples=len(pcm) // 2,
+            coverage_ok=False, final_source="fixture_partial",
+        )
+
+    system._on_record_stop()
+
+    kinds = [kind for kind, _value in events]
+    assert ("delivery", "clipboard_verified_paste_dispatched") in events
+    assert "error" in kinds and kinds.index("error") > kinds.index("delivery")
+    later_hides = [value for kind, value in events[kinds.index("error"):] if kind == "hide_after"]
+    assert later_hides and later_hides[-1] >= 2400
+    assert ("hide_after", system.SUCCESS_DISMISS_MS) not in events
+
+
 def test_successful_history_rescues_text_when_pending_and_clipboard_both_fail(tmp_path):
     system, observed, recovery, pcm, text, session_id = _finalization_fixture(
         tmp_path, clipboard_fails=True, ledger_fails=True

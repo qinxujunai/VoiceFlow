@@ -52,6 +52,88 @@ def test_default_trigger_mode_is_hold_or_tap():
     assert "trigger_mode: auto" in config
 
 
+def test_release_during_press_validation_stops_the_same_recording(tmp_path):
+    events, recording = [], [False]
+    manager = _manager(tmp_path, events, recording)
+    entered, resume = threading.Event(), threading.Event()
+
+    def can_toggle():
+        if threading.current_thread().name == "press-validation":
+            entered.set()
+            resume.wait(2)
+        return True
+
+    manager.callbacks["can_record_toggle"] = can_toggle
+    press = threading.Thread(name="press-validation", target=manager._handle_trigger, args=("f2", True))
+    release = threading.Thread(target=manager._handle_trigger, args=("f2", False))
+    try:
+        press.start()
+        assert entered.wait(1)
+        time.sleep(0.08)
+        release.start()
+        release.join(0.1)
+        resume.set()
+        press.join(1)
+        release.join(1)
+        assert _wait_until(lambda: len(events) == 2)
+        assert events[0][0] == "toggle"
+        assert events[1][0] == "release"
+        assert events[1][1] == events[0][1]
+    finally:
+        resume.set()
+        press.join(1)
+        if release.ident is not None:
+            release.join(1)
+        manager.stop()
+
+
+def test_duplicate_release_during_validation_cannot_turn_a_tap_into_hold(tmp_path):
+    events, recording = [], [False]
+    manager = _manager(tmp_path, events, recording)
+    entered, resume = threading.Event(), threading.Event()
+
+    def can_toggle():
+        if threading.current_thread().name == "press-validation":
+            entered.set()
+            resume.wait(2)
+        return True
+
+    manager.callbacks["can_record_toggle"] = can_toggle
+    press = threading.Thread(name="press-validation", target=manager._handle_trigger, args=("f2", True))
+    try:
+        press.start()
+        assert entered.wait(1)
+        manager._handle_trigger("f2", False)
+        time.sleep(0.08)
+        manager._handle_trigger("f2", False)
+        resume.set()
+        press.join(1)
+        assert _wait_until(lambda: bool(events))
+        time.sleep(0.05)
+        assert [event[0] for event in events] == ["toggle"]
+    finally:
+        resume.set()
+        press.join(1)
+        manager.stop()
+
+
+def test_failed_press_validation_does_not_disable_key(tmp_path):
+    import pytest
+
+    events, recording = [], [False]
+    manager = _manager(tmp_path, events, recording)
+    manager.callbacks["can_record_toggle"] = lambda: (_ for _ in ()).throw(RuntimeError("failure"))
+    try:
+        with pytest.raises(RuntimeError):
+            manager._handle_trigger("f2", True)
+        manager._handle_trigger("f2", False)
+        manager.callbacks["can_record_toggle"] = lambda: True
+        assert manager._handle_trigger("f2", True)
+        assert _wait_until(lambda: bool(events))
+    finally:
+        manager.stop()
+
+
 def test_holding_a_key_stops_the_recording_it_started_when_released(tmp_path):
     events, recording = [], [False]
     manager = _manager(tmp_path, events, recording)
@@ -185,7 +267,7 @@ def test_release_during_slow_start_is_not_lost():
     controller.mark_ready()
     assert controller.toggle_recording(1.0).accepted
     assert started.wait(1)
-    controller.release_recording(1.0, 1.5, wait_s=0.02)
+    controller.release_recording(1.0, 1.5)
     finish.set()
     assert _wait_until(lambda: calls == [(1.0, 1.5)])
 
@@ -206,8 +288,110 @@ def test_other_key_release_cannot_replace_the_starting_key():
     controller.mark_ready()
     assert controller.toggle_recording(1.0).accepted
     assert started.wait(1)
-    controller.release_recording(1.0, 1.5, wait_s=0.02)
-    controller.release_recording(2.0, 2.5, wait_s=0.02)
+    controller.release_recording(1.0, 1.5)
+    controller.release_recording(2.0, 2.5)
     finish.set()
     assert _wait_until(lambda: bool(calls))
+    time.sleep(0.05)
     assert calls == [(1.0, 1.5)]
+
+
+def test_a_release_never_waits_for_another_action_and_is_never_dropped():
+    from app_controller import AppController, RuntimePhase
+
+    cancel_started, finish_cancel = threading.Event(), threading.Event()
+    calls, messages = [], []
+
+    def cancel():
+        cancel_started.set()
+        finish_cancel.wait(2)
+
+    controller = AppController(
+        on_record_toggle=lambda triggered_at: controller.mark_recording(),
+        on_record_release=lambda pressed, released: calls.append((pressed, released)),
+        on_cancel=cancel,
+        on_status=messages.append,
+    )
+    controller.mark_ready()
+    assert controller.toggle_recording(1.0).accepted
+    assert _wait_until(lambda: controller.phase is RuntimePhase.RECORDING
+                       and not controller._action_in_flight)
+    assert controller.cancel_recording().accepted
+    assert cancel_started.wait(1)
+
+    began = time.perf_counter()
+    assert controller.release_recording(1.0, 1.5).accepted
+    assert controller.release_recording(3.0, 3.5).accepted
+    assert time.perf_counter() - began < 0.05
+    finish_cancel.set()
+    # Each release is matched to its own recording later; none is lost or answered with 稍等一下.
+    assert _wait_until(lambda: calls == [(1.0, 1.5), (3.0, 3.5)])
+    assert "稍等一下" not in messages
+
+
+def test_a_hold_release_is_delivered_while_another_key_tap_waits(tmp_path):
+    from hotkey_manager import HotkeyManager
+
+    events = []
+    first_running, finish_first = threading.Event(), threading.Event()
+
+    def toggle(triggered_at):
+        events.append(("toggle", triggered_at))
+        if not first_running.is_set():
+            first_running.set()
+            finish_first.wait(1.0)
+
+    config = tmp_path / "config.yaml"
+    config.write_text("hotkeys:\n  push_to_talk: [f2, xbutton1]\n  cancel: escape\n", encoding="utf-8")
+    manager = HotkeyManager(config_path=str(config), callbacks={
+        "on_record_toggle": toggle,
+        "on_record_release": lambda pressed_at, released_at: events.append(("release", pressed_at)),
+        "can_record_toggle": lambda: True,
+        "is_recording": lambda: False,
+    })
+    manager.hold_to_talk_s = 0.05
+    try:
+        assert manager._handle_trigger("f2", pressed=True)
+        assert first_running.wait(1.0)
+        time.sleep(0.08)
+        assert manager._handle_trigger("xbutton1", pressed=True)
+        assert manager._handle_trigger("f2", pressed=False)
+        finish_first.set()
+        assert _wait_until(lambda: any(kind == "release" for kind, _value in events))
+        assert ("release", events[0][1]) in events
+    finally:
+        finish_first.set()
+        manager.stop()
+
+
+def test_one_escape_seen_by_both_keyboard_hooks_cancels_once(tmp_path):
+    from hotkey_manager import HotkeyManager
+
+    config = tmp_path / "config.yaml"
+    config.write_text("hotkeys:\n  push_to_talk: [f2, right_ctrl]\n  cancel: escape\n", encoding="utf-8")
+    cancels = []
+    manager = HotkeyManager(config_path=str(config), callbacks={"on_record_cancel": lambda: cancels.append(1)})
+    try:
+        manager._on_cancel()
+        manager._on_cancel()
+        time.sleep(0.05)
+        assert cancels == [1]
+        time.sleep(manager.CANCEL_REPEAT_S)
+        manager._on_cancel()
+        assert _wait_until(lambda: len(cancels) == 2)
+    finally:
+        manager.stop()
+
+
+def test_trigger_mode_saves_when_the_hotkeys_line_has_a_comment(tmp_path):
+    import yaml
+    from settings_store import update_trigger_mode
+
+    config = tmp_path / "config.yaml"
+    config.write_text("hotkeys:  # 快捷键\n  push_to_talk: [f2]\n  trigger_mode: auto  # 按住或轻按\n"
+                      "engine:  # 识别\n  active: sensevoice\n", encoding="utf-8")
+    update_trigger_mode(config, "toggle")
+    text = config.read_text(encoding="utf-8")
+    assert yaml.safe_load(text)["hotkeys"]["trigger_mode"] == "toggle"
+    assert text.count("trigger_mode") == 1
+    assert "# 快捷键" in text and "# 按住或轻按" in text and "# 识别" in text

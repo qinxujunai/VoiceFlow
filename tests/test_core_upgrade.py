@@ -235,7 +235,7 @@ class VocabularyTests(unittest.TestCase):
             "Cursor",
             "DeepSeek",
             "GitHub",
-            "HuggingFace",
+            "Hugging Face",
             "LangGraph",
             "LlamaIndex",
             "MCP",

@@ -79,18 +79,20 @@ jobs:
           "VOICEFLOW_CERT_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
           "SIGNTOOL_PATH=$signTool" >> $env:GITHUB_ENV
       - name: Verify bundled-model distribution decisions
-        run: python scripts/check_release_models.py sensevoice-small-int8 streaming-zipformer-small-bilingual-zh-en-int8
+        run: python scripts/check_release_models.py sensevoice-small-int8 streaming-zipformer-small-bilingual-zh-en-int8 ct-transformer-punctuation-int8
       - name: Restore runtime model cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             models/sensevoice
             models/streaming-preview
+            models/punctuation
           key: voiceflow-runtime-models-${{ hashFiles('model-manifest.json') }}
       - name: Download and verify pinned runtime models
         run: |
           python scripts/download_models.py --engine sensevoice
           python scripts/download_models.py --engine streaming-preview
+          python scripts/download_models.py --engine punctuation
       - name: Test core contracts
         run: |
           python -m pytest tests -q
@@ -138,7 +140,8 @@ jobs:
           $innoCompiler = ./scripts/prepare_inno_compiler.ps1 -ToolchainRoot (Join-Path $env:RUNNER_TEMP "VoiceFlow-build-tools")
           $arguments = @(
             "/DINCLUDE_SENSEVOICE=1",
-            "/DINCLUDE_STREAMING_PREVIEW=1"
+            "/DINCLUDE_STREAMING_PREVIEW=1",
+            "/DINCLUDE_PUNCTUATION=1"
           )
           if ($env:SIGNING_AVAILABLE -eq "true") {
             $signCommand = (
@@ -213,7 +216,7 @@ jobs:
           "PREVIOUS_INSTALLER=$installer" >> $env:GITHUB_ENV
       - name: Smoke installer lifecycle and previous-version upgrade
         shell: pwsh
-        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview -PreviousInstallerPath $env:PREVIOUS_INSTALLER
+        run: ./scripts/smoke_installer.ps1 -RequireStreamingPreview -RequirePunctuation -PreviousInstallerPath $env:PREVIOUS_INSTALLER
       - name: Generate checksums, SBOM, and notices
         shell: pwsh
         run: |

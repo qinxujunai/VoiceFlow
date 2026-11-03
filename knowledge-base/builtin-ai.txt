@@ -25,7 +25,7 @@ Git
 GitHub
 GPU
 Grok
-HuggingFace
+Hugging Face
 JavaScript
 JSON
 Kimi

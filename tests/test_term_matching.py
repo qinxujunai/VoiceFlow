@@ -44,6 +44,32 @@ def test_split_or_misheard_dictionary_terms_are_restored(tmp_path, spoken, expec
     "a precursor of the idea",
     "we cloud the code",
     "cloudy code reviews",
+    "I could code that in an hour",
+    "we could code it in Python",
+    "cold code paths are slow",
+    "the cloud kid",
 ])
 def test_ordinary_words_are_left_alone(tmp_path, spoken):
     assert _cleaner(tmp_path, TERMS).clean(spoken) == spoken
+
+
+def test_sound_alike_words_need_five_letters_and_a_close_spelling(tmp_path):
+    cleaner = _cleaner(tmp_path, TERMS + ["Big Data"])
+    assert cleaner.clean("we need more bug data") == "we need more bug data"
+    assert cleaner.clean("claud code is fast") == "Claude Code is fast"
+
+
+@pytest.mark.parametrize("spoken", ["could\ncode", "Claude\nCode", "cloud\ncode", "open\nAI"])
+def test_terms_are_never_joined_across_a_line_break(tmp_path, spoken):
+    assert _cleaner(tmp_path, TERMS).clean(spoken) == spoken
+
+
+def test_builtin_hugging_face_keeps_its_official_spacing():
+    from text_cleaner import TextCleaner
+
+    terms = (ROOT / "knowledge-base" / "builtin-ai.txt").read_text(encoding="utf-8").splitlines()
+    assert "Hugging Face" in terms and "HuggingFace" not in terms
+    cleaner = TextCleaner({"cleaner": {"fix_mistakes": True, "auto_space_en": True},
+                           "hotwords": {"files": ["builtin-ai.txt"]}}, base_dir=ROOT)
+    assert cleaner.clean("I uploaded it to Hugging Face") == "I uploaded it to Hugging Face"
+    assert cleaner.clean("模型在huggingface上") == "模型在 Hugging Face 上"

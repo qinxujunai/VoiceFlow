@@ -24,6 +24,30 @@ def _sound_key(word: str) -> tuple[str, int]:
     return consonants, max(1, syllables)
 
 
+def _edit_distance(left: str, right: str) -> int:
+    previous = list(range(len(right) + 1))
+    for row, left_char in enumerate(left, 1):
+        current = [row]
+        for column, right_char in enumerate(right, 1):
+            current.append(min(previous[column] + 1, current[column - 1] + 1,
+                               previous[column - 1] + (left_char != right_char)))
+        previous = current
+    return previous[-1]
+
+
+def _sounds_like(spoken: str, written: str) -> bool:
+    """「cloud」 for 「Claude」: same consonants and syllables, spelled within two letters.
+
+    Words under five letters must match exactly: could, cold, kid and bug are ordinary
+    English that only shares consonants with Claude, Code and Big.
+    """
+    spoken, written = spoken.lower(), written.lower()
+    if spoken == written:
+        return True
+    return (min(len(spoken), len(written)) >= 5 and _sound_key(spoken) == _sound_key(written)
+            and _edit_distance(spoken, written) <= 2)
+
+
 class TextCleaner:
     """ASR 输出文本清理器。所有规则通过 config.yaml 控制开关。"""
 
@@ -86,6 +110,7 @@ class TextCleaner:
 
         A term may also be heard split where its own words or capitals meet:
         「open AI」 -> OpenAI, 「chat gpt」 -> ChatGPT, 「git hub」 -> GitHub.
+        A split never spans a line break.
         """
         if not self.vocabulary:
             return []
@@ -96,7 +121,7 @@ class TextCleaner:
             parts = [part for word in re.split(r"[\s-]+", term)
                      for part in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", word)]
             if len(parts) > 1 and "".join(parts) == re.sub(r"[\s-]", "", term):
-                body = r"[\s-]*".join(re.escape(part) for part in parts)
+                body = r"[ \t-]*".join(re.escape(part) for part in parts)
             else:
                 body = re.escape(term)
             pattern = re.compile(
@@ -107,7 +132,7 @@ class TextCleaner:
         return sorted(terms, key=lambda item: len(item[0]), reverse=True)
 
     def _build_term_sounds(self):
-        """Multi-word ASCII terms whose every word has three or more letters, keyed by sound."""
+        """Multi-word ASCII terms whose every word has three or more letters, matched word for word by sound."""
         if not self.vocabulary:
             return []
         sounds = []
@@ -115,21 +140,21 @@ class TextCleaner:
             words = term.split()
             if (len(words) > 1 and term.isascii()
                     and all(word.isalpha() and len(word) >= 3 for word in words)):
-                sounds.append((term, [_sound_key(word) for word in words]))
+                sounds.append((term, words))
         return sounds
 
     def _restore_misheard_terms(self, text: str) -> str:
-        """「cloud code」 -> Claude Code: same consonants and syllables, word for word."""
-        for term, keys in self.term_sounds:
-            size = len(keys)
+        """「cloud code」 -> Claude Code: every word sounds like the term's word (see _sounds_like)."""
+        for term, words in self.term_sounds:
+            size = len(words)
             tokens = list(_LATIN_TOKEN_RE.finditer(text))
             # Right to left, so a replacement never moves the windows still to be checked.
             for start in range(len(tokens) - size, -1, -1):
                 window = tokens[start:start + size]
                 gaps = [text[a.end():b.start()] for a, b in zip(window, window[1:])]
-                if any(not gap or gap.strip() for gap in gaps):
+                if any(not gap or gap.strip(" \t") for gap in gaps):
                     continue
-                if [_sound_key(token.group()) for token in window] != keys:
+                if not all(_sounds_like(token.group(), word) for token, word in zip(window, words)):
                     continue
                 if text[window[0].start():window[-1].end()] != term:
                     text = text[:window[0].start()] + term + text[window[-1].end():]

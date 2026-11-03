@@ -18,6 +18,9 @@ class HotkeyManager:
     # A press held this long is hold-to-talk: releasing it stops the recording it started.
     HOLD_TO_TALK_S = 0.3
     TRIGGER_MODES = ("auto", "toggle")
+    # With right_ctrl as a trigger one Esc reaches both the keyboard hotkey and the pynput
+    # listener; the second copy must not answer 稍等一下 during a wordless cancel.
+    CANCEL_REPEAT_S = 0.15
 
     def __init__(self, config_path=None, callbacks=None, platform_name=None):
         if config_path is None:
@@ -45,11 +48,15 @@ class HotkeyManager:
         self._pressed_triggers = set()
         # source -> perf_counter of a press that started a recording (hold-to-talk candidates)
         self._start_presses = {}
+        self._pending_presses = {}
         self._accepting_intents = True
+        self._last_cancel_at = float("-inf")
         # Keep at most one tap waiting behind the callback that is currently
         # changing recording state. A long finalization must never replay a
-        # backlog of stale taps as future start/stop actions.
-        self._intent_queue = queue.Queue(maxsize=1)
+        # backlog of stale taps as future start/stop actions. Releases are
+        # never dropped: one may be all that stops a held recording.
+        self._toggle_waiting = False
+        self._intent_queue = queue.Queue()
         self._intent_worker = threading.Thread(
             target=self._dispatch_intents,
             name="voiceflow-hotkey-intents",
@@ -93,34 +100,50 @@ class HotkeyManager:
             if not self._accepting_intents:
                 return False
             if pressed:
-                if source in self._pressed_triggers:
+                if source in self._pressed_triggers or source in self._pending_presses:
                     return False
                 self._pressed_triggers.add(source)
+                pending = {"pressed_at": now, "released_at": None, "hold": False}
+                self._pending_presses[source] = pending
             else:
                 self._pressed_triggers.discard(source)
+                pending = self._pending_presses.get(source)
+                if pending is not None:
+                    if pending["released_at"] is not None:
+                        return False
+                    pending["released_at"] = now
+                    pending["hold"] = (self.trigger_mode == "auto"
+                                       and now - pending["pressed_at"] >= self.hold_to_talk_s)
+                    return pending["hold"]
                 pressed_at = self._start_presses.pop(source, None)
                 if (pressed_at is None or self.trigger_mode != "auto"
                         or now - pressed_at < self.hold_to_talk_s):
                     return False
-        if not pressed:
-            # Hold to talk: this release stops the recording that its press started.
-            try:
                 self._intent_queue.put_nowait(("release", pressed_at, now))
-            except queue.Full:
-                return False
-            return True
+                return True
         can_toggle = self.callbacks.get("can_record_toggle")
-        if can_toggle and not can_toggle():
-            return False
-        is_recording = self.callbacks.get("is_recording")
-        starts_recording = not (is_recording and is_recording())
         try:
-            self._intent_queue.put_nowait(("toggle", now))
-        except queue.Full:
-            return False
-        if starts_recording:
+            allowed = not can_toggle or can_toggle()
+            is_recording = self.callbacks.get("is_recording")
+            starts_recording = allowed and not (is_recording and is_recording())
+        except Exception:
             with self._lock:
+                if self._pending_presses.get(source) is pending:
+                    del self._pending_presses[source]
+                    self._pressed_triggers.discard(source)
+            raise
+        with self._lock:
+            if self._pending_presses.get(source) is not pending:
+                return False
+            del self._pending_presses[source]
+            if not self._accepting_intents or not allowed or self._toggle_waiting:
+                return False
+            self._toggle_waiting = True
+            if starts_recording and pending["released_at"] is None:
                 self._start_presses[source] = now
+            self._intent_queue.put_nowait(("toggle", now))
+            if starts_recording and pending["hold"]:
+                self._intent_queue.put_nowait(("release", now, pending["released_at"]))
         return True
 
     def _dispatch_intents(self):
@@ -134,6 +157,8 @@ class HotkeyManager:
                     if callback:
                         callback(intent[1], intent[2])
                     continue
+                with self._lock:
+                    self._toggle_waiting = False
                 can_toggle = self.callbacks.get("can_record_toggle")
                 if can_toggle and not can_toggle():
                     continue
@@ -150,6 +175,11 @@ class HotkeyManager:
         self._handle_trigger(btn_name, pressed=pressed)
 
     def _on_cancel(self):
+        now = time.perf_counter()
+        with self._lock:
+            if now - self._last_cancel_at < self.CANCEL_REPEAT_S:
+                return
+            self._last_cancel_at = now
         cb = self.callbacks.get("on_record_cancel")
         if cb:
             threading.Thread(target=cb, daemon=True).start()
@@ -228,6 +258,7 @@ class HotkeyManager:
             should_stop_worker = self._accepting_intents
             self._accepting_intents = False
             self._pressed_triggers.clear()
+            self._pending_presses.clear()
         if should_stop_worker:
             while True:
                 try:

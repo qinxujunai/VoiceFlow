@@ -255,6 +255,9 @@ class NativeCapsuleView(QWidget):
             self.state.pending.clear()
             self._dismiss_at = now
         elif command == "label":
+            if args and args[0] == "error":
+                # A problem is never drawn into a capsule that is already fading out.
+                self._dismiss_at = None
             self.state.show_label(*args)
         elif command == "reset":
             self.state.reset()

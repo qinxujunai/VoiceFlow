@@ -113,7 +113,8 @@ class AppController:
         self._action_in_flight = False
         self._action_name = None
         self._action_triggered_at = None
-        self._pending_record_release = None
+        # Hold-to-talk releases that arrived while another action ran, in arrival order.
+        self._pending_record_releases = []
         self._action_queue: queue.Queue = queue.Queue(maxsize=1)
         self._action_worker = threading.Thread(
             target=self._run_actions,
@@ -222,27 +223,28 @@ class AppController:
             triggered_at=triggered_at,
         )
 
-    def release_recording(self, pressed_at, released_at, *, wait_s=2.0) -> ActionResult:
-        """Hold to talk released. Runs after a start still in flight instead of answering 请稍候."""
+    def release_recording(self, pressed_at, released_at) -> ActionResult:
+        """Hold to talk released: stop the recording this press started.
+
+        Never waits and never answers 稍等一下. While another action runs, the release waits in
+        line and runs after it; `_on_record_release` then stops only the recording its press started.
+        """
         with self._lock:
-            if self._action_in_flight and self._action_name == "record_toggle":
-                if pressed_at != self._action_triggered_at:
+            if self._action_in_flight:
+                if self._action_name == "record_toggle" and pressed_at != self._action_triggered_at:
                     return ActionResult(False, "", "not_recording")
-                self._pending_record_release = (pressed_at, released_at)
+                self._pending_record_releases.append((pressed_at, released_at))
                 return ActionResult(True, "", "")
-        deadline = time.perf_counter() + wait_s
-        while True:
-            with self._lock:
-                busy = self._action_in_flight
-            if not busy or time.perf_counter() >= deadline:
-                break
-            time.sleep(0.01)
-        if self.phase is not RuntimePhase.RECORDING:
-            return ActionResult(False, "", "not_recording")
-        return self._enqueue(
-            "record_release",
-            lambda: self._call("record_release", pressed_at, released_at),
+            if self._phase is not RuntimePhase.RECORDING:
+                return ActionResult(False, "", "not_recording")
+            self._action_in_flight = True
+            self._action_name = "record_release"
+            self._action_triggered_at = None
+        # The action queue is empty whenever no action is in flight.
+        self._action_queue.put_nowait(
+            ("record_release", lambda: self._call("record_release", pressed_at, released_at))
         )
+        return ActionResult(True, "", "")
 
     def cancel_recording(self):
         return self._enqueue("cancel", lambda: self._call("cancel"))
@@ -411,13 +413,12 @@ class AppController:
             finally:
                 while True:
                     with self._lock:
-                        pending = self._pending_record_release
-                        self._pending_record_release = None
-                        if pending is None:
+                        if not self._pending_record_releases:
                             self._action_in_flight = False
                             self._action_name = None
                             self._action_triggered_at = None
                             break
+                        pending = self._pending_record_releases.pop(0)
                     try:
                         self._call("record_release", *pending)
                     except Exception:

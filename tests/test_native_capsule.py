@@ -146,6 +146,39 @@ def test_only_a_paste_that_could_not_be_sent_says_how_to_paste():
         view.close()
 
 
+def test_an_error_after_a_silent_delivery_stays_visible():
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.present("prepare_recording", [1])
+        view.present("final", ["终稿", 1])
+        view.present("delivery", ["clipboard_verified_paste_dispatched", 1])
+        assert view._dismiss_at is not None
+        view.present("label", ["error", "历史没存上，文字已复制"])
+        assert view._dismiss_at is None
+        assert view.state.text == "历史没存上，文字已复制"
+    finally:
+        view.close()
+
+
+def test_a_status_word_does_not_interrupt_a_wordless_cancel():
+    from capsule_native import NativeCapsuleView
+    from qt_compat import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    view = NativeCapsuleView()
+    try:
+        view.present("prepare_recording", [1])
+        view.present("dismiss", [])
+        view.present("label", ["success", "稍等一下"])
+        assert view._dismiss_at is not None
+    finally:
+        view.close()
+
+
 def test_dismiss_fades_out_without_a_label():
     from capsule_native import NativeCapsuleView
     from qt_compat import QApplication

@@ -279,6 +279,12 @@ try {
     if ($RequireStreamingPreview -and $state.preview_asr -ne "ready") {
         throw "Installed VoiceFlow streaming preview did not become ready"
     }
+    if ($RequirePunctuation) {
+        $punctuationPid = [int]$state.worker_pids.punctuation
+        if ($punctuationPid -le 0 -or -not (Get-Process -Id $punctuationPid -ErrorAction SilentlyContinue)) {
+            throw "Installed VoiceFlow punctuation worker did not become ready"
+        }
+    }
     if (-not (Select-String -LiteralPath (Join-Path $smokeDataDir "logs\history.jsonl") -SimpleMatch "upgrade sentinel" -Quiet)) {
         throw "First startup lost preserved history"
     }

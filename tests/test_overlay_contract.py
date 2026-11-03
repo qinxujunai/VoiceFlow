@@ -279,7 +279,7 @@ def test_settings_do_not_expose_model_choice_or_download_controls():
 def test_history_does_not_expose_internal_output_status_codes():
     overlay = _settings_source()
 
-    assert '"clipboard_verified_paste_dispatched": "已粘贴"' in overlay
+    assert '"clipboard_verified_paste_dispatched": "已发送粘贴"' in overlay
     assert '"landed_confirmed": "已粘贴"' in overlay
     assert '"clipboard_verified_only": "已复制"' in overlay
     assert "未确认" not in overlay
