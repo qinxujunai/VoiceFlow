@@ -49,6 +49,17 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-11-03, Claude** (after the release, owner-approved plan): one coded demo per page. The
+  README drops the static brand card (it drew a second capsule above the demo) for a text title;
+  the demo SVG says 「按住说话，松开就输入」, shows F2 held while speaking, and fades whole phrases
+  in like the app instead of a sliding clip that cut glyphs in half (「同步纟」); the final
+  sentence now takes the draft's place with no empty capsule; README.en uses a new English demo.
+  Website: 「按住说话，松开成文。」, demo steps 「按住 F2 · 开始说话 / 松开 F2 · 完成识别」, the static
+  capsule picture in the recovery section removed, asset URLs re-versioned (`20261103c`). Website
+  only; the 0.3.12 installer is unchanged. Verified: full suite 929 passed (new demo, README and
+  site tests failed first); demo frames at eight moments in Chromium; local site desktop and mobile,
+  Chinese and English, no script errors or horizontal overflow.
+
 - **2026-11-03, Claude**: published Windows 0.3.12 / build 261103.1 from frozen `fb1312c`
   (release materials and site copy `d286a8a`); installer SHA-256
   `9495f143a7c4f5da0c43d962d34d70658e35cb9f3756112019af853efa343b27`, 306907346 bytes.

@@ -467,42 +467,6 @@ nav a:hover{
   margin:28px auto 0;
   color:#a2a2ac
 }
-.capsule-art{
-  width:fit-content;
-  max-width:100%;
-  min-height:100px;
-  display:flex;
-  align-items:center;
-  gap:26px;
-  padding:25px 45px;
-  margin:68px auto 35px;
-  border-radius:100px;
-  background:linear-gradient(180deg,#353539,#27272b);
-  box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 18px 65px rgba(0,0,0,.6);
-  font-size:26px;
-  letter-spacing:-.03em
-}
-.capsule-bars{
-  display:flex;
-  align-items:center;
-  gap:5px;
-  flex-shrink:0
-}
-.capsule-bars i{
-  width:5px;
-  background:var(--red);
-  border-radius:6px;
-  height:19px
-}
-.capsule-bars i:nth-child(2){
-  height:36px
-}
-.capsule-bars i:last-child{
-  height:25px
-}
-.quiet-section .art-note{
-  color:#8e8e94
-}
 .personal-section{
   display:grid;
   grid-template-columns:1.1fr 1fr;
@@ -720,9 +684,6 @@ footer{
   .paper-note,.mail-paper{
     padding:20px 17px
   }
-  .capsule-art{
-    font-size:23px
-  }
   .hero-copy{
     padding-top:72px
   }
@@ -862,19 +823,6 @@ footer{
   }
   .quiet-section .section-lede{
     max-width:340px
-  }
-  .capsule-art{
-    padding:20px 24px;
-    font-size:18px;
-    min-height:80px;
-    gap:16px;
-    margin:47px auto 25px
-  }
-  .capsule-bars{
-    gap:4px
-  }
-  .capsule-bars i{
-    width:4px
   }
   .personal-section,.privacy-inner{
     grid-template-columns:1fr;

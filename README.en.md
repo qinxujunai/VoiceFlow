@@ -1,6 +1,7 @@
 <p align="right"><a href="README.md">中文</a> · <strong>English</strong></p>
 
-![VoiceFlow — Let ideas take shape](docs/voiceflow-brand.en.svg)
+<h1 align="center">VoiceFlow</h1>
+<p align="center"><strong>Let ideas take shape.</strong></p>
 
 <div align="center">
 
@@ -14,7 +15,7 @@ Windows 10 / 11 · Works offline · No sign-in
 
 ## Less typing. Less switching.
 
-![VoiceFlow product demo](docs/voiceflow-demo.svg)
+![VoiceFlow product demo](docs/voiceflow-demo.en.svg)
 
 Place your cursor in a text field. Hold **F2** while you speak and release to finish, or tap it to start and tap again to finish.
 Your voice becomes text on your computer. Recording and recognition stay local.

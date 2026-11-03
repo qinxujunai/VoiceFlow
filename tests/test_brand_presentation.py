@@ -13,15 +13,19 @@ def _read(relative_path):
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_readmes_lead_with_brand_and_keep_the_real_demo():
-    for readme_name in ("README.md", "README.en.md"):
+def test_readmes_lead_with_one_animated_demo():
+    # Owner, 2026-11-03: the static brand card drew a second capsule above the real demo.
+    for readme_name, demo in (("README.md", "docs/voiceflow-demo.svg"),
+                              ("README.en.md", "docs/voiceflow-demo.en.svg")):
         readme = _read(readme_name)
 
         assert "/releases/latest" in readme
         assert "Ctrl+V" in readme
-        assert "docs/voiceflow-demo.svg" in readme
+        assert demo in readme
+        assert readme.count(".svg)") == 1
         assert "voiceflow-app-home" not in readme
-        assert "docs/voiceflow-brand." in readme
+        assert "docs/voiceflow-brand." not in readme
+        assert '<h1 align="center">VoiceFlow</h1>' in readme
         assert "badge.svg" not in readme
         assert "img.shields.io" not in readme
         assert "docs/help." in readme
@@ -66,12 +70,37 @@ def test_product_site_demo_matches_readme_demo():
     site_demo = _read("site/assets/voiceflow-demo.svg")
 
     assert site_demo == docs_demo
+    assert _read("site/assets/voiceflow-demo.en.svg") == _read("docs/voiceflow-demo.en.svg")
     assert "prefers-reduced-motion: reduce" in site_demo
     assert 'rx="48" fill="#f5f5f7"' in site_demo
     assert 'id="softPanel"' not in site_demo
     assert 'id="finalText"' in site_demo
     assert ">已完成</text>" not in site_demo
     assert "deliveryDismissState" in site_demo
+
+
+@pytest.mark.parametrize("name,caption", [("docs/voiceflow-demo.svg", "按住说话，松开就输入"),
+                                          ("docs/voiceflow-demo.en.svg", "Hold to speak, release to insert")])
+def test_svg_demo_shows_hold_to_talk_and_whole_words(name, caption):
+    import re
+    import xml.etree.ElementTree as ET
+    svg = _read(name)
+
+    assert caption in svg
+    assert "按一下开始" not in svg and "Press once" not in svg
+    # The key stays down while speaking and comes up on release.
+    assert 'id="keycap"' in svg and "@keyframes keyHold" in svg
+    # Words fade in whole, like the app (140 ms); a sliding clip cut glyphs in half (「同步纟」).
+    assert "previewReveal" not in svg and "clip-path" not in svg
+    root = ET.fromstring(svg)
+    live = next(e for e in root.iter() if e.get("id") == "liveText")
+    chunks = [e for e in live if e.tag.endswith("}tspan")]
+    assert len(chunks) >= 5
+    assert "".join(e.text for e in chunks) == next(e for e in root.iter() if e.get("id") == "finalText").text.replace(" ", "")
+    for index, chunk in enumerate(chunks, 1):
+        assert chunk.get("class") == f"c{index}"
+        assert re.search(rf"\.c{index} \{{ animation: c{index} 6\.8s linear infinite; \}}", svg)
+        assert f"@keyframes c{index} " in svg
 
 
 def test_svg_demo_text_is_outside_filter_groups():
@@ -113,11 +142,31 @@ def test_public_copy_describes_user_actions_and_manual_paste():
     page = _read("site/index.html")
     copy = _read("site/app.js")
 
-    assert "按 F2 开始" in page + copy
+    assert "按住 F2" in page + copy
+    assert "按 F2 开始" not in page + copy and "再按 F2" not in page + copy
+    assert "Press once" not in copy and "Press F2 again" not in copy
     assert "本地历史" in page + copy
     assert "local history" in copy
     assert "未知输入框只复制" not in page + copy
     assert "focus remains in a verified editor" not in copy
+
+
+def test_product_site_keeps_one_demo_and_describes_hold_to_talk():
+    page = _read("site/index.html")
+    copy = _read("site/app.js")
+    css = _read("site/styles.css")
+
+    # Owner, 2026-11-03: one coded demo only; the static capsule picture is gone.
+    assert 'class="live-demo"' in page
+    assert "capsule-art" not in page + css
+    for key in ("capsuleText", "capsuleArtNote", "capsuleAria"):
+        assert key not in page + copy
+    assert "按住说话，松开成文。" in page and 'heroTitleSecond: "按住说话，松开成文。"' in copy
+    assert 'heroTitleSecond: "Hold to speak. Let go to write."' in copy
+    assert 'demoStart: "按住 F2 · 开始说话"' in copy and 'demoFinish: "松开 F2 · 完成识别"' in copy
+    assert 'demoStart: "Hold F2 · Start speaking"' in copy and 'demoFinish: "Release F2 · Finish recognition"' in copy
+    assert "按住 F2 → 说话 → 松开就输入" in page
+    assert 'filmCaption: "Hold F2 → Speak → Release to insert"' in copy
 
 
 def test_removed_composite_assets_stay_removed():
@@ -257,8 +306,8 @@ def test_public_site_renderer_validates_digest_and_replaces_placeholders(tmp_pat
     copy = (output_dir / "app.js").read_text(encoding="utf-8")
     assert "__VOICEFLOW_VERSION__" not in page + copy
     assert "v0.3.0" in page + copy
-    assert 'src="app.js?v=0.3.0&amp;site=20261103"' in page or 'src="app.js?v=0.3.0&site=20261103"' in page
-    assert 'href="styles.css?v=20261103b"' in page
+    assert 'src="app.js?v=0.3.0&amp;site=20261103c"' in page or 'src="app.js?v=0.3.0&site=20261103c"' in page
+    assert 'href="styles.css?v=20261103c"' in page
     assert release["assets"][0]["browser_download_url"] in page
 
 

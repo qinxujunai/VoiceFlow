@@ -1,6 +1,7 @@
 <p align="right"><strong>中文</strong> · <a href="README.en.md">English</a></p>
 
-![VoiceFlow — 让想法成文](docs/voiceflow-brand.zh-CN.svg)
+<h1 align="center">VoiceFlow</h1>
+<p align="center"><strong>让想法成文。</strong></p>
 
 <div align="center">
 

@@ -294,7 +294,7 @@ def test_product_site_localizes_demo_links_and_accessibility_labels():
     assert 'data-i18n-href="privacyHref"' in index
     assert 'demoSrc: "assets/voiceflow-demo.en.svg"' in copy
     assert "docs/help.en.md#privacy-and-networking" in copy
-    assert "Press once to start, again to finish" in english_demo
+    assert "Hold to speak, release to insert" in english_demo
     assert "prefers-reduced-motion: reduce" in english_demo
 
 

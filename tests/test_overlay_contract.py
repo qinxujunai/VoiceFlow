@@ -742,10 +742,10 @@ def test_readme_demo_keeps_branded_overlay_geometry_and_copy():
 
     assert 'width="380" height="52" rx="26"' in svg
     assert '#demo-pill { animation: pillState' in svg
-    assert 'clip-path: url(#previewReveal)' in svg
+    assert "previewReveal" not in svg
     assert "prefers-reduced-motion: reduce" in svg
     assert "明早十点，把方案同步给团队。" in svg
-    assert "按一下开始，再按一下完成" in svg
+    assert "按住说话，松开就输入" in svg
     assert "已复制 · 14字" not in svg
     assert 'id="softPanel"' not in svg
 
@@ -756,7 +756,7 @@ def test_readme_defaults_to_chinese_with_english_switch():
 
     assert '<strong>中文</strong> · <a href="README.en.md">English</a>' in readme
     assert "Windows 10 / 11 · 离线使用 · 无需登录" in readme
-    assert "docs/voiceflow-brand.zh-CN.svg" in readme
+    assert "docs/voiceflow-brand.zh-CN.svg" not in readme
     assert "[下载 VoiceFlow]" in readme
     assert "docs/help.zh-CN.md" in readme
     assert "docs/voiceflow-demo.svg" in readme
@@ -767,10 +767,10 @@ def test_readme_defaults_to_chinese_with_english_switch():
     assert "GitHub 右侧的语言统计" not in readme
     assert '<a href="README.md">中文</a> · <strong>English</strong>' in english
     assert "Windows 10 / 11 · Works offline · No sign-in" in english
-    assert "docs/voiceflow-brand.en.svg" in english
+    assert "docs/voiceflow-brand.en.svg" not in english
     assert "[Download VoiceFlow]" in english
     assert "docs/help.en.md" in english
-    assert "docs/voiceflow-demo.svg" in english
+    assert "docs/voiceflow-demo.en.svg" in english
     assert "Ctrl+V" in english
 
 
