@@ -77,3 +77,5 @@ def test_short_demo_transcript_is_not_faded():
     import re
     rule = re.search(r"#demo-transcript\{([^}]*)\}", css).group(1)
     assert "mask-image" not in rule
+    overflow = re.search(r"#demo-transcript\[data-overflow=true\]\{([^}]*)\}", css).group(1)
+    assert "calc(100% - 22px)" not in overflow
