@@ -125,6 +125,7 @@ jobs:
         with:
           name: VoiceFlow-windows-unsigned
           path: dist/installer/*.exe
+          retention-days: 14
 
   scheduled-model-smoke:
     if: github.event_name == 'schedule'

@@ -49,6 +49,10 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-11-08, Codex**: set ordinary Windows and macOS quality-build artifacts to expire after 14 days; formal release and verification artifacts are unchanged. Change is in this commit. YAML parsed and compared with HEAD (only the intended two retention settings changed); `tests/test_platform_contract.py` passed (9 tests). Roll back by removing those two `retention-days` entries.
+
+- **2026-11-08, Codex**: moved the old untracked `site-preview/` into the ignored local backup `output/cleanup-20261108-site-preview/` to keep the working tree tidy; no commit. Verified all 9 files against their pre-move SHA-256 hashes, and found no running process referencing the preview. Restore by moving that backup back to `site-preview/`.
+
 - **2026-11-07, Claude**: follow-up to the demo change below, from the independent review. The capsule in
   both demo SVGs appeared 0.9 s before F2 went down and came back empty for the last 7 % of the loop; it
   now fades in as the key goes down and stays gone after the silent finish (`capsuleState`). The release
