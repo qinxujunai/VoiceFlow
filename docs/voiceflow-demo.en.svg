@@ -34,10 +34,12 @@
         0%, 11%, 65%, 100% { fill: #ffffff; }
         13%, 63% { fill: #e8e8ed; }
       }
+      /* The capsule appears as F2 goes down and is gone after the silent finish: none before the press, none at the loop's end. */
       @keyframes capsuleState {
-        0%, 12%, 96%, 100% { opacity: 1; transform: translate(552px,168px); }
+        0%, 12% { opacity: 0; transform: translate(552px,168px); }
+        14% { opacity: 1; }
         22%, 76% { opacity: 1; transform: translate(410px,168px); }
-        82%, 92% { opacity: 0; transform: translate(552px,168px); }
+        82%, 100% { opacity: 0; transform: translate(552px,168px); }
       }
       @keyframes pillState {
         0%, 12%, 96%, 100% { width: 96px; }

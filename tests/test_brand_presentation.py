@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import hashlib
 import pytest
+import re
 import subprocess
 import sys
 
@@ -101,6 +102,39 @@ def test_svg_demo_shows_hold_to_talk_and_whole_words(name, caption):
         assert chunk.get("class") == f"c{index}"
         assert re.search(rf"\.c{index} \{{ animation: c{index} 6\.8s linear infinite; \}}", svg)
         assert f"@keyframes c{index} " in svg
+
+
+def _keyframes(svg, name):
+    """Return {offset percent: {property: value}} for one CSS @keyframes rule of an SVG demo."""
+    start = svg.index(f"@keyframes {name} {{") + len(f"@keyframes {name} {{")
+    depth, end = 1, start
+    while depth:
+        depth += {"{": 1, "}": -1}.get(svg[end], 0)
+        end += 1
+    frames = {}
+    for offsets, declarations in re.findall(r"([\d.%,\s]+)\{([^}]*)\}", svg[start:end - 1]):
+        props = dict(part.split(":", 1) for part in declarations.split(";") if ":" in part)
+        for offset in offsets.split(","):
+            frames.setdefault(float(offset.strip().rstrip("%")), {}).update(
+                {key.strip(): value.strip() for key, value in props.items()})
+    return frames
+
+
+@pytest.mark.parametrize("name", ["docs/voiceflow-demo.svg", "docs/voiceflow-demo.en.svg"])
+def test_svg_demo_capsule_exists_only_while_f2_is_down(name):
+    # Owner, 2026-11-03: hold to talk. The capsule appears when the key goes down and is gone after the
+    # silent finish; the loop must not show a recording capsule before the press or an empty one at the end.
+    svg = _read(name)
+    key_down = min(offset for offset, props in _keyframes(svg, "keyHold").items() if "2px" in props["transform"])
+    opacity = {offset: float(props["opacity"])
+               for offset, props in _keyframes(svg, "capsuleState").items() if "opacity" in props}
+
+    assert opacity[0.0] == 0 and opacity[100.0] == 0
+    assert all(value == 0 for offset, value in opacity.items() if offset < key_down)
+    shown = [offset for offset, value in opacity.items() if value > 0]
+    gone = min(offset for offset, value in opacity.items() if value == 0 and offset > max(shown) - 1)
+    assert min(shown) >= key_down
+    assert all(value == 0 for offset, value in opacity.items() if offset >= gone)
 
 
 def test_svg_demo_text_is_outside_filter_groups():

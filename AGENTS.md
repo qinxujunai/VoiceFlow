@@ -49,6 +49,14 @@ to swap engines without the quality gates below.
 
 ## Handoff Log
 
+- **2026-11-07, Claude**: follow-up to the demo change below, from the independent review. The capsule in
+  both demo SVGs appeared 0.9 s before F2 went down and came back empty for the last 7 % of the loop; it
+  now fades in as the key goes down and stays gone after the silent finish (`capsuleState`). The release
+  checklist names both demo files. Left for later: `DESIGN.md` line 7 and the `src/main.py` docstring still
+  describe tap-to-start; `site/assets/voiceflow-share.png` (link preview) still shows the old static capsule
+  and tagline. Verified: new `test_svg_demo_capsule_exists_only_while_f2_is_down` failed on both SVGs first;
+  capsule opacity sampled in Chromium at 14 points of the cycle before and after; full suite below.
+
 - **2026-11-03, Claude** (after the release, owner-approved plan): one coded demo per page. The
   README drops the static brand card (it drew a second capsule above the demo) for a text title;
   the demo SVG says 「按住说话，松开就输入」, shows F2 held while speaking, and fades whole phrases
