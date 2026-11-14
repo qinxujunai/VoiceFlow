@@ -226,6 +226,19 @@ def test_public_release_uploads_installer_and_verification_assets():
     assert "THIRD_PARTY_NOTICES.md" in publish_command
 
 
+def test_site_mirror_root_matches_the_update_checker():
+    import importlib.util
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "src"))
+    from update_checker import MIRROR_ROOT
+
+    spec = importlib.util.spec_from_file_location("site_renderer_mirror", PROJECT_ROOT / "scripts/prepare_public_site.py")
+    renderer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(renderer)
+    assert renderer.MIRROR_ROOT == MIRROR_ROOT
+
+
 def test_readmes_use_latest_release_instead_of_a_versioned_asset():
     for readme_name in ("README.md", "README.en.md"):
         readme = _read(readme_name)
@@ -340,9 +353,11 @@ def test_public_site_renderer_validates_digest_and_replaces_placeholders(tmp_pat
     copy = (output_dir / "app.js").read_text(encoding="utf-8")
     assert "__VOICEFLOW_VERSION__" not in page + copy
     assert "v0.3.0" in page + copy
-    assert 'src="app.js?v=0.3.0&amp;site=20261103c"' in page or 'src="app.js?v=0.3.0&site=20261103c"' in page
-    assert 'href="styles.css?v=20261103c"' in page
+    assert 'src="app.js?v=0.3.0&amp;site=20261114a"' in page or 'src="app.js?v=0.3.0&site=20261114a"' in page
+    assert 'href="styles.css?v=20261114a"' in page
     assert release["assets"][0]["browser_download_url"] in page
+    assert ('href="https://media-1416754078.cos.ap-shanghai.myqcloud.com/voiceflow/releases/'
+            'v0.3.0/VoiceFlow-0.3.0-Windows-x64.exe"') in page
 
 
 def test_public_site_renderer_rejects_a_checksum_mismatch(tmp_path):

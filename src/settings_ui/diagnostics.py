@@ -139,7 +139,7 @@ class DiagnosticsMixin:
         update_row = QHBoxLayout()
         self.check_update_button = QPushButton("检查更新")
         self.check_update_button.clicked.connect(self._check_for_update)
-        self.update_status = QLabel("仅在点击后检查；日常运行不会联网。")
+        self.update_status = QLabel("开启「每天自动检查更新」时，每天最多联网一次，只读取最新版本号；录音与识别始终离线。")
         self.update_status.setObjectName("sectionSubtitle")
         self.update_status.setWordWrap(True)
         update_row.addWidget(self.check_update_button)

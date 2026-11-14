@@ -147,6 +147,11 @@ class PreferencesMixin:
         self.autostart_check.setAccessibleName("开机自动启动 VoiceFlow")
         self.autostart_check.setMinimumHeight(44)
         input_card.addWidget(self.autostart_check)
+        self.auto_update_check = QCheckBox("每天自动检查更新")
+        self.auto_update_check.setAccessibleName("每天自动检查更新")
+        self.auto_update_check.setToolTip("每天最多联网一次，只读取最新版本号，有新版时在托盘提醒。录音与识别始终离线。")
+        self.auto_update_check.setMinimumHeight(44)
+        input_card.addWidget(self.auto_update_check)
 
         format_card, format_fields = group("标点与格式")
         self.dictation_scope_combo = QComboBox()
@@ -245,7 +250,7 @@ class PreferencesMixin:
         ]
         for widget in (self.language_combo, self.microphone_combo, self.trigger_mode_combo):
             widget.currentIndexChanged.connect(self._settings_changed)
-        for widget in (self.autostart_check, self.preserve_format_check):
+        for widget in (self.autostart_check, self.auto_update_check, self.preserve_format_check):
             widget.toggled.connect(self._settings_changed)
         self.sentence_end_combo.currentIndexChanged.connect(self._settings_changed)
         self.save_settings_button.setEnabled(False)
@@ -312,7 +317,8 @@ class PreferencesMixin:
 
     def _settings_values(self):
         return (self.language_combo.currentData(), self.microphone_combo.currentData(), self.autostart_check.isChecked(),
-                copy.deepcopy(self._preferences_draft), self.trigger_mode_combo.currentData())
+                copy.deepcopy(self._preferences_draft), self.trigger_mode_combo.currentData(),
+                self.auto_update_check.isChecked())
 
     def _settings_dirty(self):
         return self._settings_baseline is not None and self._settings_values() != self._settings_baseline
@@ -370,6 +376,7 @@ class PreferencesMixin:
         self.autostart_check.setChecked(is_autostart_enabled(self.paths))
         mode = config.get("hotkeys", {}).get("trigger_mode", "auto")
         self.trigger_mode_combo.setCurrentIndex(max(0, self.trigger_mode_combo.findData(mode)))
+        self.auto_update_check.setChecked((config.get("updates") or {}).get("auto_check", True) is not False)
 
     def _save_settings(self):
         config = self._load_config()
@@ -385,6 +392,7 @@ class PreferencesMixin:
             "device_index": self.microphone_combo.currentData(),
             "autostart": self.autostart_check.isChecked(),
             "trigger_mode": self.trigger_mode_combo.currentData(),
+            "auto_update_check": self.auto_update_check.isChecked(),
             "expected_config": self._config_snapshot,
             "expected_preferences": {key: copy.deepcopy(self._dictation_preferences_snapshot[key]) for key in ("schema_version", "global", "apps")},
             "preferences": copy.deepcopy(self._preferences_draft),
@@ -419,7 +427,8 @@ class PreferencesMixin:
         self._dictation_preferences_snapshot = copy.deepcopy(payload["preferences"])
         # Keep any edits made while the save worker was running as a new draft.
         self._settings_baseline = (payload["language"], payload["device_index"], payload["autostart"],
-                                   copy.deepcopy(payload["preferences"]), payload["trigger_mode"])
+                                   copy.deepcopy(payload["preferences"]), payload["trigger_mode"],
+                                   payload["auto_update_check"])
         self._settings_changed()
         self._set_status_badge("已保存。设备设置重启后生效。" if payload["restart_required"] else "已保存，下一次听写生效。")
 

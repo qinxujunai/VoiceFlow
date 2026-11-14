@@ -16,6 +16,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = re.compile(r"^v(?P<version>\d+\.\d+\.\d+)$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+# China mirror (Tencent Cloud COS, Shanghai): the same installer bytes as the Release
+# asset. Keep in sync with MIRROR_ROOT in src/update_checker.py.
+MIRROR_ROOT = "https://media-1416754078.cos.ap-shanghai.myqcloud.com/voiceflow/"
 
 
 def _request(url: str, *, token: str, accept: str) -> bytes:
@@ -149,6 +152,8 @@ def _validated_release(
         "tag": f"v{version}",
         "installer_name": installer_name,
         "installer_url": str(installer["browser_download_url"]),
+        # Same installer bytes on the China mirror (Tencent Cloud COS, Shanghai).
+        "mirror_url": f"{MIRROR_ROOT}releases/v{version}/{installer_name}",
         "installer_size": int(installer["size"]),
         "sha256": asset_digest,
         "compliance_sha256": compliance_digests,
@@ -167,6 +172,7 @@ def _render_site(source_dir: Path, output_dir: Path, metadata: dict) -> None:
     replacements = {
         "__VOICEFLOW_VERSION__": metadata["version"],
         "__VOICEFLOW_INSTALLER_URL__": metadata["installer_url"],
+        "__VOICEFLOW_MIRROR_URL__": metadata["mirror_url"],
     }
     replaced = {marker: False for marker in replacements}
     for filename in ("index.html", "app.js"):

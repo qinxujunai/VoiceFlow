@@ -37,8 +37,9 @@ The installer includes the files needed for offline dictation. You do not need P
 The installer is currently unsigned, so Windows may show a security prompt. Download from this project's release page; a SHA256 checksum file is provided.
 
 Exit VoiceFlow from the tray before running a new installer. Your settings, vocabulary and history are kept.
-VoiceFlow does not update silently or connect automatically. Check for updates yourself in About VoiceFlow.
-The update check offers a download only when the installer and checksum file have matching versions and digests.
+By default VoiceFlow checks for a new version once a day. It reads only the latest version number; when one is out, the tray shows a single notice and a 下载新版本 (download new version) menu item that opens the download page. Nothing is downloaded or installed automatically.
+To stay offline, turn off 每天自动检查更新 (check for updates daily) in 设置 → 输入 (Settings → Input); you can still check by hand in About VoiceFlow.
+Through GitHub, a download is offered only when the installer and checksum file have matching versions and digests; when GitHub is unreachable, the version manifest on the China mirror (Tencent Cloud) is read instead.
 
 ## History and recovery
 
@@ -50,7 +51,7 @@ Clearing local data removes dictation history and undelivered recordings after c
 
 Recording and recognition run on your computer. Everyday dictation needs no connection, account or audio upload.
 Settings, vocabulary, history and recovery recordings live in `%LOCALAPPDATA%\VoiceFlow`.
-Normal use does not download models, check updates or call cloud recognition. An explicit update check accesses GitHub.
+Normal use does not download models or call cloud recognition. The only automatic connection is the daily update check: it contacts GitHub, or Tencent Cloud when GitHub is unreachable, reads the version number and sends no audio, text or personal information. You can turn it off in Settings.
 Preparing source dependencies or an approved model download requires a connection. The installer contains no developer or other user's dictation history.
 
 ## Get help

@@ -29,6 +29,7 @@ Each has a reason; change one only after writing the new reason here.
 | Seams in long dictation: an overlap junction takes the next piece's punctuation; a pause-cut stop before a lowercase word is dropped; final punctuation is rebuilt wherever a gap touches Chinese, also in mixed paragraphs, while English keeps the recognizer's punctuation and case | The owner's 73 s mixed recording showed 「时间的。话呢」 and 「into. the」. The worker stripped 「AItranser。And」 into one word, so the guard returned the whole paragraph unchanged. Measured with `scripts/evaluate_dictation.py` | 2026-11-03 |
 | Dictionary terms also match split at their own word or capital boundaries (「open AI」 → OpenAI, never across a line break) and, for multi-word terms whose words all have 3+ letters, by sound word for word (「cloud code」 → Claude Code). A word heard differently needs 5+ letters, the same consonants and syllables, and a spelling within two letters of the term's word; shorter words must match exactly | The word lists were loaded but changed nothing beyond exact case; single words are never matched by sound. The first sound rule ignored vowels, so the review saw 「I could code that」 → 「I Claude Code that」 and 「bug data」 → Big Data | 2026-11-03 |
 | A public release needs the artifact-bound license review (`licenses/release-review-<version>.md`, LGPL sources) and installed verification | Compliance gate in `scripts/check_release_compliance.py` is fail-closed by design; do not bypass it in CI | 0.3.9 release |
+| Daily update check, on by default: `updates.auto_check` (设置 → 输入 → 每天自动检查更新). About 60 s after start and then every 6 h the tray asks `update_schedule.UpdateSchedule` whether 24 h have passed; if so `update_checker.check_latest_release` runs on its own thread (GitHub Releases with digest checks first, the Tencent Cloud manifest `voiceflow/latest.json` only when GitHub is unreachable). A newer version adds 「下载新版本 x.y.z」 to the tray menu (kept across restarts in `update-check.json`) and one tray notice per version; a click opens the download page. Nothing is downloaded or installed automatically, and any failure is silent | Owner, 2026-11-14: a manual 检查更新 meant nobody learned about new versions, while platform and model fixes matter. It reads one small file a day and sends no audio, text or personal data. A push design needs an always-on server; polling a static file is what desktop software does without one. The site, README and help say exactly this | 2026-11-14 |
 
 The stack is already the mature choice for offline dictation on Windows (sherpa-onnx with
 SenseVoice and a streaming Zipformer, PySide6, sounddevice, uiautomation); there is no reason
@@ -48,6 +49,8 @@ to swap engines without the quality gates below.
   natural speech is collected.
 
 ## Handoff Log
+
+- **2026-11-14, Claude** (owner-approved): daily automatic update check, on by default, with a setting to turn it off; China mirror fallback for the check and a 「国内下载」 link on the site (`__VOICEFLOW_MIRROR_URL__`, same installer bytes under `voiceflow/releases/v<version>/` on Tencent Cloud COS). New `src/update_schedule.py`; `update_checker.py` mirror fallback; tray item and notice in `overlay_webview.py`; setting in `preferences.py` / `settings_store.py` (same save transaction); About-page, README, help and site wording; site assets re-versioned `20261114a`. Not released: the next release (0.3.13) must upload `voiceflow/latest.json` (`{"version", "installer_url", "sha256"}`) and the installer to the mirror. Verified on Linux with Xvfb: full suite with the same 18 environment failures before and after, 16 new tests passed; site rendered from the live 0.3.12 Release, desktop and mobile without overflow or script errors. Windows tray notice still to be seen on a real installed build.
 
 - **2026-11-08, Codex**: set ordinary Windows and macOS quality-build artifacts to expire after 14 days; formal release and verification artifacts are unchanged. Change is in this commit. YAML parsed and compared with HEAD (only the intended two retention settings changed); `tests/test_platform_contract.py` passed (9 tests). Roll back by removing those two `retention-days` entries.
 
@@ -263,7 +266,7 @@ on the recording action path. Preview PCM blocks are at most 100 ms.
 
 ## Product Rules
 
-- Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls.
+- Offline by default. Do not add cloud ASR, cloud LLM, or hidden network calls. The only automatic request is the documented daily update check, which the person can turn off.
 - Text cleanup preserves wording and repetitions. Only visible dictionary corrections
   may replace words. Punctuation inference preserves lexical content, bypasses technical
   or preserve-format input, and falls back unchanged on failure or timeout.

@@ -55,7 +55,9 @@ from tray_icon import (
 from ui_state import UiState, display_for_state
 from settings_store import onboarding_completed, set_onboarding_completed
 from runtime_paths import AppPaths
-from version import display_version
+from version import APP_VERSION, display_version
+from update_checker import DOWNLOAD_PAGE, check_latest_release
+from update_schedule import UpdateSchedule, auto_check_enabled
 from runtime_services import ModelManager
 from platform_utils import icon_asset_name, platform_label, trigger_summary, system_high_contrast_enabled
 from recovery_session import RecoverySessionStore
@@ -664,6 +666,16 @@ class _SettingsWindow(PreferencesMixin, DictionaryMixin, HistoryMixin, Diagnosti
     def _high_contrast_enabled(self):
         return system_high_contrast_enabled()
 
+class _UpdateNotifier(QObject):
+    """Carries an update-check result from its worker thread to the Qt thread."""
+
+    found = Signal(object)
+
+
+UPDATE_FIRST_CHECK_MS = 60_000
+UPDATE_RECHECK_MS = 6 * 3600 * 1000
+
+
 class OverlayWindow:
 
     def __init__(self, paths=None, controller=None):
@@ -729,6 +741,10 @@ class OverlayWindow:
         self._web_channel = None
         self._ui_watchdog_timer = None
         self._ui_watchdog_stop = None
+        self._update_notifier = None
+        self._update_timer = None
+        self._update_action = None
+        self._update_check_running = False
 
     def set_actions(
         self,
@@ -837,6 +853,7 @@ class OverlayWindow:
         # ---- 托盘 ----
         try:
             self._setup_tray()
+            self._start_update_checks()
             self.window.hide()
         except Exception as e:
             print(f"[托盘] 启动失败: {e}", flush=True)
@@ -1013,6 +1030,74 @@ class OverlayWindow:
 
         self._tray.setContextMenu(self._tray_menu)
         self._tray.activated.connect(self._on_tray_activated)
+
+    # ============================================================
+    # 自动检查更新（设置 → 每天自动检查更新，默认开启）
+    # ============================================================
+
+    def _start_update_checks(self):
+        """Check for a newer release about a minute after start, then at most once a day.
+
+        Never on the recording path: the request runs on its own thread, reads only
+        the latest version number, and any failure is silent.
+        """
+        self._update_notifier = _UpdateNotifier()
+        self._update_notifier.found.connect(self._announce_update)
+        if self._tray is not None:
+            # The tray shows no other notifications, so a click always means the update.
+            self._tray.messageClicked.connect(self._open_update_page)
+        known = UpdateSchedule(self.paths.data_dir).available_version(APP_VERSION)
+        if known:
+            self._announce_update({"latest_version": known})
+        self._update_timer = QTimer()
+        self._update_timer.timeout.connect(self._maybe_check_for_update)
+        self._update_timer.start(UPDATE_RECHECK_MS)
+        QTimer.singleShot(UPDATE_FIRST_CHECK_MS, self._maybe_check_for_update)
+
+    def _maybe_check_for_update(self):
+        if self._update_check_running or not auto_check_enabled(self.paths.config_file):
+            return
+        schedule = UpdateSchedule(self.paths.data_dir)
+        if not schedule.due():
+            return
+        self._update_check_running = True
+        notifier = self._update_notifier
+
+        def run():
+            try:
+                result = check_latest_release(APP_VERSION)
+                if result.state in {"available", "up_to_date"}:
+                    schedule.record_check()
+                if result.state == "available":
+                    schedule.record_available(result.latest_version)
+                    notifier.found.emit(result.as_dict())
+            except Exception:
+                pass
+            finally:
+                self._update_check_running = False
+
+        threading.Thread(target=run, name="voiceflow-auto-update-check", daemon=True).start()
+
+    def _announce_update(self, result):
+        version = result.get("latest_version", "")
+        if not version or self._tray_menu is None:
+            return
+        if self._update_action is None:
+            self._update_action = QAction(self._tray_menu)
+            self._update_action.triggered.connect(self._open_update_page)
+            first = self._tray_menu.actions()[0] if self._tray_menu.actions() else None
+            self._tray_menu.insertAction(first, self._update_action)
+            self._tray_menu.insertSeparator(first)
+        self._update_action.setText(f"下载新版本 {version}")
+        schedule = UpdateSchedule(self.paths.data_dir)
+        if self._tray is not None and schedule.should_announce(version):
+            schedule.record_announced(version)
+            self._tray.showMessage("VoiceFlow 有新版本", f"{version} 已发布，点这里下载。")
+
+    def _open_update_page(self, *_args):
+        import webbrowser
+
+        webbrowser.open(DOWNLOAD_PAGE)
 
     def _setup_sentence_end_menu(self):
         self._sentence_end_menu = self._tray_menu.addMenu("句末标点 · 默认值")

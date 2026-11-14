@@ -575,6 +575,12 @@ nav a:hover{
 .download-section .button{
   margin-top:36px
 }
+.download-section .mirror-link{
+  display:flex;
+  justify-content:center;
+  margin-top:12px;
+  font-size:14px
+}
 .compatibility{
   margin-top:18px;
   font-size:12px;

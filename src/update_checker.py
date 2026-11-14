@@ -12,6 +12,12 @@ from urllib.request import Request, urlopen
 REPOSITORY = "qinxujunai/VoiceFlow"
 RELEASES_API = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 DOWNLOAD_ROOT = f"https://github.com/{REPOSITORY}/releases/download/"
+# Domestic mirror (Tencent Cloud COS, Shanghai). GitHub is often slow or
+# unreachable in mainland China; the mirror holds a small manifest and the
+# same installer bytes. It is read only when GitHub cannot be reached.
+MIRROR_ROOT = "https://media-1416754078.cos.ap-shanghai.myqcloud.com/voiceflow/"
+MIRROR_MANIFEST = f"{MIRROR_ROOT}latest.json"
+DOWNLOAD_PAGE = "https://qinxujunai.github.io/VoiceFlow/"
 VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 CHECKSUM_PATTERN = re.compile(r"^([0-9a-fA-F]{64})\s+[* ]?(.+?)\s*$")
 MAX_RESPONSE_BYTES = 1024 * 1024
@@ -72,6 +78,49 @@ def _invalid(current: str, message: str, latest: str = "") -> UpdateResult:
     )
 
 
+def _check_mirror(current: str, fetch_json) -> UpdateResult | None:
+    """Read the domestic manifest; None when it is missing or not trustworthy.
+
+    The manifest is ``{"version": "0.3.13", "installer_url": ..., "sha256": ...}``.
+    The installer must be the versioned file on GitHub Releases or under the
+    mirror's ``releases/v<version>/`` folder, with a 64-hex SHA-256 to compare.
+    """
+    try:
+        payload = fetch_json(MIRROR_MANIFEST)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    latest = str(payload.get("version", "")).removeprefix("v")
+    latest_tuple = _version(latest)
+    digest = str(payload.get("sha256", "")).lower()
+    url = str(payload.get("installer_url", ""))
+    installer = f"VoiceFlow-{latest}-Windows-x64.exe"
+    allowed = {
+        f"{DOWNLOAD_ROOT}v{latest}/{installer}",
+        f"{MIRROR_ROOT}releases/v{latest}/{installer}",
+    }
+    if latest_tuple is None or url not in allowed or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return None
+    if latest_tuple <= _version(current):
+        return UpdateResult(
+            state="up_to_date",
+            current_version=current,
+            latest_version=latest,
+            installer_url=url,
+            installer_sha256=digest,
+            message="已是最新稳定版本。",
+        )
+    return UpdateResult(
+        state="available",
+        current_version=current,
+        latest_version=latest,
+        installer_url=url,
+        installer_sha256=digest,
+        message="发现新版本。",
+    )
+
+
 def check_latest_release(
     current_version: str,
     *,
@@ -85,6 +134,9 @@ def check_latest_release(
     try:
         payload = fetch_json(RELEASES_API)
     except Exception as error:
+        mirrored = _check_mirror(current, fetch_json)
+        if mirrored is not None:
+            return mirrored
         return UpdateResult(
             state="unavailable",
             current_version=current,

@@ -32,7 +32,7 @@ So VoiceFlow runs entirely on your computer: no network delay; the final pass co
 
 | What matters during use | How VoiceFlow handles it |
 | --- | --- |
-| A connection or account? | Recording and recognition run locally. Dictate offline after installation, without signing in. |
+| A connection or account? | Recording and recognition run locally. Dictate offline after installation, without signing in. By default it checks for a new version once a day (version number only); turn this off in Settings. |
 | Automatic paste fails? | Final text is copied before paste is attempted. Press Ctrl+V; the old clipboard is not restored. |
 | The last sentence at stop? | Final recognition covers the complete stopped recording. Preview is feedback and cannot overwrite the final text. |
 | Recovering a result? | Final text is kept in local history; undelivered recordings have a local recovery path. |

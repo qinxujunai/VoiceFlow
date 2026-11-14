@@ -75,6 +75,21 @@ def test_trigger_mode_is_saved_in_the_same_transaction(transaction):
         save_settings_transaction(paths, store, payload)
 
 
+def test_auto_update_setting_is_saved_in_the_same_transaction(transaction):
+    from settings_store import save_settings_transaction
+
+    paths, store, payload, _autostart = transaction
+    payload["auto_update_check"] = False
+    result = save_settings_transaction(paths, store, payload)
+    saved = paths.config_file.read_text(encoding="utf-8")
+    assert result["auto_update_check"] is False
+    assert yaml.safe_load(saved)["updates"] == {"auto_check": False}
+    assert "# keep comments" in saved
+    payload["expected_config"], payload["auto_update_check"] = saved, "yes"
+    with pytest.raises(ValueError):
+        save_settings_transaction(paths, store, payload)
+
+
 def test_unified_save_commits_all_settings(transaction):
     from settings_store import save_settings_transaction
 

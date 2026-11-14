@@ -32,6 +32,9 @@ def save_settings_transaction(paths, preferences, payload):
     trigger_mode = payload.get("trigger_mode")
     if trigger_mode is not None and trigger_mode not in TRIGGER_MODES:
         raise ValueError("invalid trigger mode")
+    auto_update = payload.get("auto_update_check")
+    if auto_update is not None and not isinstance(auto_update, bool):
+        raise ValueError("invalid update setting")
     draft = payload["preferences"]
     if draft.get("schema_version") != 1 or not isinstance(draft.get("apps"), dict) or len(draft["apps"]) > 128:
         raise ValueError("invalid preferences schema")
@@ -48,6 +51,8 @@ def save_settings_transaction(paths, preferences, payload):
                    or config.get("audio", {}).get("device_index") != device)
         trigger_changed = (trigger_mode is not None
                            and (config.get("hotkeys") or {}).get("trigger_mode", "auto") != trigger_mode)
+        update_changed = (auto_update is not None
+                          and ((config.get("updates") or {}).get("auto_check", True) is not False) != auto_update)
         previous_autostart = is_autostart_enabled(paths)
         autostart_snapshot = read_autostart_state()
         try:
@@ -55,6 +60,8 @@ def save_settings_transaction(paths, preferences, payload):
                 update_runtime_settings(paths.config_file, engine=engine, language=language, device_index=device)
             if trigger_changed:
                 update_trigger_mode(paths.config_file, trigger_mode)
+            if update_changed:
+                update_auto_update_check(paths.config_file, auto_update)
             if enabled != previous_autostart:
                 set_autostart(paths, enabled)
             preferences._write(candidate)
@@ -79,6 +86,8 @@ def save_settings_transaction(paths, preferences, payload):
             preferences.load_error = False
         return {"restart_required": restart, "preferences": candidate,
                 "trigger_mode": trigger_mode or (config.get("hotkeys") or {}).get("trigger_mode", "auto"),
+                "auto_update_check": (auto_update if auto_update is not None
+                                      else (config.get("updates") or {}).get("auto_check", True) is not False),
                 "config_text": paths.config_file.read_text(encoding="utf-8")}
 
 
@@ -188,6 +197,35 @@ def update_trigger_mode(config_path: str | Path, mode: str) -> None:
         block = f"\n{replacement}" + block
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(text[:section.end()] + block + text[end:], encoding="utf-8")
+    os.replace(temporary, path)
+
+
+@_serialized_config_update
+def update_auto_update_check(config_path: str | Path, enabled: bool) -> None:
+    """Write updates.auto_check in place; add the section when an older config lacks it."""
+    if not isinstance(enabled, bool):
+        raise ValueError("invalid update setting")
+    path = Path(config_path)
+    text = path.read_text(encoding="utf-8")
+    replacement = f"  auto_check: {_yaml_scalar(enabled)}"
+    section = re.search(r"(?m)^updates:[ \t]*(?:#[^\n]*)?$", text)
+    if section:
+        next_top = re.search(r"(?m)^[^\s#][^:\n]*:[ \t]*(?:#[^\n]*)?$", text[section.end():])
+        end = section.end() + next_top.start() if next_top else len(text)
+        block, count = re.subn(
+            r"(?m)^  auto_check:\s*[^#\r\n]*(?P<comment>\s+#.*)?$",
+            lambda match: replacement + (match.group("comment") or ""),
+            text[section.end():end],
+            count=1,
+        )
+        if not count:
+            block = f"\n{replacement}" + block
+        text = text[:section.end()] + block + text[end:]
+    else:
+        separator = "" if text.endswith(("\n", "\r")) else "\n"
+        text = f"{text}{separator}\nupdates:\n{replacement}\n"
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
     os.replace(temporary, path)
 
 
